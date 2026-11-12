@@ -1,0 +1,9 @@
+{
+  "name": "watt-blitz",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "test": "node --test tests/core.test.mjs"
+  }
+}

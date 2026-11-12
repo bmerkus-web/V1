@@ -1,0 +1,12 @@
+{
+  "name": "Watt Blitz",
+  "short_name": "Watt Blitz",
+  "description": "Arcade-racen op je fietstrainer, met power-ups en vrienden.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#12032e",
+  "theme_color": "#12032e",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
