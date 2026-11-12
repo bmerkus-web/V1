@@ -2,6 +2,7 @@
 import { clamp } from './util.js';
 
 export const REF_FTP = 200; // referentie voor de eerlijke modus
+export const REF_KG = 75; // referentiegewicht voor watt per kilo
 const MASS = 82, INERTIA = 50, G = 9.81, RHO = 1.2, CDA = 0.32, CRR = 0.004;
 export const GRADE_FEEL = 0.5;
 

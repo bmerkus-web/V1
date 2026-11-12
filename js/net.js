@@ -89,6 +89,65 @@ async function peerTransport(code, isHost, cb) {
   };
 }
 
+// Gehost als Claude-artifact: daar is geen WebRTC, maar wel een "room" waarin iedereen die de
+// pagina open heeft elkaars aanwezigheid ziet. Alles loopt via dat aanwezigheidsobject:
+// `st` = laatste positie-update, `q` = korte wachtrij met gebeurtenissen [volgnr, aan, bericht].
+// Iedereen hoort iedereen rechtstreeks (mesh), dus de host hoeft niets door te sturen.
+async function roomTransport(code, isHost, cb) {
+  const api = await window.claude.use('room');
+  if (!api) throw new Error('Multiplayer is hier niet beschikbaar (log in bij Claude)');
+  const room = await api.join('wb-' + code.toLowerCase());
+  const me = isHost ? 'host' : 'c' + Math.random().toString(36).slice(2, 8);
+  const seen = new Map(); // id -> { q, st, peer }
+  let seq = 0, stN = 0, q = [], opened = false, closed = false;
+  const push = () => {
+    const now = Date.now();
+    q = q.filter((e) => now - e.at < 3000).slice(-14);
+    while (q.length > 1 && JSON.stringify(q.map((e) => e.m)).length > 2600) q.shift();
+    room.presence({ id: me, q: q.map((e) => [e.n, e.to, e.m]) }).catch(() => {});
+  };
+  const handle = (p) => {
+    const pr = p.presence || {}, id = pr.id;
+    if (p.sameTab || typeof id !== 'string' || id === me) return;
+    let s = seen.get(id);
+    if (!s) {
+      s = { q: 0, st: 0, peer: p.peer };
+      seen.set(id, s);
+      if (isHost) cb.peer(id);
+      else if (id === 'host' && !opened) { opened = true; cb.open(); }
+    }
+    if (Array.isArray(pr.q)) for (const e of pr.q) {
+      if (!Array.isArray(e) || !(e[0] > s.q)) continue;
+      s.q = e[0];
+      if ((e[1] == null || e[1] === me) && e[2] && typeof e[2] === 'object') cb.data(id, e[2]);
+    }
+    if (pr.st && pr.st.n !== s.st && pr.st.m) { s.st = pr.st.n; cb.data(id, pr.st.m); }
+  };
+  const off = room.onPeers((ch) => {
+    if (closed) return;
+    for (const p of ch.joined) handle(p);
+    for (const p of ch.updated) handle(p);
+    for (const p of ch.left) for (const [id, s] of seen) if (s.peer === p.peer) {
+      seen.delete(id);
+      if (isHost) cb.gone(id); else if (id === 'host') cb.gone('host');
+    }
+  }, () => { if (!closed) cb.gone('host'); });
+  const timer = setInterval(push, 1000);
+  push();
+  setTimeout(() => { if (isHost) cb.open(); }, 0);
+  if (!isHost) setTimeout(() => { if (!opened && !closed) cb.timeout?.(); }, 8000);
+  return {
+    mesh: true,
+    send(to, msg) {
+      if (closed) return;
+      if (msg.t === 'st') { room.presence({ st: { n: ++stN, m: msg } }).catch(() => {}); return; }
+      q.push({ n: ++seq, to: to || null, m: msg, at: Date.now() });
+      push();
+    },
+    close() { closed = true; clearInterval(timer); off(); room.leave().catch(() => {}); },
+  };
+}
+
 // Kamer: houdt de spelerslijst bij en routeert berichten.
 // Events: onRoster(players), onSettings(s), onStart(cfg), onGame(msg), onLobby(), onClosed(reden)
 export class Room {
@@ -115,7 +174,7 @@ export class Room {
         },
         peer: () => {},
         data: (from, msg) => {
-          this._seen.set(this.isHost ? from : 'host', Date.now());
+          if (this.isHost || from === 'host' || !this.t?.mesh) this._seen.set(this.isHost ? from : 'host', Date.now());
           if (msg.t === 'ping') return;
           if (!this.isHost && msg.t === 'welcome') { this.me.id = msg.id; done = true; resolve(); }
           if (!this.isHost && msg.t === 'full' && !done) { fail(msg.why); return; }
@@ -125,7 +184,8 @@ export class Room {
         error: fail,
         timeout: () => { if (!done) fail('Kamer niet gevonden'); },
       };
-      Promise.resolve(LOCAL ? bcTransport(this.code, this.isHost, cb) : peerTransport(this.code, this.isHost, cb))
+      const make = window.claude?.use ? roomTransport : LOCAL ? bcTransport : peerTransport;
+      Promise.resolve().then(() => make(this.code, this.isHost, cb))
         .then((t) => { this.t = t; }, (e) => fail(e.message));
       // Hartslag: zo merken we ook een weggevallen verbinding (wifi uit, tab dicht).
       this._beat = setInterval(() => {
@@ -154,11 +214,16 @@ export class Room {
       }
       const id = this._ids.get(from);
       if (!id) return;
-      // Doorsturen naar de andere spelers.
-      for (const [peer, pid] of this._ids) if (pid !== id) this.t.send(peer, msg);
+      // Doorsturen naar de andere spelers (bij mesh hoort iedereen elkaar al).
+      if (!this.t.mesh) for (const [peer, pid] of this._ids) if (pid !== id) this.t.send(peer, msg);
       this.onGame(msg);
       return;
     }
+    // Kamerberichten komen alleen van de host, en pas nadat we zijn toegelaten.
+    const lobbyMsg = ['welcome', 'full', 'roster', 'settings', 'start', 'lobby', 'left'].includes(msg.t);
+    if (lobbyMsg && this.t?.mesh && from !== 'host') return;
+    if (!this.me.id && msg.t !== 'welcome' && msg.t !== 'full') return;
+    if (msg.t === 'hello') return;
     switch (msg.t) {
       case 'welcome': break;
       case 'full': this.onClosed(msg.why); break;

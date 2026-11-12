@@ -4,7 +4,7 @@ const COLORS = ['#ff3fa4', '#39ffb0', '#7df9ff', '#ffd166', '#b28dff', '#ff7b1c'
 export { COLORS };
 
 const defaults = () => ({
-  profile: { name: 'Renner', color: COLORS[0], ftp: 200, fair: true, trainerFeel: 50, assist: true, music: true, sfx: true },
+  profile: { name: 'Renner', color: COLORS[0], ftp: 200, weight: 75, fair: true, trainerFeel: 50, assist: true, music: true, sfx: true },
   pr: { real: {}, demo: {} },
   power: {},
   stats: { km: 0, races: 0, wins: 0, xp: 0 },

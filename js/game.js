@@ -1,6 +1,6 @@
 // Race-logica: renners, items, bots, zones/PR's, spook en netwerk-synchronisatie.
 import { SEG } from './track.js';
-import { stepSpeed, fxMask, REF_FTP, FX } from './physics.js';
+import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
 import { submitTime, getTime, setGhost, submitPower, store, save } from './storage.js';
 
@@ -56,7 +56,7 @@ export class Race {
     this.ghostRider = this.ghost ? { id: 'ghost', name: 'PR', color: '#ffffff', kind: 'ghost', dist: -3, x: 0, v: 0, mask: 0, bolts: 0, cadence: 80 } : null;
     this.rec = [];
     this.recAt = 0;
-    this.stats = { sumP: 0, n: 0, maxP: 0, secs: [], secAcc: 0, secN: 0, secT: 0, best: { 5: 0, 60: 0, 300: 0 }, maxV: 0 };
+    this.stats = { sumP: 0, n: 0, maxP: 0, secs: [], secAcc: 0, secN: 0, secT: 0, best: { 5: 0, 60: 0, 300: 0 }, maxV: 0, sumHr: 0, nHr: 0, maxHr: 0 };
     this.launch = 0;
     this.netAt = 0;
     this.trainerGrade = 0;
@@ -75,7 +75,7 @@ export class Race {
       finished: false, finishTime: null, rank: i + 1, bell: 0, net: null,
     };
     if (r.kind === 'bot') {
-      const ref = this.profile.fair ? REF_FTP : this.profile.ftp;
+      const ref = this.profile.fair ? REF_FTP : (this.profile.ftp * REF_KG) / (this.profile.weight || REF_KG);
       rider.ai = {
         base: ref * (DIFFICULTY[this.difficulty] || 0.82) * (0.88 + 0.2 * (r.skill ?? 0.5)),
         ph: this.rng() * 10, lane: rider.x, tx: rider.x, think: 0, itemT: 0, laneT: 3 + this.rng() * 6,
@@ -102,6 +102,7 @@ export class Race {
     const inp = this.getPower(dt);
     me.power = inp.power;
     me.cadence = inp.cadence;
+    me.hr = inp.hr || 0;
 
     if (this.state === 'countdown') {
       this.countdown -= dt;
@@ -125,7 +126,8 @@ export class Race {
     this.time += dt;
 
     // Ik
-    const eff = this.profile.fair ? (me.power * REF_FTP) / Math.max(80, this.profile.ftp) : me.power;
+    // Eerlijk: vermogen t.o.v. FTP. Anders: watt per kilo (omgerekend naar een renner van 75 kg).
+    const eff = this.profile.fair ? (me.power * REF_FTP) / Math.max(80, this.profile.ftp) : (me.power * REF_KG) / clamp(this.profile.weight || REF_KG, 40, 150);
     if (me.finished) this._stepLocal(me, 110, clamp(-me.x * 2, -1, 1), dt, true);
     else {
       this._stepLocal(me, eff, this.getSteer(dt), dt, false);
@@ -239,6 +241,7 @@ export class Race {
   _meProgress(dt) {
     const me = this.me, st = this.stats, L = this.L, id = this.track.id;
     st.sumP += me.power; st.n++;
+    if (me.hr > 0) { st.sumHr += me.hr; st.nHr++; st.maxHr = Math.max(st.maxHr, me.hr); }
     st.maxP = Math.max(st.maxP, me.power);
     st.maxV = Math.max(st.maxV, me.v);
     st.secAcc += me.power; st.secN++; st.secT += dt;

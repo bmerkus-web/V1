@@ -23,12 +23,14 @@
         <label>Naam <input id="p-name" maxlength="14" autocomplete="off"></label>
         <div class="row"><span>Kleur</span><div id="p-colors" class="chips"></div></div>
         <label>FTP (watt) <input id="p-ftp" type="number" min="80" max="500" step="5"></label>
+        <label>Gewicht (kg) <input id="p-weight" type="number" min="40" max="150" step="1"></label>
         <p class="small" id="p-level"></p>
       </div>
       <div class="card">
         <h2>Apparaten</h2>
         <button id="b-trainer" class="dev"><b>🚴 Trainer</b><span id="st-trainer">Niet verbonden</span></button>
         <button id="b-sterzo" class="dev"><b>🎮 Sterzo-stuur</b><span id="st-sterzo">Niet verbonden</span></button>
+        <button id="b-hr" class="dev"><b>❤️ Hartslagmeter</b><span id="st-hr">Niet verbonden</span></button>
         <button id="b-center" class="ghost hidden">Stuur recht zetten (C)</button>
         <p class="small" id="ble-note">Zonder trainer speel je in demo-modus: ↑ = trappen, Shift = sprint, ←/→ = sturen.</p>
       </div>
@@ -55,9 +57,11 @@
     <div id="tracks" class="tracks"></div>
     <div class="card opts">
       <label>Rondes <select id="o-laps"><option>1</option><option selected>2</option><option>3</option><option>5</option></select></label>
-      <label>Bots <select id="o-bots"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
-      <label>Niveau bots <select id="o-diff"><option>makkelijk</option><option selected>normaal</option><option>zwaar</option><option>beul</option></select></label>
+      <label class="check"><input id="o-botson" type="checkbox"> Bots toevoegen</label>
+      <label id="o-bots-l">Aantal <select id="o-bots"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
+      <label id="o-diff-l">Niveau bots <select id="o-diff"><option>makkelijk</option><option selected>normaal</option><option>zwaar</option><option>beul</option></select></label>
       <label class="check"><input id="o-fair" type="checkbox"> Eerlijk (vermogen t.o.v. FTP)</label>
+      <p class="small" id="o-fair-note"></p>
       <label class="check" id="o-ghost-l"><input id="o-ghost" type="checkbox" checked> Spook van mijn PR</label>
     </div>
     <div class="menu">
@@ -97,7 +101,7 @@
   <section id="s-help" class="screen hidden">
     <h2>Uitleg</h2>
     <div class="card help">
-      <p><b>Trappen = gas.</b> Je watts bepalen je snelheid. In de eerlijke modus telt je vermogen t.o.v. je FTP, zodat vrienden van verschillend niveau samen kunnen racen.</p>
+      <p><b>Trappen = gas.</b> Je watts bepalen je snelheid. In de eerlijke modus telt je vermogen t.o.v. je FTP, zodat vrienden van verschillend niveau samen kunnen racen. Staat die uit, dan telt je watt per kilo: een lichte en een zware renner met hetzelfde aantal W/kg zijn even snel.</p>
       <p><b>Sturen</b> met je Sterzo (of ←/→, of de knoppen op het scherm). Pak <b>?-boxen</b> voor power-ups, <b>⚡boutjes</b> voor topsnelheid (max 10) en rijd over <b>turbostroken</b>.</p>
       <p><b>Power-up gebruiken:</b> spatie / Enter / 1, of tik op het vakje. <b>B</b> = bel. <b>C</b> = stuur recht zetten. <b>M</b> = muziek. <b>F</b> = volledig scherm. <b>Esc</b> = pauze.</p>
       <div id="help-items" class="items"></div>
@@ -116,6 +120,7 @@
   <div class="h-bl">
     <div id="h-watt">0<small>W</small></div>
     <div class="h-sub"><span id="h-spd">0</span> km/u · <span id="h-cad">0</span> rpm · <span id="h-grade">0</span>%</div>
+    <div id="h-hr" class="hidden">❤ <span id="h-hr-v">0</span></div>
     <div id="h-draft" class="hidden">💨 SLIPSTREAM</div>
   </div>
   <div class="h-br">

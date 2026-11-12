@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #12032e; --panel: rgba(24, 12, 58, .88); --line: rgba(125, 249, 255, .25);
   --pink: #ff3fa4; --cyan: #7df9ff; --green: #39ffb0; --gold: #ffd166; --text: #f5f5ff; --dim: #a9a3c9;
 }
@@ -9,7 +10,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 /* ---------- menu ---------- */
-#ui { position: fixed; inset: 0; overflow-y: auto; padding: 16px;
+#ui { position: fixed; inset: 0; overflow-y: auto; padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   background: radial-gradient(ellipse at 50% 0%, rgba(255, 63, 164, .25), transparent 60%), linear-gradient(#12032e, #1d0a45 60%, #0a2a3a); }
 #ui.ingame { display: none; }
 .screen { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 30px; }
@@ -47,7 +48,8 @@ button { font: inherit; color: var(--text); cursor: pointer; border: 0; border-r
 .track.sel { border-color: var(--pink); box-shadow: 0 0 18px rgba(255, 63, 164, .5); }
 .track b { font-size: 18px; font-style: italic; } .track canvas { width: 100%; height: 54px; border-radius: 8px; }
 .track .pr { color: var(--gold); font-size: 13px; font-weight: 700; }
-.opts { flex-direction: row; flex-wrap: wrap; gap: 14px 24px; }
+.opts { flex-direction: row; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
+.opts .small { flex-basis: 100%; }
 .code { font-size: 30px; letter-spacing: 6px; font-weight: 900; color: var(--gold); text-transform: uppercase; }
 input.code { width: 150px; text-align: center; }
 .players { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -76,6 +78,7 @@ tr.me td { color: var(--gold); font-weight: 800; }
 .h-bl { left: 14px; bottom: 64px; }
 #h-watt { font-size: clamp(48px, 11vh, 96px); line-height: .9; } #h-watt small { font-size: .35em; color: var(--cyan); margin-left: 4px; }
 .h-sub { font-size: clamp(14px, 2.8vh, 20px); font-style: normal; font-weight: 700; }
+#h-hr { color: #ff6b8b; font-size: clamp(20px, 4vh, 32px); }
 #h-draft { color: var(--cyan); font-size: clamp(14px, 2.6vh, 18px); }
 .h-br { right: 14px; bottom: 64px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 #h-bolts { font-size: clamp(18px, 3.6vh, 28px); color: var(--gold); }

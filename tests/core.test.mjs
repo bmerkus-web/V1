@@ -85,3 +85,15 @@ test('Items: vuurpijl raakt de voorganger, schild blokt', () => {
   assert.equal(first.fx.shield, 0);
   assert.equal(first.fx.slow, 0);
 });
+
+test('Hartslagmeting: 8- en 16-bits', async () => {
+  const { parseHeartRate } = await import('../js/ble.js');
+  assert.equal(parseHeartRate(dv([0x00, 142])), 142);
+  assert.equal(parseHeartRate(dv([0x01, 0x2c, 0x01])), 300);
+});
+
+test('Watt per kilo: zwaardere renner is trager bij gelijk vermogen', () => {
+  const light = simulate({ fair: false, weight: 65, bots: 0, useItems: false }).results[0].time;
+  const heavy = simulate({ fair: false, weight: 90, bots: 0, useItems: false }).results[0].time;
+  assert.ok(heavy > light * 1.05, `${light} vs ${heavy}`);
+});

@@ -7,13 +7,15 @@ Het is een web-app zonder installatie: hij draait in **Chrome op een Android-tab
 ## Wat zit erin
 
 - **Trainer als gaspedaal** – Wahoo KICKR Core (en elke andere trainer met FTMS of Cycling Power). De trainer voelt klimmetjes, en wordt even zwaarder als je geraakt wordt.
+- **Hartslagmeter** – koppel een Bluetooth-hartslagband en zie je hartslag tijdens de race en in de uitslag.
 - **Echt sturen** met de Elite Sterzo Smart. Zonder Sterzo: pijltjestoetsen of knoppen op het scherm.
 - **6 power-ups** – Turbo, Schild, Vuurpijl, Lijmklodder, Magneet en Tegenwind. Wie achteraan rijdt krijgt de sterkste.
 - **Boutjes, turbostroken, slipstream en raketstart.**
 - **3 banen** – Neon Polder (vlak), Vulkaanpas (lange klim) en Kosmodroom (bochtig, steile muur).
 - **Solo** – tot 5 bots op vier niveaus, PR's voor sprints, klimmen, rondes en races, een spook van je beste race, vermogensrecords (5 s / 1 min / 5 min) en levels.
 - **Multiplayer** – tot 6 renners via een kamercode van 4 letters; lege plekken vul je met bots.
-- **Eerlijke modus** – vermogen telt t.o.v. ieders FTP, zodat verschillende niveaus samen kunnen racen.
+- **Eerlijke modus** – vermogen telt t.o.v. ieders FTP, zodat verschillende niveaus samen kunnen racen. Staat die uit, dan telt watt per kilo.
+- **Bots aan of uit** – per race te kiezen, solo en in een kamer.
 
 ## Spelen
 
@@ -66,6 +68,8 @@ js/ble.js                KICKR (FTMS/CPS) en Sterzo
 js/net.js                kamers via PeerJS
 tests/                   `npm test`
 ```
+
+Een versie voor Claude-artifacts (één bestand, multiplayer via de `room` van het artifact) bouw je met `node tools/build-artifact.mjs <esbuild> <map>`.
 
 Meerdere spelers testen op één computer: open `http://localhost:8080/?net=local` in een paar tabbladen.
 

@@ -43,6 +43,10 @@ export function parseCyclingPower(dv, prev) {
   return out;
 }
 
+export function parseHeartRate(dv) {
+  return dv.getUint8(0) & 1 ? dv.getUint16(1, true) : dv.getUint8(1);
+}
+
 export function simParamsCommand(gradePct, crr = 0.004, cw = 0.51) {
   const b = new DataView(new ArrayBuffer(7));
   b.setUint8(0, 0x11);
@@ -166,6 +170,28 @@ export class Trainer extends Device {
     this._lastGradeAt = now;
     this._write(simParamsCommand(g));
   }
+}
+
+export class HeartRate extends Device {
+  constructor() {
+    super();
+    this.bpm = 0;
+    this.lastData = 0;
+  }
+  async connect() {
+    await this._open({ filters: [{ services: [0x180d] }] });
+  }
+  async _setup(server) {
+    const svc = await server.getPrimaryService(0x180d);
+    const ch = await svc.getCharacteristic(0x2a37);
+    ch.addEventListener('characteristicvaluechanged', (e) => {
+      this.bpm = parseHeartRate(e.target.value);
+      this.lastData = performance.now();
+    });
+    await ch.startNotifications();
+  }
+  // Actuele hartslag, of 0 als er (even) geen meting is.
+  get value() { return this.connected && performance.now() - this.lastData < 5000 ? this.bpm : 0; }
 }
 
 let codesPromise = null;
