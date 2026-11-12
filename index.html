@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#12032e">
+<title>Watt Blitz</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- ============ MENU'S ============ -->
+<div id="ui">
+  <section id="s-home" class="screen">
+    <h1 class="logo">WATT<span>BLITZ</span><i>⚡</i></h1>
+    <p class="tag">Trap hard. Stuur slim. Pak de power-ups.</p>
+    <div class="cols">
+      <div class="card">
+        <h2>Renner</h2>
+        <label>Naam <input id="p-name" maxlength="14" autocomplete="off"></label>
+        <div class="row"><span>Kleur</span><div id="p-colors" class="chips"></div></div>
+        <label>FTP (watt) <input id="p-ftp" type="number" min="80" max="500" step="5"></label>
+        <label>Gewicht (kg) <input id="p-weight" type="number" min="40" max="150" step="1"></label>
+        <p class="small" id="p-level"></p>
+      </div>
+      <div class="card">
+        <h2>Apparaten</h2>
+        <button id="b-trainer" class="dev"><b>🚴 Trainer</b><span id="st-trainer">Niet verbonden</span></button>
+        <button id="b-sterzo" class="dev"><b>🎮 Sterzo-stuur</b><span id="st-sterzo">Niet verbonden</span></button>
+        <button id="b-hr" class="dev"><b>❤️ Hartslagmeter</b><span id="st-hr">Niet verbonden</span></button>
+        <button id="b-center" class="ghost hidden">Stuur recht zetten (C)</button>
+        <p class="small" id="ble-note">Zonder trainer speel je in demo-modus: ↑ = trappen, Shift = sprint, ←/→ = sturen.</p>
+      </div>
+    </div>
+    <div class="menu">
+      <button id="b-solo" class="big">Solo race</button>
+      <button id="b-host" class="big alt">Kamer maken</button>
+      <button id="b-join" class="big alt">Meedoen</button>
+    </div>
+    <div class="menu">
+      <button id="b-records" class="ghost">🏆 Records</button>
+      <button id="b-settings" class="ghost">⚙️ Instellingen</button>
+      <button id="b-help" class="ghost">❓ Uitleg</button>
+    </div>
+  </section>
+
+  <section id="s-setup" class="screen hidden">
+    <h2 id="setup-title">Solo race</h2>
+    <div id="lobby-box" class="card hidden">
+      <div class="row"><span>Kamercode</span><b id="room-code" class="code"></b><button id="b-copy" class="ghost">Link kopiëren</button></div>
+      <div id="players" class="players"></div>
+      <p class="small" id="lobby-note"></p>
+    </div>
+    <div id="tracks" class="tracks"></div>
+    <div class="card opts">
+      <label>Rondes <select id="o-laps"><option>1</option><option selected>2</option><option>3</option><option>5</option></select></label>
+      <label class="check"><input id="o-botson" type="checkbox"> Bots toevoegen</label>
+      <label id="o-bots-l">Aantal <select id="o-bots"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
+      <label id="o-diff-l">Niveau bots <select id="o-diff"><option>makkelijk</option><option selected>normaal</option><option>zwaar</option><option>beul</option></select></label>
+      <label class="check"><input id="o-fair" type="checkbox"> Eerlijk (vermogen t.o.v. FTP)</label>
+      <p class="small" id="o-fair-note"></p>
+      <label class="check" id="o-ghost-l"><input id="o-ghost" type="checkbox" checked> Spook van mijn PR</label>
+    </div>
+    <div class="menu">
+      <button id="b-back" class="ghost">← Terug</button>
+      <button id="b-start" class="big">START</button>
+    </div>
+  </section>
+
+  <section id="s-join" class="screen hidden">
+    <h2>Meedoen</h2>
+    <div class="card">
+      <label>Kamercode <input id="j-code" maxlength="4" class="code" autocomplete="off" autocapitalize="characters"></label>
+      <p class="small" id="j-msg"></p>
+    </div>
+    <div class="menu"><button class="ghost" data-go="home">← Terug</button><button id="b-dojoin" class="big">Verbinden</button></div>
+  </section>
+
+  <section id="s-records" class="screen hidden">
+    <h2>Records</h2>
+    <div class="row"><select id="r-ns"><option value="real">Met trainer</option><option value="demo">Demo-modus</option></select></div>
+    <div id="records" class="cols"></div>
+    <div class="menu"><button class="ghost" data-go="home">← Terug</button></div>
+  </section>
+
+  <section id="s-settings" class="screen hidden">
+    <h2>Instellingen</h2>
+    <div class="card">
+      <label>Trainer-gevoel helling <input id="p-feel" type="range" min="0" max="100" step="10"><b id="p-feel-v"></b></label>
+      <p class="small">Hoe sterk je KICKR klimmetjes laat voelen. 0% = altijd vlak, 100% = de echte helling.</p>
+      <label class="check"><input id="p-assist" type="checkbox"> Stuurhulp in bochten</label>
+      <label class="check"><input id="p-music" type="checkbox"> Muziek</label>
+      <label class="check"><input id="p-sfx" type="checkbox"> Geluidseffecten</label>
+    </div>
+    <div class="menu"><button class="ghost" data-go="home">← Terug</button></div>
+  </section>
+
+  <section id="s-help" class="screen hidden">
+    <h2>Uitleg</h2>
+    <div class="card help">
+      <p><b>Trappen = gas.</b> Je watts bepalen je snelheid. In de eerlijke modus telt je vermogen t.o.v. je FTP, zodat vrienden van verschillend niveau samen kunnen racen. Staat die uit, dan telt je watt per kilo: een lichte en een zware renner met hetzelfde aantal W/kg zijn even snel.</p>
+      <p><b>Sturen</b> met je Sterzo (of ←/→, of de knoppen op het scherm). Pak <b>?-boxen</b> voor power-ups, <b>⚡boutjes</b> voor topsnelheid (max 10) en rijd over <b>turbostroken</b>.</p>
+      <p><b>Power-up gebruiken:</b> spatie / Enter / 1, of tik op het vakje. <b>B</b> = bel. <b>C</b> = stuur recht zetten. <b>M</b> = muziek. <b>F</b> = volledig scherm. <b>Esc</b> = pauze.</p>
+      <div id="help-items" class="items"></div>
+      <p><b>Slipstream:</b> rijd vlak achter iemand voor minder luchtweerstand. <b>Raketstart:</b> trap boven 120% FTP als het aftellen eindigt.</p>
+      <p><b>Solo:</b> jaag op PR's voor sprints, klimmen, rondes en hele races – je beste race rijdt als spook met je mee.</p>
+    </div>
+    <div class="menu"><button class="ghost" data-go="home">← Terug</button></div>
+  </section>
+</div>
+
+<!-- ============ HUD ============ -->
+<div id="hud" class="hidden">
+  <div class="h-tl"><div id="h-pos">1<small>/6</small></div><div id="h-lap"></div></div>
+  <div class="h-tc"><div id="h-time">0:00.0</div><div id="h-delta"></div><div id="h-zone" class="hidden"></div></div>
+  <div class="h-tr"><div id="h-rank"></div><div id="h-feed"></div></div>
+  <div class="h-bl">
+    <div id="h-watt">0<small>W</small></div>
+    <div class="h-sub"><span id="h-spd">0</span> km/u · <span id="h-cad">0</span> rpm · <span id="h-grade">0</span>%</div>
+    <div id="h-hr" class="hidden">❤ <span id="h-hr-v">0</span></div>
+    <div id="h-draft" class="hidden">💨 SLIPSTREAM</div>
+  </div>
+  <div class="h-br">
+    <div id="h-bolts">⚡ 0</div>
+    <button id="h-item"><span id="h-item-i"></span><small id="h-item-n">spatie</small></button>
+  </div>
+  <div class="h-bc"><canvas id="h-prof" width="600" height="46"></canvas><div id="h-dots"></div></div>
+  <div id="h-banner"></div>
+  <div id="h-count"></div>
+  <button id="t-left" class="touch">◀</button>
+  <button id="t-right" class="touch">▶</button>
+  <button id="t-pedal" class="touch">TRAP</button>
+  <button id="h-menu" aria-label="Pauze">II</button>
+</div>
+
+<div id="overlay" class="hidden"><div class="card" id="overlay-card"></div></div>
+<div id="toast" class="hidden"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
