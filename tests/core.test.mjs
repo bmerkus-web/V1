@@ -124,3 +124,20 @@ test('Zwift-knoppen: Play, Click en Ride', async () => {
   // Onbekend type (bv. batterij) wordt genegeerd
   assert.equal(parseZwiftPad(u(0x19, 0x10, 80)), null);
 });
+
+test('TCX-export: geldig bestand met vermogen, hartslag en afstand', async () => {
+  const { buildTcx, tcxFilename } = await import('../js/export.js');
+  const { race } = simulate({ laps: 1, bots: 0, useItems: false });
+  assert.ok(race.startedAt > 0);
+  const log = race.stats.log;
+  assert.ok(log.length > 300 && log[log.length - 1][1] > 3900);
+  log[10][4] = 150;
+  const tcx = buildTcx({ startedAt: Date.UTC(2026, 0, 2, 3, 4, 5), log, name: 'Test <&>' });
+  assert.equal((tcx.match(/<Trackpoint>/g) || []).length, log.length);
+  assert.ok(tcx.includes('<Id>2026-01-02T03:04:05Z</Id>'));
+  assert.ok(tcx.includes('<ns3:Watts>184</ns3:Watts>'));
+  assert.ok(tcx.includes('<HeartRateBpm><Value>150</Value></HeartRateBpm>'));
+  assert.ok(!tcx.includes('Test <&>'));
+  assert.match(tcxFilename(Date.now()), /^watt-blitz-\d{8}-\d{4}\.tcx$/);
+  assert.equal(buildTcx({ startedAt: 0, log: [], name: '' }), null);
+});

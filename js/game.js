@@ -56,7 +56,7 @@ export class Race {
     this.ghostRider = this.ghost ? { id: 'ghost', name: 'PR', color: '#ffffff', kind: 'ghost', dist: -3, x: 0, v: 0, mask: 0, bolts: 0, cadence: 80 } : null;
     this.rec = [];
     this.recAt = 0;
-    this.stats = { sumP: 0, n: 0, maxP: 0, secs: [], secAcc: 0, secN: 0, secT: 0, best: { 5: 0, 60: 0, 300: 0 }, maxV: 0, sumHr: 0, nHr: 0, maxHr: 0 };
+    this.stats = { sumP: 0, n: 0, maxP: 0, secs: [], secAcc: 0, secN: 0, secT: 0, best: { 5: 0, 60: 0, 300: 0 }, maxV: 0, sumHr: 0, nHr: 0, maxHr: 0, log: [] };
     this.launch = 0;
     this.netAt = 0;
     this.trainerGrade = 0;
@@ -112,6 +112,7 @@ export class Race {
       this._lastCount = c;
       if (this.countdown <= 0) {
         this.state = 'race';
+        this.startedAt = Date.now();
         this.emit('go');
         if (this.launch > this.profile.ftp * 1.2) {
           me.fx.boost = 2.5;
@@ -247,6 +248,8 @@ export class Race {
     st.secAcc += me.power; st.secN++; st.secT += dt;
     if (st.secT >= 1) {
       st.secs.push(st.secAcc / st.secN);
+      // Rit-logboek (1x per seconde) voor de export naar Strava e.d.
+      st.log.push([Math.round(this.time * 10) / 10, Math.max(0, me.dist), st.secAcc / st.secN, me.cadence, me.hr, me.v, this.track.yAt(me.dist)]);
       st.secAcc = st.secN = 0; st.secT -= 1;
       for (const w of [5, 60, 300]) {
         if (st.secs.length < w) continue;

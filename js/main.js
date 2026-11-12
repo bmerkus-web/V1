@@ -8,6 +8,7 @@ import { audio } from './audio.js';
 import { store, save, COLORS, getTime, getGhost, levelOf } from './storage.js';
 import { Room, makeCode } from './net.js';
 import { fmtTime, fmtDelta, clamp, mod } from './util.js';
+import { buildTcx, tcxFilename } from './export.js';
 
 const $ = (id) => document.getElementById(id);
 const P = store.profile;
@@ -348,6 +349,25 @@ function quitToMenu() {
 function overlay(html) { $('overlay-card').innerHTML = html; $('overlay').classList.remove('hidden'); }
 function hideOverlay() { $('overlay').classList.add('hidden'); clearInterval(resultsTimer); }
 
+// Rit als .tcx-bestand opslaan; dat bestand kun je bij Strava uploaden.
+const SAVE_BTN = '<button class="ghost" id="ov-save">💾 Rit opslaan voor Strava</button>';
+const canSave = (r) => r.ns === 'real' && r.stats.log.length > 5;
+function wireSave(r) {
+  const b = $('ov-save');
+  if (!b) return;
+  b.onclick = () => {
+    const tcx = buildTcx({ startedAt: r.startedAt, log: r.stats.log, name: `Watt Blitz – ${r.track.name}` });
+    if (!tcx) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([tcx], { type: 'application/vnd.garmin.tcx+xml' }));
+    a.download = tcxFilename(r.startedAt);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    b.outerHTML = '<p class="small" id="ov-saved">Opgeslagen in je downloads. Upload het bestand op <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a>.</p>';
+    r.saved = true;
+  };
+}
+
 function togglePause() {
   if (!race || race.state === 'done') return;
   if (!$('overlay').classList.contains('hidden')) { paused = false; hideOverlay(); return; }
@@ -355,7 +375,8 @@ function togglePause() {
   overlay(`<h2>${room ? 'Race verlaten?' : 'Pauze'}</h2><div class="menu">
     <button class="big" id="ov-resume">Verder rijden</button>
     ${room ? '' : '<button class="ghost" id="ov-restart">Opnieuw</button>'}
-    <button class="ghost" id="ov-quit">Stoppen</button></div>`);
+    <button class="ghost" id="ov-quit">Stoppen</button></div>${canSave(race) ? '<div class="menu">' + SAVE_BTN + '</div>' : ''}`);
+  wireSave(race);
   $('ov-resume').onclick = () => { paused = false; hideOverlay(); };
   if (!room) $('ov-restart').onclick = () => startRace({ ...lastCfg, seed: (Math.random() * 1e9) | 0 });
   $('ov-quit').onclick = quitToMenu;
@@ -382,11 +403,13 @@ function showResults() {
         <div><b>${(st.maxV * 3.6).toFixed(0)}</b>km/u top</div>${st.nHr ? `<div><b>${Math.round(st.sumHr / st.nHr)}</b>❤ gemiddeld</div><div><b>${st.maxHr}</b>❤ max</div>` : ''}<div><b>${Math.round((avgP * me.finishTime) / 1000)} kJ</b>arbeid</div>
       </div>
       ${r.ns === 'demo' ? '<p class="small">Demo-modus: tijden tellen apart van je trainer-records.</p>' : ''}
+      ${canSave(r) ? '<div class="menu">' + (r.saved ? '<p class="small">Rit opgeslagen. Upload het bestand op <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a>.</p>' : SAVE_BTN) + '</div>' : ''}
       <div class="menu">${room ? (room.isHost ? '<button class="big" id="ov-lobby">Terug naar kamer</button>' : '<p class="small">Wacht op de host voor de volgende race…</p><button class="ghost" id="ov-quit">Verlaten</button>')
         : '<button class="big" id="ov-again">Nog een keer</button><button class="ghost" id="ov-quit">Menu</button>'}</div>`);
     if ($('ov-lobby')) $('ov-lobby').onclick = quitToMenu;
     if ($('ov-again')) $('ov-again').onclick = () => startRace({ ...lastCfg, seed: (Math.random() * 1e9) | 0 });
     if ($('ov-quit')) $('ov-quit').onclick = quitToMenu;
+    wireSave(r);
   };
   render();
   clearInterval(resultsTimer);

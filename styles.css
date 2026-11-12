@@ -28,6 +28,7 @@ input, select { font: inherit; color: var(--text); background: #0d0626; border: 
 input[type=number] { width: 90px; } input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--pink); }
 input[type=range] { flex: 1; accent-color: var(--pink); padding: 0; }
 input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.small a { color: var(--cyan); }
 .small { font-size: 13px; color: var(--dim); margin: 0; font-weight: 400; }
 button { font: inherit; color: var(--text); cursor: pointer; border: 0; border-radius: 12px; padding: 10px 16px; font-weight: 800; }
 .big { background: linear-gradient(135deg, var(--pink), #6a2bff); font-size: 20px; font-style: italic; padding: 14px 28px; flex: 1; min-width: 150px;
