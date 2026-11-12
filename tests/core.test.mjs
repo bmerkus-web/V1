@@ -115,7 +115,12 @@ test('Zwift-knoppen: Play, Click en Ride', async () => {
   assert.equal(parseZwiftPad(u(0x37, 0x08, 0, 0x10, 0)).item, true);
   // Ride: alle bits aan = niets ingedrukt; bit 0x1 uit = links
   assert.deepEqual(parseZwiftPad(u(0x23, 0x08, 0xff, 0xff, 0x0f)), { left: 0, right: 0, item: false, bell: false });
-  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xfe, 0xff, 0x0f)).left, 1);
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xfe, 0xff, 0x0f)).left, 1); // pijl links
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xef, 0xff, 0x0f)).right, 1); // A (0x10) = rechts sturen
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xff, 0xfe, 0x0f)).left, 1); // Z (0x80) = links sturen
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xbf, 0xff, 0x0f)).item, true); // Y (0x40)
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xff, 0xdf, 0x0f)).item, true); // + (0x1000)
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xdf, 0xff, 0x0f)).bell, true); // B (0x20)
   // Onbekend type (bv. batterij) wordt genegeerd
   assert.equal(parseZwiftPad(u(0x19, 0x10, 80)), null);
 });

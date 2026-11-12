@@ -201,8 +201,8 @@ const ZWIFT_ASYNC = '00000002-19ca-4651-86e5-fa29dcdd09d1';
 const ZWIFT_RX = '00000003-19ca-4651-86e5-fa29dcdd09d1';
 const ZWIFT_TX = '00000004-19ca-4651-86e5-fa29dcdd09d1';
 const RIDE_BITS = {
-  left: 0x1, up: 0x2, right: 0x4, down: 0x8, a: 0x10, b: 0x20, y: 0x40, z: 0x100,
-  shiftL: 0x200 | 0x400, powerup: 0x800 | 0x10000, shiftR: 0x2000 | 0x4000,
+  left: 0x1, up: 0x2, right: 0x4, down: 0x8, a: 0x10, b: 0x20, y: 0x40, z: 0x80,
+  shiftUpL: 0x100, shiftDnL: 0x200, powerL: 0x400, shiftUpR: 0x1000, shiftDnR: 0x2000, powerR: 0x4000,
 };
 
 function pbFields(bytes) {
@@ -251,11 +251,13 @@ export function parseZwiftPad(bytes) {
     else { out.right = plus ? 1 : 0; out.left = minus ? 1 : 0; }
   } else { // Zwift Ride / Click v2: bitmasker, 0 = ingedrukt
     if (!m.has(1)) return null;
-    const map = m.get(1), p = (k) => (map & RIDE_BITS[k]) !== RIDE_BITS[k];
-    out.left = p('left') || p('shiftL') ? 1 : 0;
-    out.right = p('right') || p('shiftR') ? 1 : 0;
-    out.item = p('up') || p('a') || p('z') || p('powerup');
-    out.bell = p('down') || p('y') || p('b');
+    // Elk knopje werkt ook los: links ←/→ sturen, ↑ power-up, ↓ bel;
+    // rechts Z/A sturen, Y power-up, B bel. De −/+ eronder zijn ook power-up.
+    const map = m.get(1), p = (k) => (map & RIDE_BITS[k]) === 0;
+    out.left = p('left') || p('z') ? 1 : 0;
+    out.right = p('right') || p('a') ? 1 : 0;
+    out.item = p('up') || p('y') || p('shiftUpL') || p('shiftDnL') || p('shiftUpR') || p('shiftDnR') || p('powerL') || p('powerR');
+    out.bell = p('down') || p('b');
     for (const [f, v] of fields) {
       if (f !== 3 || typeof v === 'number') continue;
       const pm = new Map(pbFields(v)), val = Math.min(1, Math.abs(zigzag(pm.get(2) || 0)) / 100);
@@ -280,14 +282,20 @@ export class ZwiftPad extends Device {
     let svc;
     try { svc = await server.getPrimaryService(ZWIFT_SVC_RIDE); } catch (e) { svc = await server.getPrimaryService(ZWIFT_SVC); }
     const [async_, rx, tx] = await Promise.all([svc.getCharacteristic(ZWIFT_ASYNC), svc.getCharacteristic(ZWIFT_RX), svc.getCharacteristic(ZWIFT_TX)]);
-    async_.addEventListener('characteristicvaluechanged', (e) => {
-      const v = e.target.value;
-      const a = parseZwiftPad(new Uint8Array(v.buffer, v.byteOffset, v.byteLength));
-      if (a) this.onpad(a);
-    });
+    const hello = () => rx.writeValueWithoutResponse(new TextEncoder().encode('RideOn')).catch(() => {});
+    let lastHello = 0;
+    const onData = (e) => {
+      const v = e.target.value, bytes = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+      // De Click v2 meldt na een tijdje dat hij stopt (0xff ...); dan melden we ons opnieuw aan.
+      if (bytes[0] === 0xff && performance.now() - lastHello > 2000) { lastHello = performance.now(); hello(); return; }
+      const a = parseZwiftPad(bytes);
+      if (a) { this.lastData = performance.now(); this.onpad(a); }
+    };
+    async_.addEventListener('characteristicvaluechanged', onData);
+    tx.addEventListener('characteristicvaluechanged', onData);
     await async_.startNotifications();
     await tx.startNotifications().catch(() => {});
-    await rx.writeValueWithoutResponse(new TextEncoder().encode('RideOn'));
+    await hello();
   }
 }
 
