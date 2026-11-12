@@ -4,6 +4,7 @@ import { clamp } from './util.js';
 const keys = new Set();
 const pressed = new Set(); // eenmalige acties sinds de vorige frame
 const touch = { left: false, right: false, pedal: false };
+const pads = new Map(); // externe knoppen (Zwift): bron -> { left, right }
 let kbSteer = 0;
 let demoPower = 0;
 
@@ -32,12 +33,15 @@ export function bindTouch(el, name) {
 export const input = {
   trigger(action) { pressed.add(action); },
   take(action) { return pressed.delete(action); },
+  setPad(src, left, right) { if (left || right) pads.set(src, { left, right }); else pads.delete(src); },
   clear() { pressed.clear(); },
   // Stuuruitslag -1..1 uit toetsen/touch (loopt soepel op).
   steer(dt) {
     const l = keys.has('ArrowLeft') || keys.has('KeyA') || touch.left;
     const r = keys.has('ArrowRight') || keys.has('KeyD') || touch.right;
-    const target = (r ? 1 : 0) - (l ? 1 : 0);
+    let target = (r ? 1 : 0) - (l ? 1 : 0);
+    for (const p of pads.values()) target += p.right - p.left;
+    target = clamp(target, -1, 1);
     kbSteer += clamp(target - kbSteer, -dt * 6, dt * 6);
     return kbSteer;
   },
