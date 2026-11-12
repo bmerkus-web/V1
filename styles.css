@@ -96,10 +96,11 @@ tr.me td { color: var(--gold); font-weight: 800; }
 #h-count { inset: 0; display: flex; align-items: center; justify-content: center; font-size: 30vh; color: var(--gold); }
 #h-count.pop { animation: pop .9s ease-out forwards; }
 @keyframes pop { from { transform: scale(1.6); opacity: 1; } to { transform: scale(.8); opacity: 0; } }
-.touch, #h-menu { position: absolute; pointer-events: auto; background: rgba(255, 255, 255, .12); border: 2px solid rgba(255, 255, 255, .3); font-style: normal; display: none; }
+.touch, #h-menu, #h-fs { position: absolute; pointer-events: auto; background: rgba(255, 255, 255, .12); border: 2px solid rgba(255, 255, 255, .3); font-style: normal; display: none; }
 .touch { width: 16vw; max-width: 130px; height: 22vh; bottom: 30vh; font-size: 30px; }
 #t-left { left: 8px; } #t-right { right: 8px; } #t-pedal { right: 8px; bottom: calc(52vh + 10px); height: 12vh; font-size: 18px; }
 body.touchy .touch.on { display: block; }
+#h-fs { display: block; top: 10px; left: 50%; margin-left: clamp(134px, 23vh, 180px); padding: 6px 10px; border-radius: 10px; font-size: 16px; }
 #h-menu { display: block; top: 10px; left: 50%; margin-left: clamp(90px, 16vh, 130px); padding: 6px 10px; border-radius: 10px; font-size: 16px; }
 
 #overlay { position: fixed; inset: 0; background: rgba(8, 2, 24, .78); display: flex; align-items: center; justify-content: center; padding: 14px; overflow-y: auto; }

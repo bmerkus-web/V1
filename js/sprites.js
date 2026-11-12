@@ -102,7 +102,7 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   c.translate(X, Y);
   c.fillStyle = 'rgba(0,0,0,.35)';
   c.beginPath(); c.ellipse(0, 0, 0.5 * u, 0.1 * u, 0, 0, 7); c.fill();
-  if (opts.ghost) c.globalAlpha = 0.38;
+  if (opts.ghost || opts.fade) c.globalAlpha = 0.38;
   c.rotate((r.steer || 0) * 0.2 + (m & 32 ? Math.sin(t * 25) * 0.45 : 0));
   if (m & 1) { // turbovlammen
     for (const s of [-1, 1]) {

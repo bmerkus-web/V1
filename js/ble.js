@@ -194,6 +194,103 @@ export class HeartRate extends Device {
   get value() { return this.connected && performance.now() - this.lastData < 5000 ? this.bpm : 0; }
 }
 
+// --- Zwift-knoppen (Play, Click, Ride/Click v2) ---
+// Na het schrijven van "RideOn" sturen de knoppen hun toestand als protobuf-berichtje.
+const ZWIFT_SVC = '00000001-19ca-4651-86e5-fa29dcdd09d1', ZWIFT_SVC_RIDE = 0xfc82;
+const ZWIFT_ASYNC = '00000002-19ca-4651-86e5-fa29dcdd09d1';
+const ZWIFT_RX = '00000003-19ca-4651-86e5-fa29dcdd09d1';
+const ZWIFT_TX = '00000004-19ca-4651-86e5-fa29dcdd09d1';
+const RIDE_BITS = {
+  left: 0x1, up: 0x2, right: 0x4, down: 0x8, a: 0x10, b: 0x20, y: 0x40, z: 0x100,
+  shiftL: 0x200 | 0x400, powerup: 0x800 | 0x10000, shiftR: 0x2000 | 0x4000,
+};
+
+function pbFields(bytes) {
+  const out = [];
+  let i = 0;
+  const varint = () => {
+    let v = 0, s = 1, b;
+    do { b = bytes[i++]; v += (b & 0x7f) * s; s *= 128; } while (b & 0x80 && i < bytes.length);
+    return v;
+  };
+  while (i < bytes.length) {
+    const tag = varint(), f = Math.floor(tag / 8), w = tag & 7;
+    if (w === 0) out.push([f, varint()]);
+    else if (w === 2) { const n = varint(); out.push([f, bytes.subarray(i, i + n)]); i += n; }
+    else if (w === 5) i += 4;
+    else if (w === 1) i += 8;
+    else break;
+  }
+  return out;
+}
+const zigzag = (v) => (v % 2 ? -(v + 1) / 2 : v / 2);
+
+// Vertaalt een knoppenbericht naar spelacties: { left, right (0..1), item, bell }, of null.
+export function parseZwiftPad(bytes) {
+  const type = bytes[0];
+  if (type !== 0x07 && type !== 0x37 && type !== 0x23) return null;
+  const fields = pbFields(bytes.subarray(1));
+  const m = new Map(fields.filter(([, v]) => typeof v === 'number'));
+  const on = (f) => (m.get(f) ?? 0) === 0; // 0 (of weggelaten, de protobuf-standaard) = ingedrukt
+  const out = { left: 0, right: 0, item: false, bell: false };
+  if (type === 0x07) { // Zwift Play
+    const rightPad = on(1), paddle = Math.min(1, Math.abs(zigzag(m.get(8) || 0)) / 100);
+    if (rightPad) {
+      out.item = on(4) || on(3) || on(6) || on(7); // A, Z, zijknop
+      out.bell = on(2) || on(5); // Y, B
+      out.right = paddle;
+    } else {
+      out.left = on(3) ? 1 : paddle; // pijl links of flipper
+      out.right = on(4) ? 1 : 0;
+      out.item = on(2) || on(6) || on(7); // pijl omhoog, zijknop
+      out.bell = on(5);
+    }
+  } else if (type === 0x37) { // Zwift Click: + en -
+    const plus = on(1), minus = on(2);
+    if (plus && minus) out.item = true;
+    else { out.right = plus ? 1 : 0; out.left = minus ? 1 : 0; }
+  } else { // Zwift Ride / Click v2: bitmasker, 0 = ingedrukt
+    if (!m.has(1)) return null;
+    const map = m.get(1), p = (k) => (map & RIDE_BITS[k]) !== RIDE_BITS[k];
+    out.left = p('left') || p('shiftL') ? 1 : 0;
+    out.right = p('right') || p('shiftR') ? 1 : 0;
+    out.item = p('up') || p('a') || p('z') || p('powerup');
+    out.bell = p('down') || p('y') || p('b');
+    for (const [f, v] of fields) {
+      if (f !== 3 || typeof v === 'number') continue;
+      const pm = new Map(pbFields(v)), val = Math.min(1, Math.abs(zigzag(pm.get(2) || 0)) / 100);
+      if ((pm.get(1) || 0) === 0) out.left = Math.max(out.left, val); else if (pm.get(1) === 1) out.right = Math.max(out.right, val);
+    }
+  }
+  return out;
+}
+
+export class ZwiftPad extends Device {
+  constructor() {
+    super();
+    this.onpad = () => {};
+  }
+  async connect() {
+    await this._open({
+      filters: [{ namePrefix: 'Zwift' }, { services: [ZWIFT_SVC] }, { services: [ZWIFT_SVC_RIDE] }],
+      optionalServices: [ZWIFT_SVC, ZWIFT_SVC_RIDE],
+    });
+  }
+  async _setup(server) {
+    let svc;
+    try { svc = await server.getPrimaryService(ZWIFT_SVC_RIDE); } catch (e) { svc = await server.getPrimaryService(ZWIFT_SVC); }
+    const [async_, rx, tx] = await Promise.all([svc.getCharacteristic(ZWIFT_ASYNC), svc.getCharacteristic(ZWIFT_RX), svc.getCharacteristic(ZWIFT_TX)]);
+    async_.addEventListener('characteristicvaluechanged', (e) => {
+      const v = e.target.value;
+      const a = parseZwiftPad(new Uint8Array(v.buffer, v.byteOffset, v.byteLength));
+      if (a) this.onpad(a);
+    });
+    await async_.startNotifications();
+    await tx.startNotifications().catch(() => {});
+    await rx.writeValueWithoutResponse(new TextEncoder().encode('RideOn'));
+  }
+}
+
 let codesPromise = null;
 const loadCodes = () => (codesPromise ||= fetch('data/sterzo-challenge-codes.dat').then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b)));
 

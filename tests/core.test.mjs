@@ -97,3 +97,25 @@ test('Watt per kilo: zwaardere renner is trager bij gelijk vermogen', () => {
   const heavy = simulate({ fair: false, weight: 90, bots: 0, useItems: false }).results[0].time;
   assert.ok(heavy > light * 1.05, `${light} vs ${heavy}`);
 });
+
+test('Zwift-knoppen: Play, Click en Ride', async () => {
+  const { parseZwiftPad } = await import('../js/ble.js');
+  const u = (...b) => Uint8Array.from(b);
+  // Play links (veld 1 = 1), pijl links ingedrukt (veld 3 = 0), rest los
+  let a = parseZwiftPad(u(0x07, 0x08, 1, 0x10, 1, 0x18, 0, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 1));
+  assert.deepEqual(a, { left: 1, right: 0, item: false, bell: false });
+  // Play rechts (veld 1 = 0), A ingedrukt (veld 4 = 0), flipper half (zigzag 100 = 50)
+  a = parseZwiftPad(u(0x07, 0x08, 0, 0x10, 1, 0x18, 1, 0x20, 0, 0x28, 1, 0x30, 1, 0x38, 1, 0x40, 100));
+  assert.equal(a.item, true); assert.equal(a.bell, false); assert.equal(a.right, 0.5);
+  // Alles los
+  a = parseZwiftPad(u(0x07, 0x08, 0, 0x10, 1, 0x18, 1, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 1));
+  assert.deepEqual(a, { left: 0, right: 0, item: false, bell: false });
+  // Click: plus = rechts, beide = power-up
+  assert.equal(parseZwiftPad(u(0x37, 0x08, 0, 0x10, 1)).right, 1);
+  assert.equal(parseZwiftPad(u(0x37, 0x08, 0, 0x10, 0)).item, true);
+  // Ride: alle bits aan = niets ingedrukt; bit 0x1 uit = links
+  assert.deepEqual(parseZwiftPad(u(0x23, 0x08, 0xff, 0xff, 0x0f)), { left: 0, right: 0, item: false, bell: false });
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xfe, 0xff, 0x0f)).left, 1);
+  // Onbekend type (bv. batterij) wordt genegeerd
+  assert.equal(parseZwiftPad(u(0x19, 0x10, 80)), null);
+});

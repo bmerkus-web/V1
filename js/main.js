@@ -2,7 +2,7 @@
 import { TRACK_DEFS, getTrack } from './track.js';
 import { Race, ITEMS, BOT_NAMES } from './game.js';
 import { Renderer } from './render.js';
-import { Trainer, Sterzo, HeartRate, bleSupported } from './ble.js';
+import { Trainer, Sterzo, HeartRate, ZwiftPad, bleSupported } from './ble.js';
 import { input, bindTouch } from './input.js';
 import { audio } from './audio.js';
 import { store, save, COLORS, getTime, getGhost, levelOf } from './storage.js';
@@ -14,6 +14,7 @@ const P = store.profile;
 const trainer = new Trainer();
 const sterzo = new Sterzo();
 const hrm = new HeartRate();
+const pads = []; // gekoppelde Zwift-knoppen
 const HOSTED = !!window.claude?.use; // draait als Claude-artifact
 const renderer = new Renderer($('game'));
 let race = null, room = null, paused = false, lastCfg = null, resultsTimer = null;
@@ -65,6 +66,9 @@ function devStatus() {
   $('st-sterzo').textContent = sterzo.connected ? `${sterzo.name} ✓` : sterzo.device ? 'Verbinding kwijt…' : 'Niet verbonden';
   $('b-hr').classList.toggle('on', hrm.connected);
   $('st-hr').textContent = hrm.connected ? `${hrm.name} ✓` : hrm.device ? 'Verbinding kwijt…' : 'Niet verbonden';
+  const np = pads.filter((p) => p.connected).length;
+  $('b-pads').classList.toggle('on', np > 0);
+  $('st-pads').textContent = np ? `${np} verbonden ✓ · tik voor nog één` : pads.length ? 'Verbinding kwijt…' : 'Niet verbonden';
   $('b-center').classList.toggle('hidden', !sterzo.connected);
   $('t-pedal').classList.toggle('on', !trainer.connected);
   if (!bleSupported()) $('ble-note').textContent = 'Deze browser ondersteunt geen Bluetooth. Gebruik Chrome op Android of Mac (via https). Tot dan: demo-modus met ↑ / Shift / ←→.';
@@ -81,6 +85,27 @@ async function connect(dev, label) {
 $('b-trainer').onclick = () => connect(trainer, 'Trainer');
 $('b-sterzo').onclick = () => connect(sterzo, 'Sterzo');
 $('b-hr').onclick = () => connect(hrm, 'Hartslagmeter');
+$('b-pads').onclick = async () => {
+  audio.unlock();
+  if (!bleSupported()) { toast('Bluetooth werkt alleen in Chrome (Android / Mac) via https.'); return; }
+  const pad = new ZwiftPad();
+  let was = { item: false, bell: false };
+  pad.onpad = (a) => {
+    input.setPad(pad, a.left, a.right);
+    if (a.item && !was.item) input.trigger('item');
+    if (a.bell && !was.bell) input.trigger('bell');
+    was = a;
+  };
+  pad.onstatus = () => { if (!pad.connected) input.setPad(pad, 0, 0); devStatus(); };
+  try {
+    await pad.connect();
+    if (pads.some((p) => p.device?.id === pad.device.id)) { toast('Deze knop was al gekoppeld'); return; }
+    pads.push(pad);
+    toast(`Zwift-knop verbonden: ${pad.name}. Druk op een knop om te testen.`);
+  } catch (e) { if (e.name !== 'NotFoundError') toast('Zwift-knoppen: ' + e.message); }
+  devStatus();
+};
+$('b-fs').onclick = $('h-fs').onclick = () => toggleFullscreen();
 $('b-center').onclick = () => { sterzo.calibrate(); toast('Stuur staat nu recht'); };
 
 for (const b of document.querySelectorAll('[data-go]')) b.onclick = () => show(b.dataset.go);
