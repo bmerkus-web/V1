@@ -9,6 +9,7 @@ Het is een web-app zonder installatie: hij draait in **Chrome op een Android-tab
 - **Trainer als gaspedaal** – Wahoo KICKR Core (en elke andere trainer met FTMS of Cycling Power). De trainer voelt klimmetjes, en wordt even zwaarder als je geraakt wordt.
 - **Hartslagmeter** – koppel een Bluetooth-hartslagband en zie je hartslag tijdens de race en in de uitslag.
 - **Zwift-knoppen** – Play, Click en Ride/Click v2: sturen en power-ups vanaf je stuur.
+- **Naar Strava** – sla je rit na afloop op als `.tcx` (vermogen, hartslag, cadans, afstand, hoogte) en upload hem op strava.com/upload/select.
 - **Echt sturen** met de Elite Sterzo Smart. Zonder Sterzo: pijltjestoetsen of knoppen op het scherm.
 - **6 power-ups** – Turbo, Schild, Vuurpijl, Lijmklodder, Magneet en Tegenwind. Wie achteraan rijdt krijgt de sterkste.
 - **Boutjes, turbostroken, slipstream en raketstart.**
