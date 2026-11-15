@@ -4,7 +4,7 @@ const COLORS = ['#ff3fa4', '#39ffb0', '#7df9ff', '#ffd166', '#b28dff', '#ff7b1c'
 export { COLORS };
 
 const defaults = () => ({
-  profile: { name: 'Renner', color: COLORS[0], ftp: 200, weight: 75, fair: true, trainerFeel: 50, assist: true, music: true, sfx: true },
+  profile: { name: 'Renner', color: COLORS[0], ftp: 200, weight: 75, fair: true, trainerFeel: 50, assist: false, v: 2, music: true, sfx: true },
   pr: { real: {}, demo: {} },
   power: {},
   stats: { km: 0, races: 0, wins: 0, xp: 0 },
@@ -16,6 +16,8 @@ try {
   if (raw) {
     const d = defaults();
     data = { ...d, ...raw, profile: { ...d.profile, ...raw.profile }, pr: { ...d.pr, ...raw.pr }, stats: { ...d.stats, ...raw.stats } };
+    // Versie 2: stuurhulp staat voortaan standaard uit (eenmalig omgezet, daarna kies je zelf).
+    if (!(raw.profile?.v >= 2)) { data.profile.assist = false; data.profile.v = 2; localStorage.setItem(KEY, JSON.stringify(data)); }
   }
 } catch (e) { /* geen opslag beschikbaar */ }
 

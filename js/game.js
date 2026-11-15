@@ -1,5 +1,5 @@
 // Race-logica: renners, items, bots, zones/PR's, spook en netwerk-synchronisatie.
-import { SEG } from './track.js';
+import { SEG, ROAD_W } from './track.js';
 import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
 import { submitTime, getTime, setGhost, submitPower, store, save } from './storage.js';
@@ -14,6 +14,9 @@ export const ITEMS = {
 };
 
 export const BOT_NAMES = ['Turbo Tess', 'Watt Wout', 'Sprint Sanne', 'Klim Kees', 'Demarrage Daan', 'Bidon Bram', 'Kopman Koen'];
+// Ideale lijn: binnendoor is korter. Echte meetkunde (straal R = SEG²/bocht), iets aangedikt.
+const LINE_K = (ROAD_W / (SEG * SEG)) * 1.3;
+
 export const DIFFICULTY = { makkelijk: 0.7, normaal: 0.82, zwaar: 0.93, beul: 1.05 };
 
 function pickItem(rng, rank, total) {
@@ -166,7 +169,7 @@ export class Race {
     r.x += steer * 1.15 * dt * authority;
     if (!auto) {
       // Zonder stuurhulp duwt de bocht je naar buiten; mét stuurhulp blijf je vanzelf op de weg.
-      if (!this.profile.assist) r.x -= seg.curve * r.v * r.v * 0.0045 * dt;
+      if (!this.profile.assist) r.x -= seg.curve * r.v * r.v * 0.0055 * dt;
       else if (Math.abs(r.x) > 0.92 && Math.abs(steer) < 0.15) r.x -= Math.sign(r.x) * 0.5 * dt;
     }
     r.x = clamp(r.x, -1.45, 1.45);
@@ -188,7 +191,8 @@ export class Race {
     }
     const prev = r.dist;
     r.v = stepSpeed(r, power, seg.grade, dt, pull);
-    r.dist += r.v * dt;
+    r.line = 1 / (1 - clamp(r.x, -1, 1) * seg.curve * LINE_K) - 1; // winst (+) of verlies (-) door je lijn
+    r.dist += r.v * dt * (1 + r.line);
 
     if (r.dist >= 0) this._pickups(r, prev);
     if (r.roulette > 0) {
@@ -220,7 +224,7 @@ export class Race {
         if (o.type === 'box' && Math.abs(o.x - r.x) < 0.2) {
           this.objCool[o.id] = this.time + 5;
           if (!r.item && r.roulette <= 0) { r.roulette = 1.3; if (isMe) this.emit('sfx', 'box'); }
-        } else if (o.type === 'bolt' && Math.abs(o.x - r.x) < 0.17) {
+        } else if (o.type === 'bolt' && Math.abs(o.x - r.x) < 0.14) {
           this.objCool[o.id] = this.time + 15;
           if (isMe && r.bolts === 9) this.emit('banner', { text: '⚡ FULL BLITZ! ⚡', sub: '20% minder luchtweerstand', color: '#ffd166' });
           r.bolts = Math.min(10, r.bolts + 1);
@@ -483,7 +487,8 @@ export class Race {
       ai.kwakT = (ai.kwakT || 0) - 0.35;
       ai.laneT -= 0.35;
       if (ai.laneT <= 0) { ai.laneT = 5 + this.rng() * 8; ai.lane = (this.rng() * 2 - 1) * 0.7; }
-      let tx = ai.lane, best = 1e9;
+      // In een bocht kiest een bot (min of meer) de binnenkant.
+      let tx = Math.abs(seg.curve) > 0.06 ? Math.sign(seg.curve) * (0.3 + 0.35 * (ai.ph % 1)) : ai.lane, best = 1e9;
       const m = mod(r.dist, this.L);
       const s0 = Math.floor(m / SEG);
       for (let k = 2; k < 12; k++) {

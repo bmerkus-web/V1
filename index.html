@@ -94,6 +94,7 @@
       <label>Trainer-gevoel helling <input id="p-feel" type="range" min="0" max="100" step="10"><b id="p-feel-v"></b></label>
       <p class="small">Hoe sterk je KICKR klimmetjes laat voelen. 0% = altijd vlak, 100% = de echte helling.</p>
       <label class="check"><input id="p-assist" type="checkbox"> Stuurhulp in bochten</label>
+      <p class="small">Uit (standaard): een bocht duwt je naar buiten, harder naarmate je sneller gaat. Aan: je blijft vanzelf op de weg.</p>
       <label class="check"><input id="p-music" type="checkbox"> Muziek</label>
       <label class="check"><input id="p-sfx" type="checkbox"> Geluidseffecten</label>
     </div>
@@ -108,6 +109,7 @@
       <p><b>Power-up gebruiken:</b> spatie / Enter / 1, of tik op het vakje. <b>B</b> = bel. <b>C</b> = stuur recht zetten. <b>M</b> = muziek. <b>F</b> = volledig scherm. <b>Esc</b> = pauze.</p>
       <p><b>Zwift-knoppen:</b> koppel elke knop apart (tik per knop opnieuw op <i>Zwift-knoppen</i>). <b>Click (twee knopjes):</b> links ←/→ = sturen, ↑ = power-up, ↓ = bel; rechts Z/A = sturen, Y = power-up, B = bel; − en + = power-up. <b>Play:</b> pijltjes ←/→ of de flippers = sturen, ↑ / A / Z / zijknop = power-up, ↓ / Y / B = bel. <b>Eerste Click:</b> − en + = sturen, beide tegelijk = power-up.</p>
       <div id="help-items" class="items"></div>
+      <p><b>Ideale lijn:</b> de binnenbocht is korter, de buitenbocht langer. Snijd bochten aan de binnenkant aan en je wint meters zonder harder te trappen – maar een bocht duwt je naar buiten, dus je moet ervoor sturen.</p>
       <p><b>Kwak:</b> rijd vlak naast iemand en stuur naar hem toe. Hij schiet opzij, verliest een blitzje en is een paar tellen trager. Een schild houdt een kwak tegen.</p>
       <p><b>Slipstream:</b> rijd vlak achter iemand voor minder luchtweerstand. <b>Raketstart:</b> trap boven 120% FTP als het aftellen eindigt.</p>
       <p><b>Solo:</b> jaag op PR's voor sprints, klimmen, rondes en hele races – je beste race rijdt als spook met je mee.</p>
@@ -126,6 +128,7 @@
     <div class="h-sub"><span id="h-spd">0</span> km/u · <span id="h-cad">0</span> rpm · <span id="h-grade">0</span>%</div>
     <div id="h-hr" class="hidden">❤ <span id="h-hr-v">0</span></div>
     <div id="h-draft" class="hidden">💨 SLIPSTREAM</div>
+    <div id="h-line" class="hidden"></div>
   </div>
   <div class="h-br">
     <div id="h-bolts">⚡ 0</div>
