@@ -82,7 +82,7 @@ export class Renderer {
     const z = Math.max(NEAR, s.z1 + (s.z2 - s.z1) * t);
     const k = (DEPTH / z) * (this.W / 2);
     return {
-      X: this.W / 2 + k * (s.xw1 + (s.xw2 - s.xw1) * t + lat * ROAD_W - this.camX),
+      X: this.W / 2 + k * (s.xw1 + s.h1 * t + 0.5 * s.c * t * t + lat * ROAD_W - this.camX),
       Y: this.hz - k * ((seg.y1 + (seg.y2 - seg.y1) * t) * YS + lift - this.camY),
       u: k,
     };
@@ -114,14 +114,17 @@ export class Renderer {
     });
 
     // --- weg ---
-    let x = 0, dx = -tr.segs[base].curve * CURVE_VIS * basePct, maxy = H;
+    // De weg is een vloeiende kromme die precies bij de camera recht vooruit begint (positie 0,
+    // richting 0). Zo verspringt het beeld niet wanneer de camera een segmentgrens passeert.
+    const c0 = tr.segs[base].curve * CURVE_VIS;
+    let x = 0.5 * c0 * basePct * basePct, h = -c0 * basePct, maxy = H;
     const frame = (this.frame = (this.frame || 0) + 1);
     c.fillStyle = th.grass[0]; c.fillRect(0, hz, W, H - hz);
     for (let n = 0; n < DRAW; n++) {
       const seg = tr.segs[(base + n) % tr.n], s = seg.scr;
       s.z1 = (n - basePct) * SEG * ZS; s.z2 = s.z1 + SEG * ZS;
-      s.xw1 = x; s.xw2 = x + dx; s.frame = frame; s.clip = maxy; s.n = n;
-      x += dx; dx += seg.curve * CURVE_VIS;
+      s.c = seg.curve * CURVE_VIS; s.xw1 = x; s.h1 = h; s.frame = frame; s.clip = maxy; s.n = n;
+      x += h + 0.5 * s.c; h += s.c;
       if (s.z2 <= NEAR) continue;
       const a = this._pt(seg, 0, 0), b = this._pt(seg, 1, 0);
       if (b.Y >= maxy || a.Y <= b.Y) continue;

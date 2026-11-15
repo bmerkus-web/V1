@@ -149,12 +149,11 @@ function build(def) {
   };
   for (let d = 250; d < total - 120; d += 500) {
     for (const x of [-0.66, -0.22, 0.22, 0.66]) add('box', d, x);
-    for (let t = 0; t < 2; t++) {
-      const d0 = d + 90 + t * 190;
-      const ph = rng() * 6.28;
-      const amp = 0.3 + rng() * 0.4;
-      for (let b = 0; b < 8; b++) add('bolt', d0 + b * 12, Math.sin(ph + b * 0.5) * amp);
-    }
+    // Eén kort spoor boutjes per stuk: je moet ervoor sturen en zit niet meteen aan het maximum.
+    const d0 = d + 120 + rng() * 180;
+    const ph = rng() * 6.28;
+    const amp = 0.3 + rng() * 0.4;
+    for (let b = 0; b < 4; b++) add('bolt', d0 + b * 12, Math.sin(ph + b * 0.5) * amp);
   }
   const padAt = (d, x) => {
     const s = Math.floor(d / SEG);
