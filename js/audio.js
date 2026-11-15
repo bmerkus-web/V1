@@ -46,6 +46,7 @@ const SFX = {
   tick: (t) => tone(900, t, 0.03, 'square', 0.08),
   item: (t) => { tone(660, t, 0.1, 'square', 0.25); tone(990, t + 0.1, 0.2, 'square', 0.25); },
   boost: (t) => { tone(200, t, 0.6, 'sawtooth', 0.3, sfxGain, 1400); noise(t, 0.5, 0.15); },
+  kwak: (t) => { tone(160, t, 0.18, 'square', 0.4, sfxGain, 70); noise(t, 0.12, 0.35, sfxGain, 800); tone(900, t + 0.05, 0.12, 'triangle', 0.2, sfxGain, 300); },
   hit: (t) => { tone(300, t, 0.4, 'sawtooth', 0.4, sfxGain, 50); noise(t, 0.3, 0.3, sfxGain, 200); },
   shield: (t) => tone(500, t, 0.3, 'sine', 0.3, sfxGain, 1000),
   block: (t) => { tone(1500, t, 0.12, 'triangle', 0.3); tone(1000, t + 0.08, 0.15, 'triangle', 0.25); },
