@@ -460,6 +460,10 @@ function hud(dt) {
   $('h-hr').classList.toggle('hidden', !me.hr);
   $('h-hr-v').textContent = me.hr || '';
   $('h-draft').classList.toggle('hidden', !me.draft);
+  const ln = $('h-line'), gain = me.finished ? 0 : me.line || 0;
+  ln.classList.toggle('hidden', Math.abs(gain) < 0.012);
+  ln.classList.toggle('bad', gain < 0);
+  ln.textContent = gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`;
   $('h-item-n').textContent = me.item ? ITEMS[me.item].name : 'spatie';
   const d = $('h-delta');
   if (r.ghostDelta != null) {

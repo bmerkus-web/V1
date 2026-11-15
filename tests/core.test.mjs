@@ -167,3 +167,27 @@ test('Kwak: naar een buurman sturen kost hem een blitzje en snelheid', () => {
   place(); o.fx.kwak = 0; race.getSteer = () => -1; race.update(0.04);
   assert.equal(o.fx.kwak, 0);
 });
+
+test('Ideale lijn: binnendoor ben je sneller rond dan buitenom', () => {
+  const run = (x) => {
+    const { race } = simulate({ track: 'kosmo', laps: 1, bots: 0, maxTime: 10, useItems: false });
+    const t = race.track, me = race.me;
+    const seg = t.segs.reduce((a, s) => (s.curve > a.curve ? s : a)); // scherpste bocht naar rechts
+    me.dist = seg.i * 5 - 20; me.v = 10;
+    const d0 = me.dist;
+    for (let i = 0; i < 50; i++) { me.x = x; race.update(0.04); }
+    return me.dist - d0;
+  };
+  const inside = run(0.8), mid = run(0), outside = run(-0.8);
+  assert.ok(inside > mid * 1.03 && mid > outside * 1.03, `${inside} ${mid} ${outside}`);
+  assert.ok(inside < mid * 1.12, 'winst blijft bescheiden');
+});
+
+test('Zonder stuurhulp duwt een bocht je naar buiten', () => {
+  const { race } = simulate({ track: 'kosmo', laps: 1, bots: 0, maxTime: 10, useItems: false });
+  race.profile.assist = false;
+  const seg = race.track.segs.reduce((a, s) => (s.curve > a.curve ? s : a));
+  race.me.dist = seg.i * 5 - 10; race.me.v = 12; race.me.x = 0;
+  for (let i = 0; i < 25; i++) race.update(0.04);
+  assert.ok(race.me.x < -0.1, `x = ${race.me.x}`); // bocht naar rechts duwt naar links
+});

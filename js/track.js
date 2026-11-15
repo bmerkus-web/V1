@@ -152,13 +152,14 @@ function build(def) {
     // Eén kort spoor blitzjes per stuk: je moet ervoor sturen en zit niet meteen aan het maximum.
     const d0 = d + 120 + rng() * 180;
     const ph = rng() * 6.28;
-    const amp = 0.3 + rng() * 0.4;
-    for (let b = 0; b < 4; b++) add('bolt', d0 + b * 12, Math.sin(ph + b * 0.5) * amp);
+    // Slalom: de blitzjes liggen om en om links en rechts, je moet er echt voor sturen.
+    const amp = 0.4 + rng() * 0.3, side = rng() < 0.5 ? 1 : -1, mid = (rng() * 2 - 1) * 0.2;
+    for (let b = 0; b < 5; b++) add('bolt', d0 + b * 16, mid + side * (b % 2 ? -1 : 1) * amp + Math.sin(ph + b) * 0.06);
   }
   const padAt = (d, x) => {
     const s = Math.floor(d / SEG);
-    for (let k = 0; k < 3; k++) segs[(s + k) % n].pad = { x, w: 0.28 };
-    objects.push({ id: objects.length, type: 'pad', d, x, len: 3 * SEG, w: 0.28 });
+    for (let k = 0; k < 3; k++) segs[(s + k) % n].pad = { x, w: 0.15 };
+    objects.push({ id: objects.length, type: 'pad', d, x, len: 3 * SEG, w: 0.15 });
   };
   for (let d = 520; d < total - 300; d += 900) padAt(d, [-0.5, 0, 0.5][Math.floor(rng() * 3)]);
   for (const z of zones) if (z.type === 'sprint') padAt(z.start + 20, 0);
