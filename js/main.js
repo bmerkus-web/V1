@@ -72,6 +72,9 @@ function devStatus() {
   $('st-pads').textContent = np ? `${np} verbonden ✓ · tik voor nog één` : pads.length ? 'Verbinding kwijt…' : 'Niet verbonden';
   $('b-center').classList.toggle('hidden', !sterzo.connected);
   $('t-pedal').classList.toggle('on', !trainer.connected);
+  // Met een Sterzo of Zwift-knoppen zijn de stuurknoppen op het scherm niet nodig.
+  const ownSteer = sterzo.connected || pads.some((p) => p.connected);
+  $('t-left').classList.toggle('on', !ownSteer); $('t-right').classList.toggle('on', !ownSteer);
   if (!bleSupported()) $('ble-note').textContent = 'Deze browser ondersteunt geen Bluetooth. Gebruik Chrome op Android of Mac (via https). Tot dan: demo-modus met ↑ / Shift / ←→.';
 }
 trainer.onstatus = sterzo.onstatus = hrm.onstatus = devStatus;
@@ -452,7 +455,8 @@ function hud(dt) {
   $('h-lap').textContent = `Ronde ${clamp(Math.floor(Math.max(0, me.dist) / r.L) + 1, 1, r.laps)}/${r.laps} · ${(Math.max(0, r.total - me.dist) / 1000).toFixed(2)} km`;
   $('h-cad').textContent = Math.round(me.cadence);
   $('h-grade').textContent = r.track.segAt(me.dist).grade.toFixed(1);
-  $('h-bolts').textContent = '⚡ ' + me.bolts;
+  $('h-bolts').textContent = `⚡ ${me.bolts}/10${me.bolts >= 10 ? ' MAX' : ''}`;
+  $('h-bolts').title = `${me.bolts * 2}% minder luchtweerstand`;
   $('h-hr').classList.toggle('hidden', !me.hr);
   $('h-hr-v').textContent = me.hr || '';
   $('h-draft').classList.toggle('hidden', !me.draft);
@@ -536,4 +540,4 @@ const join = new URLSearchParams(location.search).get('join') || (/^#join-([a-z]
 if (join) { $('j-code').value = join.toUpperCase().slice(0, 4); show('join'); }
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 if (HOSTED) $('b-copy').textContent = 'Code kopiëren';
-window.__wb = { get race() { return race; }, sel, trainer, sterzo, hrm }; // voor testen/debuggen
+window.__wb = { get race() { return race; }, sel, trainer, sterzo, hrm, renderer }; // voor testen/debuggen
