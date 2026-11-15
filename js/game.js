@@ -215,7 +215,7 @@ export class Race {
           if (!r.item && r.roulette <= 0) { r.roulette = 1.3; if (isMe) this.emit('sfx', 'box'); }
         } else if (o.type === 'bolt' && Math.abs(o.x - r.x) < 0.17) {
           this.objCool[o.id] = this.time + 15;
-          if (isMe && r.bolts === 9) this.emit('banner', { text: '⚡ BOUTJES VOL!', sub: '20% minder luchtweerstand', color: '#ffd166' });
+          if (isMe && r.bolts === 9) this.emit('banner', { text: '⚡ FULL BLITZ! ⚡', sub: '20% minder luchtweerstand', color: '#ffd166' });
           r.bolts = Math.min(10, r.bolts + 1);
           if (isMe) this.emit('sfx', 'bolt');
         }
