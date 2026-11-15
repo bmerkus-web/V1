@@ -141,3 +141,29 @@ test('TCX-export: geldig bestand met vermogen, hartslag en afstand', async () =>
   assert.match(tcxFilename(Date.now()), /^watt-blitz-\d{8}-\d{4}\.tcx$/);
   assert.equal(buildTcx({ startedAt: 0, log: [], name: '' }), null);
 });
+
+test('Kwak: naar een buurman sturen kost hem een blitzje en snelheid', () => {
+  const { race } = simulate({ laps: 1, bots: 1, maxTime: 20, useItems: false });
+  const me = race.me, o = race.riders[1];
+  const place = () => { o.dist = me.dist + 0.5; o.x = 0.2; me.x = 0; o.kwakSafe = 0; me.kwakCd = 0; o.kwakCd = 9; };
+  // rechtdoor sturen: niets
+  place(); o.bolts = 3;
+  race.getSteer = () => 0; race.update(0.04);
+  assert.equal(o.fx.kwak, 0);
+  // naar rechts sturen (naar hem toe): kwak
+  place(); o.bolts = 3; const v = o.v;
+  race.getSteer = () => 1; race.update(0.04);
+  assert.ok(o.fx.kwak > 2, 'buurman is gekwakt');
+  assert.equal(o.bolts, 2);
+  assert.ok(o.v < v && o.x > 0.35, 'trager en opzij geduwd');
+  // meteen daarna nog eens: beschermd, en ik heb afkoeltijd
+  const b = o.bolts; o.x = me.x + 0.2; o.dist = me.dist; race.update(0.04);
+  assert.equal(o.bolts, b);
+  // schild blokt
+  place(); o.fx.shield = 5; o.fx.kwak = 0; o.bolts = 3;
+  race.update(0.04);
+  assert.equal(o.fx.shield, 0); assert.equal(o.fx.kwak, 0); assert.equal(o.bolts, 3);
+  // van de verkeerde kant sturen (van hem af): niets
+  place(); o.fx.kwak = 0; race.getSteer = () => -1; race.update(0.04);
+  assert.equal(o.fx.kwak, 0);
+});

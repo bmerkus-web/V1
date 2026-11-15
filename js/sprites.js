@@ -151,6 +151,12 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   }
   if (m & 16) { c.font = `${0.4 * u}px sans-serif`; c.textAlign = 'center'; c.fillText('🧲', 0, -2.0 * u); }
   if (r.bell > 0) { c.font = `${0.45 * u}px sans-serif`; c.textAlign = 'center'; c.fillText('🔔', 0.4 * u, -1.9 * u); }
+  if (r.kwakAt != null && t - r.kwakAt < 0.9) { // kwak: sterretjes, en het blitzje dat wegvliegt
+    const k = (t - r.kwakAt) / 0.9;
+    c.fillStyle = '#fff36b';
+    for (let i = 0; i < 5; i++) { const a = i * 1.26 + k * 2; c.beginPath(); c.arc(Math.cos(a) * (0.3 + k) * u, -1.0 * u + Math.sin(a) * (0.3 + k) * u, 0.06 * u, 0, 7); c.fill(); }
+    if (r.kwakLost) { c.globalAlpha = 1 - k; c.font = `${0.6 * u}px sans-serif`; c.textAlign = 'center'; c.fillText('⚡', 0.2 * u * Math.sin(k * 9), (-1.9 - k * 1.3) * u); c.globalAlpha = 1; }
+  }
   if (r.hitAt != null && t - r.hitAt < 0.5) {
     c.fillStyle = '#fff'; const k = (t - r.hitAt) * 2;
     for (let i = 0; i < 6; i++) { const a = i * 1.05 + k * 3; c.beginPath(); c.arc(Math.cos(a) * k * 1.2 * u, -0.9 * u + Math.sin(a) * k * 1.2 * u, 0.07 * u, 0, 7); c.fill(); }

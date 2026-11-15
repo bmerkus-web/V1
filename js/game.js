@@ -71,7 +71,8 @@ export class Race {
       id: r.id, name: r.name, color: r.color, kind: r.kind,
       dist: -3 - row * 4, x: [-0.5, 0, 0.5][col], v: 0, power: 0, cadence: 0, steer: 0,
       item: null, roulette: 0, bolts: 0, draft: false, mask: 0,
-      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0 },
+      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0 },
+      kwakCd: 0, kwakSafe: 0,
       finished: false, finishTime: null, rank: i + 1, bell: 0, net: null,
     };
     if (r.kind === 'bot') {
@@ -147,7 +148,7 @@ export class Race {
     this._ghost(dt);
 
     const seg = this.track.segAt(me.dist);
-    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) - (me.fx.boost > 0 ? 1.5 : 0);
+    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) - (me.fx.boost > 0 ? 1.5 : 0);
     this._net(dt);
   }
 
@@ -156,6 +157,8 @@ export class Race {
     const e = r.fx;
     for (const k in e) if (e[k] > 0) e[k] = Math.max(0, e[k] - dt);
     if (r.bell > 0) r.bell -= dt;
+    if (r.kwakCd > 0) r.kwakCd -= dt;
+    if (r.kwakSafe > 0) r.kwakSafe -= dt;
     const seg = this.track.segAt(r.dist);
     if (e.spin > 0) steer += Math.sin(this.clock * 22) * 0.9;
     r.steer = lerp(r.steer, steer, Math.min(1, dt * 10));
@@ -176,6 +179,10 @@ export class Race {
       const gap = o.dist - r.dist;
       if (gap > 0.8 && gap < 10 && Math.abs(o.x - r.x) < 0.28) r.draft = true;
       if (e.magnet > 0 && gap > 3 && gap < 160) pull = true;
+      // Kwak: rijd vlak naast iemand en stuur naar hem toe.
+      const side = o.x - r.x;
+      if (r.kwakCd <= 0 && (!r.ai || r.ai.kwakT > 0) && !(o.kwakSafe > 0) && this.time > 3 && !r.finished && !o.finished &&
+        Math.abs(gap) < 1.8 && Math.abs(side) > 0.04 && Math.abs(side) < 0.32 && steer * Math.sign(side) > 0.4) this._kwak(r, o, Math.sign(side));
       // Lichte botsing: wie achterop rijdt wijkt uit.
       if (gap > 0 && gap < 1.6 && Math.abs(o.x - r.x) < 0.16) r.x += (r.x >= o.x ? 1 : -1) * dt * 0.8;
     }
@@ -382,18 +389,49 @@ export class Race {
     for (const o of this.riders) if (this.local(o) && o !== src && o.dist > src.dist && !o.finished) this.hit(o, 'storm', src.id);
   }
 
-  hit(r, kind, by) {
+  // r geeft o een zet opzij (dir = richting van de zet: -1 links, +1 rechts).
+  _kwak(r, o, dir) {
+    r.kwakCd = r.kind === 'bot' ? 10 : 2.5; // bots houden zich wat in
+    o.kwakSafe = 3;
+    r.x -= dir * 0.05;
+    if (this.local(o)) this.hit(o, 'kwak', r.id, dir);
+    else this.room?.send({ t: 'kwak', id: r.id, to: o.id, dir });
+  }
+
+  hit(r, kind, by, dir = 0) {
     const blocked = r.fx.shield > 0;
     if (blocked) r.fx.shield = 0;
     else if (kind === 'rocket') { r.v *= 0.45; r.fx.spin = 1.2; r.bolts = Math.max(0, r.bolts - 3); }
     else if (kind === 'glue') { r.fx.slow = 2.5; r.bolts = Math.max(0, r.bolts - 1); }
     else if (kind === 'storm') r.fx.storm = 6;
-    this.room?.send({ t: 'hit', id: r.id, kind, by, blocked });
-    this._hitFx(r, kind, by, blocked);
+    if (kind === 'kwak') {
+      r.kwakSafe = 3;
+      if (!blocked) {
+        r.fx.kwak = 2.5; r.v *= 0.93; r.x = clamp(r.x + dir * 0.22, -1.45, 1.45);
+        if (r.bolts > 0) { r.bolts--; r.blitzLost = true; }
+      }
+    }
+    const lost = !!r.blitzLost;
+    r.blitzLost = false;
+    this.room?.send({ t: 'hit', id: r.id, kind, by, blocked, lost });
+    this._hitFx(r, kind, by, blocked, lost);
   }
 
-  _hitFx(r, kind, by, blocked) {
+  _hitFx(r, kind, by, blocked, lost = false) {
     const src = this.byId(by);
+    if (kind === 'kwak') {
+      if (!blocked) r.kwakAt = this.clock;
+      r.kwakLost = lost;
+      if (r === this.me) {
+        if (blocked) { this.emit('sfx', 'block'); this.emit('banner', { text: '🛡️ GEBLOKT!', color: '#7df9ff' }); }
+        else { this.emit('sfx', 'kwak'); this.emit('shake', 9); this.emit('flash', '#ffd166'); this.emit('banner', { text: `💥 KWAK van ${src ? src.name : '?'}`, sub: lost ? '−1 blitz' : '', color: '#ff6b6b' }); }
+      } else if (src === this.me) {
+        this.emit('sfx', blocked ? 'block' : 'kwak');
+        this.emit('banner', { text: blocked ? `${r.name} blokte je kwak` : `💥 KWAK! ${r.name}`, color: blocked ? '#7df9ff' : '#39ffb0' });
+      }
+      if (src) this.say(`${src.name} ${blocked ? '🛡️' : '💥'} ${r.name}`);
+      return;
+    }
     if (r === this.me) {
       if (blocked) { this.emit('sfx', 'block'); this.emit('banner', { text: '🛡️ GEBLOKT!', color: '#7df9ff' }); }
       else if (kind !== 'storm') { this.emit('sfx', 'hit'); this.emit('shake', 14); this.emit('flash', kind === 'glue' ? '#b44dff' : '#ff3b3b'); }
@@ -442,6 +480,7 @@ export class Race {
     ai.think -= dt;
     if (ai.think <= 0) {
       ai.think = 0.35;
+      ai.kwakT = (ai.kwakT || 0) - 0.35;
       ai.laneT -= 0.35;
       if (ai.laneT <= 0) { ai.laneT = 5 + this.rng() * 8; ai.lane = (this.rng() * 2 - 1) * 0.7; }
       let tx = ai.lane, best = 1e9;
@@ -459,6 +498,11 @@ export class Race {
       for (const h of this.hazards) {
         const dd = mod(h.d - m, this.L);
         if (dd < 35 && Math.abs(h.x - tx) < 0.26) tx = h.x + (tx >= h.x ? 0.42 : -0.42);
+      }
+      // Af en toe bewust een kwak uitdelen aan wie vlak naast hem rijdt.
+      if (r.kwakCd <= 0 && this.rng() < 0.05) {
+        const o = this.riders.find((q) => q !== r && !q.finished && Math.abs(q.dist - r.dist) < 1.6 && Math.abs(q.x - r.x) > 0.08 && Math.abs(q.x - r.x) < 0.3);
+        if (o) { tx = o.x; ai.kwakT = 0.8; }
       }
       ai.tx = clamp(tx, -0.85, 0.85);
     }
@@ -479,6 +523,7 @@ export class Race {
   // ---------- netwerk ----------
   _remote(r, dt) {
     if (r.bell > 0) r.bell -= dt;
+    if (r.kwakSafe > 0) r.kwakSafe -= dt;
     const n = r.net;
     if (!n) return;
     n.age += dt;
@@ -523,7 +568,8 @@ export class Race {
         break;
       }
       case 'hazgone': this.hazards = this.hazards.filter((h) => h.id !== msg.hid); break;
-      case 'hit': { const r = this.byId(msg.id); if (r) this._hitFx(r, msg.kind, msg.by, msg.blocked); break; }
+      case 'hit': { const r = this.byId(msg.id); if (r) this._hitFx(r, msg.kind, msg.by, msg.blocked, msg.lost); break; }
+      case 'kwak': { const r = this.byId(msg.to); if (r && this.local(r) && !(r.kwakSafe > 0) && !r.finished) this.hit(r, 'kwak', msg.id, msg.dir > 0 ? 1 : -1); break; }
       case 'fin': {
         const r = this.byId(msg.id);
         if (r && !r.finished) { r.finished = true; r.finishTime = msg.time; this.say(`🏁 ${r.name}`); }
