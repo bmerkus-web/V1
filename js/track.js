@@ -140,7 +140,7 @@ function build(def) {
   }
   segs[0].arch = { text: 'START · FINISH', color: '#ff3fa4' };
 
-  // Objecten: itemboxen, boutjes (munten) en turbostroken. Deterministisch per baan.
+  // Objecten: itemboxen, blitzjes (bliksemschichtjes) en turbostroken. Deterministisch per baan.
   const objects = [];
   const add = (type, d, x) => {
     const o = { id: objects.length, type, d, x };
@@ -149,7 +149,7 @@ function build(def) {
   };
   for (let d = 250; d < total - 120; d += 500) {
     for (const x of [-0.66, -0.22, 0.22, 0.66]) add('box', d, x);
-    // Eén kort spoor boutjes per stuk: je moet ervoor sturen en zit niet meteen aan het maximum.
+    // Eén kort spoor blitzjes per stuk: je moet ervoor sturen en zit niet meteen aan het maximum.
     const d0 = d + 120 + rng() * 180;
     const ph = rng() * 6.28;
     const amp = 0.3 + rng() * 0.4;

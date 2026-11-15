@@ -455,7 +455,7 @@ function hud(dt) {
   $('h-lap').textContent = `Ronde ${clamp(Math.floor(Math.max(0, me.dist) / r.L) + 1, 1, r.laps)}/${r.laps} · ${(Math.max(0, r.total - me.dist) / 1000).toFixed(2)} km`;
   $('h-cad').textContent = Math.round(me.cadence);
   $('h-grade').textContent = r.track.segAt(me.dist).grade.toFixed(1);
-  $('h-bolts').textContent = `⚡ ${me.bolts}/10${me.bolts >= 10 ? ' MAX' : ''}`;
+  $('h-bolts').textContent = `⚡ ${me.bolts}/10${me.bolts >= 10 ? ' FULL BLITZ' : ''}`;
   $('h-bolts').title = `${me.bolts * 2}% minder luchtweerstand`;
   $('h-hr').classList.toggle('hidden', !me.hr);
   $('h-hr-v').textContent = me.hr || '';

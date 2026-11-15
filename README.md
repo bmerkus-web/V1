@@ -12,7 +12,7 @@ Het is een web-app zonder installatie: hij draait in **Chrome op een Android-tab
 - **Naar Strava** – sla je rit na afloop op als `.tcx` (vermogen, hartslag, cadans, afstand, hoogte) en upload hem op strava.com/upload/select.
 - **Echt sturen** met de Elite Sterzo Smart. Zonder Sterzo: pijltjestoetsen of knoppen op het scherm.
 - **6 power-ups** – Turbo, Schild, Vuurpijl, Lijmklodder, Magneet en Tegenwind. Wie achteraan rijdt krijgt de sterkste.
-- **Boutjes, turbostroken, slipstream en raketstart.**
+- **Blitzjes (bliksemschichtjes voor extra snelheid), turbostroken, slipstream en raketstart.**
 - **3 banen** – Neon Polder (vlak), Vulkaanpas (lange klim) en Kosmodroom (bochtig, steile muur).
 - **Solo** – tot 5 bots op vier niveaus, PR's voor sprints, klimmen, rondes en races, een spook van je beste race, vermogensrecords (5 s / 1 min / 5 min) en levels.
 - **Multiplayer** – tot 6 renners via een kamercode van 4 letters; lege plekken vul je met bots.
