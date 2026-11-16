@@ -76,7 +76,11 @@
       <label id="o-diff-l">Niveau bots <select id="o-diff"><option>makkelijk</option><option selected>normaal</option><option>zwaar</option><option>beul</option></select></label>
       <label class="check"><input id="o-fair" type="checkbox"> Eerlijk (vermogen t.o.v. FTP)</label>
       <p class="small" id="o-fair-note"></p>
-      <label class="check" id="o-ghost-l"><input id="o-ghost" type="checkbox" checked> Spook van mijn PR</label>
+      <div class="row ghosts"><span>👻 Spook van mijn PR</span>
+        <label class="check" id="o-ghost-l"><input id="o-ghost" type="checkbox"> Race</label>
+        <label class="check"><input id="o-ghost-lap" type="checkbox"> Ronde</label>
+        <label class="check"><input id="o-ghost-seg" type="checkbox"> Segment</label>
+      </div>
     </div>
     <div class="menu">
       <button id="b-back" class="ghost">← Terug</button>
@@ -126,7 +130,7 @@
       <p><b>Training:</b> kies bij de start <i>Training</i> en stel je eigen parcours samen uit etappes (baan + aantal rondes), met 7 minuten warming-up en cooling-down. Aan het eind van een etappe rijd je door een teleportboog naar de volgende baan. Je hele rit komt als één bestand in je Strava-export.</p>
       <p><b>Kwak:</b> rijd vlak naast iemand en stuur naar hem toe. Hij schiet opzij, verliest een blitzje en is een paar tellen trager. Een schild houdt een kwak tegen.</p>
       <p><b>Slipstream:</b> rijd vlak achter iemand voor minder luchtweerstand. <b>Raketstart:</b> trap boven 120% FTP als het aftellen eindigt.</p>
-      <p><b>Solo:</b> jaag op PR's voor sprints, klimmen, rondes en hele races – je beste race rijdt als spook met je mee.</p>
+      <p><b>Records en spoken:</b> jaag op PR's voor sprints, klimmen, rondes en hele races. Je beste race, ronde en segment kunnen als spook met je meerijden; bij de start kies je welke je wilt zien.</p>
     </div>
     <div class="menu"><button class="ghost" data-go="home">← Terug</button></div>
   </section>

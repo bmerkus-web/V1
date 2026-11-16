@@ -272,3 +272,34 @@ test('Training: etappes sluiten op elkaar aan via de teleportboog', async () => 
   assert.ok(cd.race.me.dist > d0 + 50, 'ik rijd zelf tijdens het uitrijden');
   assert.ok(cd.race.riders[1].finished && cd.race.riders[1].finishTime > cd.race.me.finishTime);
 });
+
+test('Ronde- en segmentspook: beste poging rijdt mee en geeft het tijdsverschil', async () => {
+  const { getGhost, getTime } = await import('../js/storage.js');
+  const opts = { track: 'kosmo', laps: 2, bots: 0, useItems: false, extra: { ghostLap: true, ghostSeg: true, ns: 'real' } }; // eigen 'boek', los van de andere tests
+  // 1e rit: zet de tijden en de spoken
+  const a = simulate({ ...opts, effort: 1.0 });
+  const lap = getGhost('real', 'kosmo|lapghost'), seg = getGhost('real', 'kosmo|segghost|lanceerbaan');
+  assert.ok(lap && seg, 'spoken opgeslagen');
+  assert.ok(Math.abs(lap.t - getTime('real', 'kosmo|lap')) < 0.01, 'rondespook hoort bij het ronde-PR');
+  assert.ok(Math.abs(lap.s[lap.s.length - 2] - 4500) < 15 && lap.s[0] === 0, 'spook beslaat één ronde');
+  for (let i = 3; i < lap.s.length; i += 3) assert.ok(lap.s[i] > lap.s[i - 3] && lap.s[i + 1] >= lap.s[i - 2]);
+  assert.ok(a.race.prs.some((p) => p.label === 'Ronde'));
+
+  // 2e rit, trager: de spoken rijden mee en ik loop achter
+  const seen = { lap: 0, seg: 0, lapBehind: 0, segLabel: 0, maxLapDelta: 0 };
+  const b = simulate({ ...opts, effort: 0.85, onTick: (r) => {
+    const gl = r.ghostRiders.find((g) => g.gk === 'lap'), gs = r.ghostRiders.find((g) => g.gk === 'seg');
+    if (gl) { seen.lap++; if (gl.delta > 0) seen.lapBehind++; seen.maxLapDelta = Math.max(seen.maxLapDelta, gl.delta || 0); }
+    if (gs) { seen.seg++; if (r.ghostLabel === 'segment') seen.segLabel++; assert.ok(r.activeZone, 'segmentspook alleen binnen het segment'); }
+  } });
+  assert.ok(seen.lap > 1000 && seen.seg > 100, JSON.stringify(seen));
+  assert.ok(seen.lapBehind > seen.lap * 0.8 && seen.maxLapDelta > 5, JSON.stringify(seen));
+  assert.ok(seen.segLabel > 50, 'in een segment gaat het segmentverschil voor');
+  assert.ok(Math.abs(getGhost('real', 'kosmo|lapghost').t - lap.t) < 1e-9, 'een tragere rit vervangt het spook niet');
+  assert.ok(!b.race.prs.some((p) => p.label === 'Ronde'));
+
+  // uitgevinkt: geen spoken
+  let any = 0;
+  simulate({ ...opts, effort: 0.9, maxTime: 120, extra: { ghostLap: false, ghostSeg: false, ns: 'real' }, onTick: (r) => { any += r.ghostRiders.length; } });
+  assert.equal(any, 0);
+});

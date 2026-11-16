@@ -54,6 +54,7 @@ button { font: inherit; color: var(--text); cursor: pointer; border: 0; border-r
 .plan .stage b { color: var(--gold); min-width: 5.5em; } .plan .stage select { flex: 1; min-width: 120px; } .plan .stage .n { flex: 0 0 auto; min-width: 0; }
 .plan .stage button { padding: 6px 12px; }
 #mode-row button.sel { border-color: var(--pink); box-shadow: 0 0 14px rgba(255, 63, 164, .5); background: rgba(255, 63, 164, .18); }
+.ghosts { justify-content: flex-start; gap: 8px 18px; flex-basis: 100%; }
 .opts { flex-direction: row; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
 .opts .small { flex-basis: 100%; }
 .code { font-size: 30px; letter-spacing: 6px; font-weight: 900; color: var(--gold); text-transform: uppercase; }

@@ -21,7 +21,7 @@ const renderer = new Renderer($('game'));
 let race = null, room = null, paused = false, lastCfg = null, resultsTimer = null;
 const WARM_SECS = +new URLSearchParams(location.search).get('warm') || 420; // 7 minuten in- en uitrijden
 const T = (store.training ||= { plan: [{ track: 'polder', laps: 1 }, { track: 'vulkaan', laps: 1 }, { track: 'kosmo', laps: 1 }], warm: true, cool: true });
-const sel = { track: 'polder', laps: 2, botsOn: true, bots: 5, diff: 'normaal', fair: P.fair, ghost: true, mode: 'race', plan: T.plan, warm: T.warm, cool: T.cool };
+const sel = { track: 'polder', laps: 2, botsOn: true, bots: 5, diff: 'normaal', fair: P.fair, mode: 'race', plan: T.plan, warm: T.warm, cool: T.cool };
 let training = null; // lopende training: { stages, idx, courseLen, gone }
 
 // ---------- hulpjes ----------
@@ -178,9 +178,10 @@ function renderSetup() {
   $('o-bots-l').classList.toggle('hidden', !$('o-botson').checked);
   $('o-diff-l').classList.toggle('hidden', !$('o-botson').checked);
   $('o-fair-note').textContent = sel.fair ? 'Iedereen die op zijn eigen FTP rijdt is even snel.' : 'Uit: snelheid volgt je watt per kilo (vul je gewicht in bij Renner).';
-  $('o-laps').value = sel.laps; $('o-bots').value = Math.max(1, Math.min(sel.bots, maxBots || 1)); $('o-diff').value = sel.diff; $('o-fair').checked = sel.fair; $('o-ghost').checked = sel.ghost;
+  $('o-laps').value = sel.laps; $('o-bots').value = Math.max(1, Math.min(sel.bots, maxBots || 1)); $('o-diff').value = sel.diff; $('o-fair').checked = sel.fair;
+  $('o-ghost').checked = P.ghostRace; $('o-ghost-lap').checked = P.ghostLap; $('o-ghost-seg').checked = P.ghostSeg;
   for (const id of ['o-laps', 'o-bots', 'o-diff', 'o-fair']) $(id).disabled = !canEdit;
-  $('o-ghost-l').classList.toggle('hidden', lobby || tr_);
+  $('o-ghost-l').classList.toggle('hidden', tr_); // een training heeft geen race-PR
   $('b-start').classList.toggle('hidden', !canEdit);
   $('b-back').textContent = lobby ? '← Kamer verlaten' : '← Terug';
 }
@@ -229,7 +230,7 @@ $('o-bots').onchange = (e) => { sel.bots = +e.target.value; pushSettings(); };
 $('o-botson').onchange = (e) => { sel.botsOn = e.target.checked; pushSettings(); };
 $('o-diff').onchange = (e) => { sel.diff = e.target.value; pushSettings(); };
 $('o-fair').onchange = (e) => { sel.fair = e.target.checked; if (!room) { P.fair = sel.fair; save(); } pushSettings(); };
-$('o-ghost').onchange = (e) => { sel.ghost = e.target.checked; };
+for (const [id, k] of [['o-ghost', 'ghostRace'], ['o-ghost-lap', 'ghostLap'], ['o-ghost-seg', 'ghostSeg']]) $(id).onchange = (e) => { P[k] = e.target.checked; save(); };
 $('b-solo').onclick = () => { audio.unlock(); show('setup'); renderSetup(); };
 $('b-back').onclick = () => { leaveRoom(); show('home'); };
 $('b-start').onclick = () => {
@@ -391,7 +392,7 @@ function launch(cfg, carry) {
     ...cfg.bots.map((b) => ({ ...b, kind: iRunBots ? 'bot' : 'remote' })),
   ];
   const n = ns();
-  const ghost = !room && !training && sel.ghost ? getGhost(n, `${track.id}|ghost|${cfg.laps}`) : null;
+  const ghost = !training && P.ghostRace ? getGhost(n, `${track.id}|ghost|${cfg.laps}`) : null;
   let extra = {};
   if (training) {
     const all = training.stages, i = training.idx;
@@ -415,7 +416,7 @@ function launch(cfg, carry) {
   }
   race = new Race({
     track, laps: st.laps, seed: cfg.seed + (training ? training.idx : 0), riders, room, isHost: iRunBots, ns: n,
-    profile: { ...P, fair: cfg.fair }, difficulty: cfg.diff, ghost, getPower, getSteer, emit, ...extra,
+    profile: { ...P, fair: cfg.fair }, difficulty: cfg.diff, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
   });
   drawProfile($('h-prof'), track, profDots);
   $('h-dots').innerHTML = '';
@@ -572,7 +573,7 @@ function hud(dt) {
   $('h-item-n').textContent = me.item ? ITEMS[me.item].name : 'spatie';
   const d = $('h-delta');
   if (r.ghostDelta != null) {
-    d.textContent = fmtDelta(r.ghostDelta) + ' vs PR';
+    d.textContent = `${fmtDelta(r.ghostDelta)} vs PR ${r.ghostLabel}`;
     d.className = r.ghostDelta <= 0 ? 'ahead' : 'behind';
   } else d.textContent = '';
   const z = $('h-zone');
@@ -589,7 +590,7 @@ function hud(dt) {
   $('h-feed').innerHTML = r.feed.filter((f) => r.clock - f.at < 6).map((f) => `<div>${esc(f.text)}</div>`).join('');
   // stippen op het profiel
   const dots = $('h-dots');
-  const list = r.ghostRider && !r.ghostRider.hidden ? [...r.riders, r.ghostRider] : r.riders;
+  const list = [...r.riders, ...r.ghostRiders.filter((g) => !g.hidden)];
   while (dots.children.length < list.length) dots.appendChild(document.createElement('i'));
   while (dots.children.length > list.length) dots.lastChild.remove();
   list.forEach((x, i) => {
