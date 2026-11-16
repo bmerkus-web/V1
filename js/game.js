@@ -16,6 +16,7 @@ export const ITEMS = {
 export const BOT_NAMES = ['Turbo Tess', 'Watt Wout', 'Sprint Sanne', 'Klim Kees', 'Demarrage Daan', 'Bidon Bram', 'Kopman Koen'];
 // Ideale lijn: binnendoor is korter. Echte meetkunde (straal R = SEG²/bocht), iets aangedikt.
 const LINE_K = (ROAD_W / (SEG * SEG)) * 1.3;
+const CUT_BONUS = 0.12; // extra voortgang op het short-cut-pad
 
 export const DIFFICULTY = { makkelijk: 0.7, normaal: 0.82, zwaar: 0.93, beul: 1.05 };
 
@@ -81,6 +82,7 @@ export class Race {
     if (r.kind === 'bot') {
       const ref = this.profile.fair ? REF_FTP : (this.profile.ftp * REF_KG) / (this.profile.weight || REF_KG);
       rider.ai = {
+        cutP: 0.12 + 0.5 * (r.skill ?? 0.5), skill: r.skill ?? 0.5,
         base: ref * (DIFFICULTY[this.difficulty] || 0.82) * (0.88 + 0.2 * (r.skill ?? 0.5)),
         ph: this.rng() * 10, lane: rider.x, tx: rider.x, think: 0, itemT: 0, laneT: 3 + this.rng() * 6,
       };
@@ -170,9 +172,14 @@ export class Race {
     if (!auto) {
       // Zonder stuurhulp duwt de bocht je naar buiten; mét stuurhulp blijf je vanzelf op de weg.
       if (!this.profile.assist) r.x -= seg.curve * r.v * r.v * 0.0055 * dt;
-      else if (Math.abs(r.x) > 0.92 && Math.abs(steer) < 0.15) r.x -= Math.sign(r.x) * 0.5 * dt;
+      else if (Math.abs(r.x) > 0.92 && Math.abs(steer) < 0.15 && !r.onCut) r.x -= Math.sign(r.x) * 0.5 * dt;
     }
-    r.x = clamp(r.x, -1.45, 1.45);
+    // Bij een short cut is er meer berm (ook aan de buitenkant van het pad).
+    const lim = seg.cut ? 1.7 : 1.45;
+    if (Math.abs(r.x) > lim) r.x -= Math.sign(r.x) * Math.min(Math.abs(r.x) - lim, 1.5 * dt);
+    const cc = seg.cut ? seg.cut.a + (seg.cut.b - seg.cut.a) * (mod(r.dist, SEG) / SEG) : 0;
+    r.onCut = !!seg.cut && Math.abs(r.x - cc) < seg.cut.hw;
+    r.berm = Math.abs(r.x) > 1 && !r.onCut;
 
     // Slipstream en magneet
     r.draft = false;
@@ -191,7 +198,16 @@ export class Race {
     }
     const prev = r.dist;
     r.v = stepSpeed(r, power, seg.grade, dt, pull);
-    r.line = 1 / (1 - clamp(r.x, -1, 1) * seg.curve * LINE_K) - 1; // winst (+) of verlies (-) door je lijn
+    r.line = 1 / (1 - (r.onCut ? r.x : clamp(r.x, -1, 1)) * seg.curve * LINE_K) - 1; // winst (+) of verlies (-) door je lijn
+    const offRoadCut = r.onCut && Math.abs(r.x) > 1;
+    if (offRoadCut) r.line += CUT_BONUS;
+    if (r === this.me && !r.finished) {
+      if (offRoadCut) this.cutGain = (this.cutGain || 0) + r.v * dt * r.line;
+      else if (!seg.cut && this.cutGain) {
+        if (this.cutGain > 6) { this.emit('sfx', 'pr'); this.emit('banner', { text: `🔀 SHORT CUT! +${Math.round(this.cutGain)} m`, color: '#ffd166' }); }
+        this.cutGain = 0;
+      }
+    }
     r.dist += r.v * dt * (1 + r.line);
 
     if (r.dist >= 0) this._pickups(r, prev);
@@ -276,6 +292,8 @@ export class Race {
 
     if (me.dist < 0) return;
     const m1 = mod(me.dist, L), m0 = mod(me.dist - me.v * dt, L);
+    const cut = this.track.cut;
+    if (cut && m0 < cut.start - 70 && m1 >= cut.start - 70) this.emit('banner', { text: cut.side < 0 ? '🔀 ← SHORT CUT' : '🔀 SHORT CUT →', sub: 'smal pad door de binnenbocht', color: '#ffd166' });
     for (const z of this.track.zones) {
       if (m0 < z.start && m1 >= z.start) {
         this.zoneStart[z.id] = this.time;
@@ -510,8 +528,19 @@ export class Race {
         if (o) { tx = o.x; ai.kwakT = 0.8; }
       }
       ai.tx = clamp(tx, -0.85, 0.85);
+      // Short cut: betere bots nemen hem vaker en strakker.
+      const cut = this.track.cut;
+      if (cut) {
+        const toStart = mod(cut.start - m, this.L), lap = Math.floor(r.dist / this.L);
+        if (toStart < 50 && ai.cutLap !== lap) { ai.cutLap = lap; ai.takeCut = this.rng() < ai.cutP; }
+        if (ai.takeCut) {
+          const ahead = this.track.segAt(r.dist + 5).cut;
+          if (ahead) ai.tx = (ahead.a + ahead.b) / 2 + (1 - ai.skill) * 0.07 * Math.sin(this.time * 3 + ai.ph);
+          else if (toStart > 60) ai.takeCut = false;
+        }
+      }
     }
-    const steer = clamp((ai.tx - r.x) * 4, -0.8, 0.8);
+    const steer = clamp((ai.tx - r.x) * (ai.takeCut ? 7 : 4), -0.8, 0.8);
     this._stepLocal(r, p, steer, dt, true);
 
     if (r.item) {

@@ -2,7 +2,8 @@
 import { mulberry, hashStr, mod } from './util.js';
 
 export const SEG = 5; // meter per wegsegment
-export const ROAD_W = 4.5; // halve wegbreedte in meter
+export const ROAD_W = 4.5;
+export const CUT_X = 1.28, CUT_HW = 0.115; // short cut: midden en halve breedte (in halve wegbreedtes) // halve wegbreedte in meter
 
 const T = (len, curve = 0, grade = 0, zone = null) => ({ len, curve, grade, zone });
 const sprint = (name) => ({ type: 'sprint', name });
@@ -26,6 +27,7 @@ export const TRACK_DEFS = [
       fog: '#ff7a90',
       scenery: ['windmill', 'poplar', 'poplar', 'lamp', 'tulips', 'tulips', 'billboard'],
     },
+    cut: [2950, 150],
     sections: [
       T(300), T(400, 2), T(300, 0, 0, sprint('Dijksprint')), T(350, -3), T(150, 0, 4), T(150, 0, -4),
       T(500, 2.5), T(300, -1.5, 0.5), T(400, 0, 0, sprint('Molenstraat')), T(450, -3.5, -0.5),
@@ -49,6 +51,7 @@ export const TRACK_DEFS = [
       fog: '#ff6a2a',
       scenery: ['rock', 'rock', 'deadtree', 'crystal', 'lavavent', 'billboard'],
     },
+    cut: [2500, 140],
     sections: [
       T(400), T(300, 2, 1), T(350, -4, 6, climb('Lavamuur')), T(250, 5, 8, climb('Lavamuur')),
       T(300, -5, 7, climb('Lavamuur')), T(300, 4, 6, climb('Lavamuur')), T(200, 0, 2),
@@ -73,6 +76,7 @@ export const TRACK_DEFS = [
       fog: '#39d0c8',
       scenery: ['antenna', 'dome', 'rocketpad', 'lamp', 'crystal', 'billboard'],
     },
+    cut: [3380, 130],
     sections: [
       T(300), T(300, 4, 2), T(300, -4, -2), T(250, 5, 3), T(250, -5, -3),
       T(400, 0, 0, sprint('Lanceerbaan')), T(400, 3, 10, climb('Raketmuur')), T(300, -2, 2),
@@ -164,18 +168,36 @@ function build(def) {
   for (let d = 520; d < total - 300; d += 900) padAt(d, [-0.5, 0, 0.5][Math.floor(rng() * 3)]);
   for (const z of zones) if (z.type === 'sprint') padAt(z.start + 20, 0);
 
+  // Short cut: een smal pad door de binnenberm van een scherpe bocht. Aan het begin en eind
+  // loopt een oprit schuin vanaf de weg, zodat je er zonder berm op en af kunt.
+  let cut = null;
+  if (def.cut) {
+    const [cs, cl] = def.cut, RAMP = 30, s0 = cs / SEG, cn = cl / SEG;
+    const side = Math.sign(segs[s0 + (cn >> 1)].curve) || 1;
+    const centre = (d) => {
+      const k = Math.max(0, Math.min(1, d < RAMP ? d / RAMP : (cl - d) / RAMP));
+      return side * (0.86 + (CUT_X - 0.86) * k * k * (3 - 2 * k));
+    };
+    for (let k = 0; k < cn; k++) {
+      const onRamp = k * SEG < RAMP || (k + 1) * SEG > cl - RAMP;
+      segs[s0 + k].cut = { a: centre(k * SEG), b: centre((k + 1) * SEG), hw: onRamp ? 0.15 : CUT_HW };
+    }
+    cut = { start: cs, end: cs + cl, side };
+  }
+
   // Decor langs de weg.
   const sc = def.theme.scenery;
   for (let k = 2; k < n; k += 3) {
     for (const side of [-1, 1]) {
-      if (rng() < 0.75) segs[k].sprites.push({ k: sc[Math.floor(rng() * sc.length)], x: side * (1.25 + rng() * 1.6) });
+      const near = rng() < 0.75 ? { k: sc[Math.floor(rng() * sc.length)], x: side * (1.25 + rng() * 1.6) } : null;
+      if (near && !(segs[k].cut && cut.side === side)) segs[k].sprites.push(near); // pad vrijhouden
       if (rng() < 0.3) segs[k].sprites.push({ k: sc[Math.floor(rng() * sc.length)], x: side * (3.8 + rng() * 5) });
     }
   }
 
   const track = {
     id: def.id, name: def.name, desc: def.desc, theme: def.theme,
-    segs, n, length: total, zones, objects,
+    segs, n, length: total, zones, objects, cut,
     segAt(d) { return segs[Math.floor(mod(d, total) / SEG) % n]; },
     yAt(d) {
       const m = mod(d, total);

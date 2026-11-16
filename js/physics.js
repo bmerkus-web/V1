@@ -26,7 +26,7 @@ export function stepSpeed(r, power, gradePct, dt, magnetPull = false) {
   if (e.storm > 0) cda *= 2.3;
   if (e.slow > 0) { cda *= 3.5; crr *= 12; }
   if (e.kwak > 0) { p *= 0.8; cda *= 1.5; } // na een kwak: even wat trager
-  if (Math.abs(r.x) > 1) crr += 0.035; // berm
+  if (r.berm ?? Math.abs(r.x) > 1) crr += 0.035; // berm
   const v = Math.max(r.v, 0);
   const drive = p / Math.max(v, 2.2);
   const res = MASS * G * (gradePct / 100 * GRADE_FEEL + crr) + 0.5 * RHO * cda * v * v;
