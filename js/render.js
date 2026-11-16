@@ -1,5 +1,5 @@
 // Pseudo-3D wegweergave op canvas (licht genoeg voor een oude Mac of tablet).
-import { SEG, ROAD_W } from './track.js';
+import { SEG, ROAD_W, KERB } from './track.js';
 import { mod, clamp, mulberry } from './util.js';
 import { SCENERY, drawRider, drawBox, drawBolt, drawGlue, drawRocket } from './sprites.js';
 
@@ -131,19 +131,23 @@ export class Renderer {
       const alt = seg.i % 2;
       const w1 = a.u * ROAD_W, w2 = b.u * ROAD_W;
       c.fillStyle = th.grass[alt]; c.fillRect(0, b.Y - 0.5, W, a.Y - b.Y + 1);
-      c.fillStyle = seg.zone === 'sprint' ? (alt ? '#39ffb0' : '#0c6b4a') : seg.zone === 'climb' ? (alt ? '#ff7b1c' : '#7a2a00') : th.rumble[alt];
-      this._quad(a.X, a.Y, w1 * 1.1, b.X, b.Y, w2 * 1.1);
+      // Kerbstones: korte blokjes in de lijnkleur, afgewisseld met niets. Wie erop rijdt, zit in de berm.
+      // Bij de op- en afrit van de short cut ontbreken ze: dat is de enige aanwijzing.
+      c.fillStyle = seg.zone === 'sprint' ? '#39ffb0' : seg.zone === 'climb' ? '#ff7b1c' : th.rumble[0];
+      const kc = (1 + KERB) / 2, kh = (KERB - 1) / 2;
+      for (let q = 0; q < 2; q++) { // twee blokjes per wegsegment, met evenveel ruimte ertussen
+        const k1 = q ? this._pt(seg, 0.5, 0) : a, k2 = this._pt(seg, q ? 0.75 : 0.25, 0);
+        for (const sd of [-1, 1]) {
+          if (seg.cut && seg.cut.ramp && Math.sign(seg.cut.a) === sd) continue;
+          this._quad(k1.X + sd * k1.u * ROAD_W * kc, k1.Y, k1.u * ROAD_W * kh, k2.X + sd * k2.u * ROAD_W * kc, k2.Y, k2.u * ROAD_W * kh);
+        }
+      }
       c.fillStyle = seg.i < 2 ? (alt ? '#f5f5ff' : '#15152a') : th.road[alt];
       this._quad(a.X, a.Y, w1, b.X, b.Y, w2);
       if (alt && n < 90) {
         c.fillStyle = th.lane; c.globalAlpha = 0.55;
         for (const l of [-1 / 3, 1 / 3]) this._quad(a.X + w1 * l, a.Y, w1 * 0.014, b.X + w2 * l, b.Y, w2 * 0.014);
         c.globalAlpha = 1;
-      }
-      if (seg.cut) { // short-cut-pad door de berm
-        const cu = seg.cut;
-        c.fillStyle = alt ? '#ffd166' : '#a8791f';
-        this._quad(a.X + w1 * cu.a, a.Y, w1 * cu.hw, b.X + w2 * cu.b, b.Y, w2 * cu.hw);
       }
       if (seg.pad) {
         const p = seg.pad, blink = (Math.floor(t * 8) + seg.i) % 3;

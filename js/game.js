@@ -201,13 +201,6 @@ export class Race {
     r.line = 1 / (1 - (r.onCut ? r.x : clamp(r.x, -1, 1)) * seg.curve * LINE_K) - 1; // winst (+) of verlies (-) door je lijn
     const offRoadCut = r.onCut && Math.abs(r.x) > 1;
     if (offRoadCut) r.line += CUT_BONUS;
-    if (r === this.me && !r.finished) {
-      if (offRoadCut) this.cutGain = (this.cutGain || 0) + r.v * dt * r.line;
-      else if (!seg.cut && this.cutGain) {
-        if (this.cutGain > 6) { this.emit('sfx', 'pr'); this.emit('banner', { text: `🔀 SHORT CUT! +${Math.round(this.cutGain)} m`, color: '#ffd166' }); }
-        this.cutGain = 0;
-      }
-    }
     r.dist += r.v * dt * (1 + r.line);
 
     if (r.dist >= 0) this._pickups(r, prev);
@@ -292,8 +285,6 @@ export class Race {
 
     if (me.dist < 0) return;
     const m1 = mod(me.dist, L), m0 = mod(me.dist - me.v * dt, L);
-    const cut = this.track.cut;
-    if (cut && m0 < cut.start - 70 && m1 >= cut.start - 70) this.emit('banner', { text: cut.side < 0 ? '🔀 ← SHORT CUT' : '🔀 SHORT CUT →', sub: 'smal pad door de binnenbocht', color: '#ffd166' });
     for (const z of this.track.zones) {
       if (m0 < z.start && m1 >= z.start) {
         this.zoneStart[z.id] = this.time;
