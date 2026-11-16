@@ -191,7 +191,8 @@ export class Renderer {
       if (s.z1 < NEAR * 0.5 && !dyn.has(seg.i)) continue;
       const clipped = s.clip < H;
       if (clipped) { c.save(); c.beginPath(); c.rect(0, 0, W, s.clip); c.clip(); }
-      if (seg.arch && s.z1 > NEAR) this._arch(seg);
+      const ar = seg.i === 0 && race.portal ? race.portal : seg.arch;
+      if (ar && s.z1 > NEAR) this._arch(seg, ar, t);
       if (s.z1 > NEAR) {
         for (const sp of seg.sprites) {
           const def = SCENERY[sp.k]; if (!def) continue;
@@ -233,11 +234,20 @@ export class Renderer {
     c.beginPath(); c.moveTo(x1 - w1, y1); c.lineTo(x2 - w2, y2 - 0.6); c.lineTo(x2 + w2, y2 - 0.6); c.lineTo(x1 + w1, y1); c.fill();
   }
 
-  _arch(seg) {
-    const c = this.c, a = seg.arch;
+  _arch(seg, a, t) {
+    const c = this.c;
     const l = this._pt(seg, 0, -1.22), r = this._pt(seg, 0, 1.22), u = l.u;
     if (u < 1.5) return;
     const top = 7 * u, beam = 1.5 * u;
+    if (a.portal) { // teleportboog: een gloeiend, golvend veld tussen de palen
+      const x0 = l.X + 0.25 * u, wv = r.X - l.X - 0.5 * u, bands = 7;
+      for (let i = 0; i < bands; i++) {
+        const k = (i + (t * 1.5) % 1) / bands;
+        c.fillStyle = `hsla(${185 + 60 * Math.sin(t * 2 + i)}, 100%, 65%, ${0.16 + 0.12 * Math.sin(t * 5 + i * 1.7)})`;
+        c.fillRect(x0, l.Y - (top - beam) * (1 - k), wv, ((top - beam) / bands) * 0.8);
+      }
+      c.fillStyle = 'rgba(125,249,255,.18)'; c.fillRect(x0, l.Y - top + beam, wv, top - beam);
+    }
     c.fillStyle = '#23233a';
     c.fillRect(l.X - 0.25 * u, l.Y - top, 0.5 * u, top); c.fillRect(r.X - 0.25 * u, r.Y - top, 0.5 * u, top);
     c.fillStyle = '#15152a'; c.fillRect(l.X - 0.25 * u, l.Y - top, r.X - l.X + 0.5 * u, beam);

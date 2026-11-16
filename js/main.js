@@ -19,7 +19,10 @@ const pads = []; // gekoppelde Zwift-knoppen
 const HOSTED = !!window.claude?.use; // draait als Claude-artifact
 const renderer = new Renderer($('game'));
 let race = null, room = null, paused = false, lastCfg = null, resultsTimer = null;
-const sel = { track: 'polder', laps: 2, botsOn: true, bots: 5, diff: 'normaal', fair: P.fair, ghost: true };
+const WARM_SECS = +new URLSearchParams(location.search).get('warm') || 420; // 7 minuten in- en uitrijden
+const T = (store.training ||= { plan: [{ track: 'polder', laps: 1 }, { track: 'vulkaan', laps: 1 }, { track: 'kosmo', laps: 1 }], warm: true, cool: true });
+const sel = { track: 'polder', laps: 2, botsOn: true, bots: 5, diff: 'normaal', fair: P.fair, ghost: true, mode: 'race', plan: T.plan, warm: T.warm, cool: T.cool };
+let training = null; // lopende training: { stages, idx, courseLen, gone }
 
 // ---------- hulpjes ----------
 function show(name) {
@@ -143,7 +146,13 @@ function drawProfile(cv, track, dots) {
 
 function renderSetup() {
   const lobby = !!room, canEdit = !room || room.isHost;
-  $('setup-title').textContent = lobby ? 'Kamer' : 'Solo race';
+  const tr_ = sel.mode === 'training';
+  $('setup-title').textContent = lobby ? 'Kamer' : tr_ ? 'Training' : 'Solo race';
+  $('m-race').classList.toggle('sel', !tr_); $('m-training').classList.toggle('sel', tr_);
+  $('m-race').disabled = $('m-training').disabled = !canEdit;
+  $('tracks').classList.toggle('hidden', tr_); $('plan-box').classList.toggle('hidden', !tr_);
+  $('o-laps-l').classList.toggle('hidden', tr_);
+  renderPlan(canEdit);
   $('lobby-box').classList.toggle('hidden', !lobby);
   if (lobby) {
     $('room-code').textContent = room.code;
@@ -171,10 +180,46 @@ function renderSetup() {
   $('o-fair-note').textContent = sel.fair ? 'Iedereen die op zijn eigen FTP rijdt is even snel.' : 'Uit: snelheid volgt je watt per kilo (vul je gewicht in bij Renner).';
   $('o-laps').value = sel.laps; $('o-bots').value = Math.max(1, Math.min(sel.bots, maxBots || 1)); $('o-diff').value = sel.diff; $('o-fair').checked = sel.fair; $('o-ghost').checked = sel.ghost;
   for (const id of ['o-laps', 'o-bots', 'o-diff', 'o-fair']) $(id).disabled = !canEdit;
-  $('o-ghost-l').classList.toggle('hidden', lobby);
+  $('o-ghost-l').classList.toggle('hidden', lobby || tr_);
   $('b-start').classList.toggle('hidden', !canEdit);
   $('b-back').textContent = lobby ? '← Kamer verlaten' : '← Terug';
 }
+function renderPlan(canEdit) {
+  const dis = canEdit ? '' : ' disabled';
+  $('plan').innerHTML = sel.plan.map((st, i) => `<div class="stage"><b>Etappe ${i + 1}</b>
+    <select data-i="${i}" data-k="track" aria-label="Baan etappe ${i + 1}"${dis}>${TRACK_DEFS.map((d) => `<option value="${d.id}"${d.id === st.track ? ' selected' : ''}>${d.name}</option>`).join('')}</select>
+    <select class="n" data-i="${i}" data-k="laps" aria-label="Rondes etappe ${i + 1}"${dis}>${[1, 2, 3, 4, 5].map((n) => `<option value="${n}"${n === st.laps ? ' selected' : ''}>${n} ronde${n > 1 ? 's' : ''}</option>`).join('')}</select>
+    <button class="ghost" data-del="${i}" aria-label="Etappe ${i + 1} verwijderen"${canEdit && sel.plan.length > 1 ? '' : ' disabled'}>✕</button></div>`).join('');
+  $('t-warm').checked = sel.warm; $('t-cool').checked = sel.cool;
+  $('t-warm').disabled = $('t-cool').disabled = $('t-add').disabled = !canEdit;
+  $('t-add').classList.toggle('hidden', !canEdit || sel.plan.length >= 8);
+  let km = 0, hm = 0;
+  for (const st of sel.plan) { const t = getTrack(st.track); km += (t.length * st.laps) / 1000; hm += t.climbTotal * st.laps; }
+  const extra = ((sel.warm ? 1 : 0) + (sel.cool ? 1 : 0)) * Math.round(WARM_SECS / 60);
+  $('plan-sum').textContent = `${sel.plan.length} etappe${sel.plan.length > 1 ? 's' : ''} · ${km.toFixed(1)} km · ${Math.round(hm)} hm${extra ? ` · plus ${extra} min in- en uitrijden` : ''}. Tussen de etappes rijd je door een teleportboog.`;
+}
+function planChanged() {
+  store.training = { plan: sel.plan, warm: sel.warm, cool: sel.cool };
+  save();
+  pushSettings();
+}
+$('plan').onchange = (e) => {
+  const el = e.target, st = sel.plan[+el.dataset.i];
+  if (!st) return;
+  if (el.dataset.k === 'track') st.track = el.value; else st.laps = +el.value;
+  planChanged();
+};
+$('plan').onclick = (e) => {
+  const d = e.target.closest('[data-del]');
+  if (!d || sel.plan.length < 2) return;
+  sel.plan.splice(+d.dataset.del, 1);
+  planChanged();
+};
+$('t-add').onclick = () => { if (sel.plan.length < 8) { sel.plan.push({ track: TRACK_DEFS[sel.plan.length % TRACK_DEFS.length].id, laps: 1 }); planChanged(); } };
+$('t-warm').onchange = (e) => { sel.warm = e.target.checked; planChanged(); };
+$('t-cool').onchange = (e) => { sel.cool = e.target.checked; planChanged(); };
+$('m-race').onclick = () => { sel.mode = 'race'; pushSettings(); };
+$('m-training').onclick = () => { sel.mode = 'training'; pushSettings(); };
 function pushSettings() {
   if (room?.isHost) room.setSettings({ ...sel });
   renderSetup();
@@ -199,6 +244,7 @@ $('b-start').onclick = () => {
     skill: nb > 1 ? i / (nb - 1) : 0.6,
   }));
   const cfg = { track: sel.track, laps: sel.laps, diff: sel.diff, fair: sel.fair, seed: (Math.random() * 1e9) | 0, roster, bots };
+  if (sel.mode === 'training') Object.assign(cfg, { plan: sel.plan.map((s) => ({ track: s.track, laps: s.laps })), warm: sel.warm, cool: sel.cool });
   room?.start(cfg);
   startRace(cfg);
 };
@@ -211,7 +257,7 @@ function wireRoom() {
   room.onRoster = () => { if (!race) renderSetup(); };
   room.onSettings = (s) => { Object.assign(sel, s); if (!race) renderSetup(); };
   room.onStart = (cfg) => startRace(cfg);
-  room.onGame = (m) => race?.onNet(m);
+  room.onGame = (m) => { if (m.t === 'left') training?.gone.add(m.id); race?.onNet(m); };
   room.onLobby = () => { endRace(); show('setup'); renderSetup(); };
   room.onClosed = (why) => { room = null; endRace(); show('home'); toast(why || 'Verbinding verbroken'); };
 }
@@ -280,7 +326,17 @@ function emit(type, data) {
     case 'sfx': audio.sfx(data); break;
     case 'shake': renderer.shake = Math.max(renderer.shake, data); break;
     case 'flash': renderer.flash = { color: data, a: 1 }; break;
-    case 'finish': audio.sfx('finish'); renderer.party(); setTimeout(showResults, 1800); break;
+    case 'stage': nextStage(); break;
+    case 'finish': {
+      audio.sfx('finish'); renderer.party();
+      const r = race;
+      // Na de laatste etappe eerst nog uitrijden; de uitslag komt daarna.
+      if (training && training.stages[training.idx + 1]?.kind === 'cool') {
+        banners.push({ text: r.riders.length > 1 ? `🏁 ${r.me.rank}e plaats!` : '🏁 Finish!', sub: fmtTime(r.me.finishTime, 2), color: '#ffd166' });
+        setTimeout(() => { if (race === r) nextStage(); }, 3500);
+      } else setTimeout(showResults, 1800);
+      break;
+    }
   }
 }
 function popCount(v) {
@@ -303,35 +359,79 @@ let profDots = {};
 function startRace(cfg) {
   lastCfg = cfg;
   hideOverlay();
-  const track = getTrack(cfg.track);
-  const meId = room ? room.me.id : 'p0';
-  const iRunBots = !room || room.isHost;
-  const riders = [
-    ...cfg.roster.map((p) => ({ ...p, kind: p.id === meId ? 'me' : 'remote' })),
-    ...cfg.bots.map((b) => ({ ...b, kind: iRunBots ? 'bot' : 'remote' })),
-  ];
-  const n = ns();
-  const ghost = !room && sel.ghost ? getGhost(n, `${track.id}|ghost|${cfg.laps}`) : null;
-  race = new Race({
-    track, laps: cfg.laps, seed: cfg.seed, riders, room, isHost: iRunBots, ns: n,
-    profile: { ...P, fair: cfg.fair }, difficulty: cfg.diff, ghost, getPower, getSteer, emit,
-  });
+  training = null;
+  if (cfg.plan) {
+    const stages = [];
+    if (cfg.warm) stages.push({ kind: 'warm', track: cfg.plan[0].track, laps: 1 });
+    cfg.plan.forEach((s, i) => stages.push({ kind: 'stage', track: s.track, laps: s.laps, n: i + 1 }));
+    if (cfg.cool) stages.push({ kind: 'cool', track: cfg.plan[cfg.plan.length - 1].track, laps: 1 });
+    training = { stages, idx: 0, gone: new Set(), count: cfg.plan.length, courseLen: cfg.plan.reduce((a, s) => a + getTrack(s.track).length * s.laps, 0) };
+  }
   paused = false;
   banners.length = 0; bannerT = 0;
   input.clear();
   renderer.confetti = [];
+  launch(cfg, null);
   $('ui').classList.add('ingame');
   $('hud').classList.remove('hidden');
   $('h-count').textContent = '';
-  drawProfile($('h-prof'), track, profDots);
-  $('h-dots').innerHTML = '';
   renderer.resize();
   if (P.music) audio.startMusic();
   navigator.wakeLock?.request('screen').then((w) => { wake = w; }).catch(() => {});
 }
 
+// Start één race, of de huidige etappe van een training (carry = toestand uit de vorige etappe).
+function launch(cfg, carry) {
+  const st = training ? training.stages[training.idx] : { kind: 'race', track: cfg.track, laps: cfg.laps };
+  const track = getTrack(st.track);
+  const meId = room ? room.me.id : 'p0';
+  const iRunBots = !room || room.isHost;
+  const riders = [
+    ...cfg.roster.filter((p) => !training?.gone.has(p.id)).map((p) => ({ ...p, kind: p.id === meId ? 'me' : 'remote' })),
+    ...cfg.bots.map((b) => ({ ...b, kind: iRunBots ? 'bot' : 'remote' })),
+  ];
+  const n = ns();
+  const ghost = !room && !training && sel.ghost ? getGhost(n, `${track.id}|ghost|${cfg.laps}`) : null;
+  let extra = {};
+  if (training) {
+    const all = training.stages, i = training.idx;
+    const next = all.slice(i + 1).find((s) => s.kind === 'stage');
+    const before = all.slice(0, i).filter((s) => s.kind === 'stage').reduce((a, s) => a + getTrack(s.track).length * s.laps, 0);
+    const free = st.kind !== 'stage';
+    extra = {
+      mode: st.kind, training: true, stageIdx: i, stageN: st.n, stageCount: training.count, carry,
+      open: st.kind === 'stage' && !!next,
+      timed: free ? WARM_SECS : 0,
+      rolling: free || (!!carry && all[i - 1].kind === 'stage'), // eerste etappe: aftellen; daarna vliegend door
+      distOffset: st.kind === 'warm' ? -1e6 : st.kind === 'cool' ? training.courseLen : before,
+      courseLen: training.courseLen,
+      portalArch: next ? { text: '⚡ TELEPORT → ' + getTrack(next.track).name.toUpperCase(), color: '#7df9ff', portal: true } : null,
+    };
+    const mins = Math.round(WARM_SECS / 60);
+    banners.push(st.kind === 'warm' ? { text: 'WARMING-UP', sub: `${mins} minuten rustig indraaien`, color: '#7df9ff' }
+      : st.kind === 'cool' ? { text: 'COOLING-DOWN', sub: `${mins} minuten uitrijden`, color: '#7df9ff' }
+      : { text: `ETAPPE ${st.n}/${training.count} · ${track.name.toUpperCase()}`, sub: `${st.laps} ronde${st.laps > 1 ? 's' : ''}`, color: '#ffd166' });
+    if (carry) { renderer.flash = { color: '#ffffff', a: 1.4 }; audio.sfx('boost'); }
+  }
+  race = new Race({
+    track, laps: st.laps, seed: cfg.seed + (training ? training.idx : 0), riders, room, isHost: iRunBots, ns: n,
+    profile: { ...P, fair: cfg.fair }, difficulty: cfg.diff, ghost, getPower, getSteer, emit, ...extra,
+  });
+  drawProfile($('h-prof'), track, profDots);
+  $('h-dots').innerHTML = '';
+}
+
+function nextStage() {
+  if (!race || !training) return;
+  const carry = race.carryOut();
+  training.idx++;
+  if (training.idx >= training.stages.length) { training.idx--; race.state = 'done'; showResults(); return; }
+  launch(lastCfg, carry);
+}
+
 function endRace() {
   if (race) race.savePower();
+  training = null;
   race = null;
   clearInterval(resultsTimer);
   hideOverlay();
@@ -378,11 +478,13 @@ function togglePause() {
   overlay(`<h2>${room ? 'Race verlaten?' : 'Pauze'}</h2><div class="menu">
     <button class="big" id="ov-resume">Verder rijden</button>
     ${room ? '' : '<button class="ghost" id="ov-restart">Opnieuw</button>'}
+    ${race.timed && (race.mode === 'cool' || !room) ? `<button class="ghost" id="ov-skip">${race.mode === 'warm' ? 'Warming-up' : 'Cooling-down'} overslaan</button>` : ''}
     <button class="ghost" id="ov-quit">Stoppen</button></div>${canSave(race) ? '<div class="menu">' + SAVE_BTN + '</div>' : ''}`);
   wireSave(race);
   $('ov-resume').onclick = () => { paused = false; hideOverlay(); };
   if (!room) $('ov-restart').onclick = () => startRace({ ...lastCfg, seed: (Math.random() * 1e9) | 0 });
   $('ov-quit').onclick = quitToMenu;
+  if ($('ov-skip')) $('ov-skip').onclick = () => { const r = race; paused = false; hideOverlay(); r.timed = 0.001; };
 }
 
 function showResults() {
@@ -398,12 +500,13 @@ function showResults() {
     const pn = { 5: '5 s', 60: '1 min', 300: '5 min' };
     for (const w of r.powerPRs || []) prs.push(`<li>Vermogen ${pn[w]}: ${Math.round(st.best[w])} W</li>`);
     overlay(`<h2>${win ? '🥇 GEWONNEN!' : me.rank + 'e plaats'}</h2>
+      ${r.training ? `<p class="small">Training: ${training ? training.count : ''} etappe(s) · ${(r.courseLen / 1000).toFixed(1)} km. De tijd is die van de etappes samen, zonder in- en uitrijden.</p>` : ''}
       <table>${rows}</table>
       ${prs.length ? `<p><b>🏆 Nieuwe records</b></p><ul class="prlist">${prs.join('')}</ul>` : ''}
       <div class="statgrid">
         <div><b>${Math.round(avgP)} W</b>gemiddeld</div><div><b>${Math.round(st.maxP)} W</b>piek</div>
-        <div><b>${Math.round(st.best[5])} W</b>beste 5 s</div><div><b>${((r.total / me.finishTime) * 3.6).toFixed(1)}</b>km/u gem.</div>
-        <div><b>${(st.maxV * 3.6).toFixed(0)}</b>km/u top</div>${st.nHr ? `<div><b>${Math.round(st.sumHr / st.nHr)}</b>❤ gemiddeld</div><div><b>${st.maxHr}</b>❤ max</div>` : ''}<div><b>${Math.round((avgP * me.finishTime) / 1000)} kJ</b>arbeid</div>
+        <div><b>${Math.round(st.best[5])} W</b>beste 5 s</div><div><b>${((r.courseLen / me.finishTime) * 3.6).toFixed(1)}</b>km/u gem.</div>
+        <div><b>${(st.maxV * 3.6).toFixed(0)}</b>km/u top</div>${st.nHr ? `<div><b>${Math.round(st.sumHr / st.nHr)}</b>❤ gemiddeld</div><div><b>${st.maxHr}</b>❤ max</div>` : ''}<div><b>${Math.round(st.secs.reduce((a, w) => a + w, 0) / 1000)} kJ</b>arbeid</div>
       </div>
       ${r.ns === 'demo' ? '<p class="small">Demo-modus: tijden tellen apart van je trainer-records.</p>' : ''}
       ${canSave(r) ? '<div class="menu">' + (r.saved ? '<p class="small">Rit opgeslagen. Upload het bestand op <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a>.</p>' : SAVE_BTN) + '</div>' : ''}
@@ -452,7 +555,9 @@ function hud(dt) {
   hudSlow = 0.2;
   const total = r.riders.length;
   $('h-pos').innerHTML = `${me.rank}<small>/${total}</small>`;
-  $('h-lap').textContent = `Ronde ${clamp(Math.floor(Math.max(0, me.dist) / r.L) + 1, 1, r.laps)}/${r.laps} · ${(Math.max(0, r.total - me.dist) / 1000).toFixed(2)} km`;
+  const left = r.timed ? fmtTime(Math.ceil(Math.max(0, r.timed - (r.time - r.t0))), 0) : '';
+  $('h-lap').textContent = r.mode === 'warm' ? `WARMING-UP · nog ${left}` : r.mode === 'cool' ? `COOLING-DOWN · nog ${left}`
+    : `${r.training ? `Etappe ${r.stageN}/${r.stageCount} · ` : ''}Ronde ${clamp(Math.floor(Math.max(0, me.dist) / r.L) + 1, 1, r.laps)}/${r.laps} · ${(Math.max(0, r.total - me.dist) / 1000).toFixed(2)} km`;
   $('h-cad').textContent = Math.round(me.cadence);
   $('h-grade').textContent = r.track.segAt(me.dist).grade.toFixed(1);
   $('h-bolts').textContent = `⚡ ${me.bolts}/10${me.bolts >= 10 ? ' FULL BLITZ' : ''}`;
