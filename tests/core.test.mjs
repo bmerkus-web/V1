@@ -217,3 +217,58 @@ test('Short cut: oprit sluit aan op de weg, pad loont, ernaast is berm', () => {
   assert.ok(path.d > edge.d * 1.08, `pad ${path.d} vs binnenkant weg ${edge.d}`);
   assert.ok(berm.d < edge.d, 'in de berm verlies je');
 });
+
+test('Training: etappes sluiten op elkaar aan via de teleportboog', async () => {
+  const { Race } = await import('../js/game.js');
+  const mk = (track, extra) => {
+    const ev = [];
+    const riders = [{ id: 'p0', name: 'Ik', color: '#fff', kind: 'me' }, { id: 'b0', name: 'Bot', color: '#000', kind: 'bot', skill: 0.5 }];
+    const race = new Race({ track: getTrack(track), laps: 1, seed: 3, riders, room: null, isHost: true, ns: 'demo', training: true,
+      profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+      getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: (t) => ev.push(t), ...extra });
+    return { race, ev };
+  };
+  const run = (o, secs) => { for (let i = 0; i < secs * 25 && !o.race.ended && o.race.state !== 'done'; i++) o.race.update(0.04); };
+
+  // warming-up: tijdgestuurd, geen items, niemand finisht
+  const w = mk('polder', { mode: 'warm', timed: 20, rolling: true });
+  w.race.me.item = 'turbo'; w.race.useItem();
+  assert.equal(w.race.me.item, 'turbo', 'geen power-ups tijdens de warming-up');
+  run(w, 60);
+  assert.ok(w.ev.includes('stage') && Math.abs(w.race.time - 20) < 0.1);
+  assert.ok(w.race.riders.every((r) => !r.finished));
+  const c1 = w.race.carryOut();
+  assert.equal(c1.time, 0); assert.ok(Math.abs(c1.logT - 20) < 0.1);
+
+  // etappe 1 (open): aftellen, daarna door de boog zonder te finishen
+  const s1 = mk('polder', { mode: 'stage', open: true, carry: c1 });
+  assert.equal(s1.race.state, 'countdown');
+  run(s1, 6);
+  const { me } = s1.race, bot = s1.race.riders[1];
+  me.dist = s1.race.total - 30; me.v = 10; me.bolts = 3; me.item = 'shield'; bot.dist = me.dist - 12; bot.v = 9;
+  run(s1, 30);
+  assert.ok(s1.ev.includes('stage') && !me.finished && !bot.finished);
+  const c2 = s1.race.carryOut();
+  assert.ok(c2.riders.b0.gap < -5 && c2.riders.p0.gap >= 0);
+
+  // etappe 2 (laatste): vliegende start, toestand gaat mee, finish telt
+  const s2 = mk('kosmo', { mode: 'stage', rolling: true, carry: c2, courseLen: 8500, distOffset: 4000 });
+  assert.equal(s2.race.state, 'race');
+  assert.ok(Math.abs(s2.race.time - c2.time) < 1e-9);
+  assert.equal(s2.race.me.bolts, c2.riders.p0.bolts); assert.ok(c2.riders.p0.bolts >= 3); assert.equal(s2.race.me.item, 'shield');
+  assert.ok(s2.race.riders[1].dist < -5 && s2.race.me.v > 5);
+  s2.race.me.dist = s2.race.total - 30; s2.race.riders[1].dist = s2.race.total - 50; s2.race.riders[1].v = 8;
+  run(s2, 30);
+  assert.ok(s2.ev.includes('finish') && s2.race.me.finished);
+  // logboek loopt door over de etappes heen
+  const log = s2.race.stats.log;
+  for (let i = 1; i < log.length; i++) assert.ok(log[i][0] > log[i - 1][0] && log[i][1] >= log[i - 1][1] - 0.01, `logregel ${i}`);
+
+  // cooling-down: ik ben al gefinisht en rijd vrij; de bot finisht nog op de streep (afstand 0)
+  const cd = mk('kosmo', { mode: 'cool', timed: 30, rolling: true, carry: s2.race.carryOut() });
+  assert.equal(cd.race.me.finished, true);
+  const d0 = cd.race.me.dist;
+  run(cd, 12);
+  assert.ok(cd.race.me.dist > d0 + 50, 'ik rijd zelf tijdens het uitrijden');
+  assert.ok(cd.race.riders[1].finished && cd.race.riders[1].finishTime > cd.race.me.finishTime);
+});

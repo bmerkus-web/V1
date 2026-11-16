@@ -40,6 +40,14 @@ export class Race {
     Object.assign(this, cfg); // track, laps, room, isHost, ns, profile, getPower, getSteer, difficulty, ghost, emit
     this.L = this.track.length;
     this.total = this.L * this.laps;
+    // Training: een rit bestaat uit etappes. mode = 'race' (losse race), 'warm', 'stage' of 'cool'.
+    this.mode = cfg.mode || 'race';
+    this.free = this.mode === 'warm' || this.mode === 'cool'; // vrij rijden: geen items, geen strijd
+    this.finishAt = this.mode === 'cool' ? 0 : this.free || this.open ? Infinity : this.total; // waar de eindstreep ligt
+    this.distOffset = cfg.distOffset || 0; // afstand van eerdere etappes (voor multiplayer)
+    this.logDist = cfg.logDist || 0;
+    this.logT = cfg.carry?.logT || 0;
+    this.courseLen = cfg.courseLen || this.total;
     this.rng = mulberry((cfg.seed || 1) ^ 0x9e3779b9);
     this.time = 0;
     this.clock = 0; // loopt altijd (animaties)
@@ -66,6 +74,18 @@ export class Race {
     this.trainerGrade = 0;
     this._hid = 0;
     this._lastCount = 6;
+    const c = cfg.carry; // toestand uit de vorige etappe
+    if (c) {
+      this.time = c.time; this.stats = c.stats; this.startedAt = c.startedAt; this.prs = c.prs; this.logDist = c.logDist;
+      for (const r of this.riders) {
+        const o = c.riders[r.id];
+        if (!o) continue;
+        r.bolts = o.bolts; r.item = this.free ? null : o.item; r.finished = o.finished; r.finishTime = o.finishTime;
+        if (cfg.rolling) { r.dist = o.gap; r.x = o.x; r.v = o.v; }
+      }
+    }
+    this.t0 = this.lapStart = this.time;
+    if (cfg.rolling) { this.state = 'race'; this.countdown = 0; this.startedAt ||= Date.now(); }
     this.rank();
   }
 
@@ -118,7 +138,7 @@ export class Race {
       this._lastCount = c;
       if (this.countdown <= 0) {
         this.state = 'race';
-        this.startedAt = Date.now();
+        this.startedAt ||= Date.now();
         this.emit('go');
         if (this.launch > this.profile.ftp * 1.2) {
           me.fx.boost = 2.5;
@@ -131,15 +151,19 @@ export class Race {
       return;
     }
     this.time += dt;
+    if (this.timed && !this.ended && this.time - this.t0 >= this.timed) { this.ended = true; this.emit('stage'); return; }
+    this.portal = this.open && me.dist >= this.total - this.L ? this.portalArch : null;
 
     // Ik
     // Eerlijk: vermogen t.o.v. FTP. Anders: watt per kilo (omgerekend naar een renner van 75 kg).
     const eff = this.profile.fair ? (me.power * REF_FTP) / Math.max(80, this.profile.ftp) : (me.power * REF_KG) / clamp(this.profile.weight || REF_KG, 40, 150);
-    if (me.finished) this._stepLocal(me, 110, clamp(-me.x * 2, -1, 1), dt, true);
+    if (me.finished && !this.free) this._stepLocal(me, 110, clamp(-me.x * 2, -1, 1), dt, true);
     else {
       this._stepLocal(me, eff, this.getSteer(dt), dt, false);
       this._meProgress(dt);
     }
+    // Door de teleportboog: volgende etappe.
+    if (this.open && !this.ended && me.dist >= this.total) { this.ended = true; this.emit('stage'); return; }
 
     // Bots (alleen als ik ze beheer) en renners op afstand
     for (const r of this.riders) {
@@ -191,7 +215,7 @@ export class Race {
       if (e.magnet > 0 && gap > 3 && gap < 160) pull = true;
       // Kwak: rijd vlak naast iemand en stuur naar hem toe.
       const side = o.x - r.x;
-      if (r.kwakCd <= 0 && (!r.ai || r.ai.kwakT > 0) && !(o.kwakSafe > 0) && this.time > 3 && !r.finished && !o.finished &&
+      if (!this.free && r.kwakCd <= 0 && (!r.ai || r.ai.kwakT > 0) && !(o.kwakSafe > 0) && this.time > 3 && !r.finished && !o.finished &&
         Math.abs(gap) < 1.8 && Math.abs(side) > 0.04 && Math.abs(side) < 0.32 && steer * Math.sign(side) > 0.4) this._kwak(r, o, Math.sign(side));
       // Lichte botsing: wie achterop rijdt wijkt uit.
       if (gap > 0 && gap < 1.6 && Math.abs(o.x - r.x) < 0.16) r.x += (r.x >= o.x ? 1 : -1) * dt * 0.8;
@@ -203,7 +227,7 @@ export class Race {
     if (offRoadCut) r.line += CUT_BONUS;
     r.dist += r.v * dt * (1 + r.line);
 
-    if (r.dist >= 0) this._pickups(r, prev);
+    if (r.dist >= 0 && !this.free) this._pickups(r, prev);
     if (r.roulette > 0) {
       r.roulette -= dt;
       if (r.roulette <= 0) {
@@ -211,9 +235,9 @@ export class Race {
         if (r === this.me) this.emit('sfx', 'item');
       }
     }
-    if (!r.finished && r.dist >= this.total) {
+    if (!r.finished && r.dist >= this.finishAt) {
       r.finished = true;
-      r.finishTime = this.time - (r.dist - this.total) / Math.max(r.v, 1);
+      r.finishTime = this.time - (r.dist - this.finishAt) / Math.max(r.v, 1);
       this.room?.send({ t: 'fin', id: r.id, time: r.finishTime });
       if (r !== this.me) this.say(`🏁 ${r.name}`);
     }
@@ -270,7 +294,7 @@ export class Race {
     if (st.secT >= 1) {
       st.secs.push(st.secAcc / st.secN);
       // Rit-logboek (1x per seconde) voor de export naar Strava e.d.
-      st.log.push([Math.round(this.time * 10) / 10, Math.max(0, me.dist), st.secAcc / st.secN, me.cadence, me.hr, me.v, this.track.yAt(me.dist)]);
+      st.log.push([Math.round((this.logT + this.time) * 10) / 10, this.logDist + Math.max(0, me.dist), st.secAcc / st.secN, me.cadence, me.hr, me.v, this.track.yAt(me.dist)]);
       st.secAcc = st.secN = 0; st.secT -= 1;
       for (const w of [5, 60, 300]) {
         if (st.secs.length < w) continue;
@@ -283,7 +307,7 @@ export class Race {
     this.recAt -= dt;
     if (this.recAt <= 0) { this.recAt += 0.5; this.rec.push(Math.round(me.dist * 10) / 10, Math.round(me.x * 100)); }
 
-    if (me.dist < 0) return;
+    if (me.dist < 0 || this.free) return;
     const m1 = mod(me.dist, L), m0 = mod(me.dist - me.v * dt, L);
     for (const z of this.track.zones) {
       if (m0 < z.start && m1 >= z.start) {
@@ -307,24 +331,36 @@ export class Race {
       this.lapStart = this.time;
       this.lastLap = t;
       if (this.laps > 1) {
-        this._time(`${id}|lap`, t, 'Ronde');
+        if (!this.training) this._time(`${id}|lap`, t, 'Ronde'); // in een training start je vliegend: geen ronde-PR
         if (lap < this.laps) this.emit('sfx', 'lap');
         if (lap === this.laps - 1) this.emit('banner', { text: 'LAATSTE RONDE!', color: '#ff3fa4' });
       }
     }
     if (me.finished) {
-      const key = `${id}|race|${this.laps}`;
-      const res = this._time(key, me.finishTime, 'Race');
-      if (res.isPR) setGhost(this.ns, `${id}|ghost|${this.laps}`, { d: this.rec });
+      if (!this.training) {
+        const key = `${id}|race|${this.laps}`;
+        const res = this._time(key, me.finishTime, 'Race');
+        if (res.isPR) setGhost(this.ns, `${id}|ghost|${this.laps}`, { d: this.rec });
+      }
       this.state = 'done';
       const s = store.stats;
-      s.km += this.total / 1000; s.races++;
+      s.km += this.courseLen / 1000; s.races++;
       if (me.rank === 1 && this.riders.length > 1) s.wins++;
-      s.xp += Math.round(this.total / 100 + (this.riders.length - me.rank) * 15 + this.prs.length * 10);
+      s.xp += Math.round(this.courseLen / 100 + (this.riders.length - me.rank) * 15 + this.prs.length * 10);
       this.savePower();
       save();
       this.emit('finish');
     }
+  }
+
+  // Toestand die mee moet naar de volgende etappe. Afstanden t.o.v. de streep.
+  carryOut() {
+    const warm = this.mode === 'warm', riders = {};
+    for (const r of this.riders) riders[r.id] = { gap: warm ? 0 : r.dist - this.total, x: r.x, v: r.v, bolts: warm ? 0 : r.bolts, item: this.free ? null : r.item, finished: r.finished, finishTime: r.finishTime };
+    return {
+      time: warm ? 0 : this.time, logT: warm ? this.logT + this.time : this.logT, logDist: this.logDist + Math.max(0, this.me.dist),
+      stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders,
+    };
   }
 
   savePower() {
@@ -368,7 +404,7 @@ export class Race {
 
   // ---------- items ----------
   useItem(r = this.me) {
-    if (!r.item || this.state === 'countdown' || r.finished) return;
+    if (!r.item || this.state === 'countdown' || r.finished || this.free) return;
     const item = r.item;
     r.item = null;
     const isMe = r === this.me;
@@ -378,7 +414,7 @@ export class Race {
       case 'shield': r.fx.shield = 12; if (isMe) this.emit('sfx', 'shield'); break;
       case 'magnet': r.fx.magnet = 6; if (isMe) this.emit('sfx', 'shield'); break;
       case 'glue':
-        msg.h = { id: r.id + '-' + this._hid++, d: mod(r.dist - 3, this.L), x: r.x, owner: r.id };
+        msg.h = { id: r.id + '-' + this._hid++, d: mod(r.dist - 3, this.L), x: r.x, owner: r.id, st: this.stageIdx | 0 };
         this.hazards.push({ ...msg.h, age: 0 });
         if (isMe) this.emit('sfx', 'drop');
         break;
@@ -484,9 +520,11 @@ export class Race {
     let p = ai.base * (1 + 0.08 * Math.sin(this.time * 0.13 + ai.ph) + 0.05 * Math.sin(this.time * 0.47 + ai.ph * 2));
     if (seg.grade > 3) p *= 1.08;
     if (seg.zone === 'sprint') p *= 1.3;
-    if (this.total - r.dist < 300) p *= 1.35;
+    if (this.finishAt - r.dist < 300 && this.finishAt > r.dist) p *= 1.35;
     if (!me.finished) p *= 1 + clamp((me.dist - r.dist) / 400, -0.1, 0.12); // elastiek
     if (r.finished) p = 100;
+    // Warming-up / uitrijden: rustig meerijden in de buurt van de speler.
+    if (this.mode === 'warm' || (this.free && r.finished)) p = ai.base * 0.5 * (1 + clamp((me.dist - 4 - r.dist) / 60, -0.5, 0.6));
     r.power = p;
     r.cadence = 85 + 10 * Math.sin(this.time * 0.2 + ai.ph);
 
@@ -553,7 +591,8 @@ export class Race {
     if (!n) return;
     n.age += dt;
     const target = n.d + n.v * Math.min(n.age, 1);
-    r.dist = lerp(r.dist + n.v * dt, target, Math.min(1, dt * 6));
+    if (Math.abs(target - r.dist) > 150) r.dist = target; // andere etappe of teleport: niet schuiven maar springen
+    else r.dist = lerp(r.dist + n.v * dt, target, Math.min(1, dt * 6));
     r.x = lerp(r.x, n.x, Math.min(1, dt * 8));
     r.v = n.v;
   }
@@ -566,7 +605,7 @@ export class Race {
     const a = [];
     for (const r of this.riders) {
       if (!this.local(r)) continue;
-      a.push([r.id, Math.round(r.dist * 10) / 10, Math.round(r.x * 100) / 100, Math.round(r.v * 10) / 10, Math.round(r.power), r.mask, r.bolts, Math.round(r.cadence)]);
+      a.push([r.id, Math.round((r.dist + this.distOffset) * 10) / 10, Math.round(r.x * 100) / 100, Math.round(r.v * 10) / 10, Math.round(r.power), r.mask, r.bolts, Math.round(r.cadence)]);
     }
     this.room.send({ t: 'st', a });
   }
@@ -574,8 +613,8 @@ export class Race {
   onNet(msg) {
     switch (msg.t) {
       case 'st':
-        for (const [id, d, x, v, p, mask, bolts, cad] of msg.a) {
-          const r = this.byId(id);
+        for (const [id, gd, x, v, p, mask, bolts, cad] of msg.a) {
+          const r = this.byId(id), d = gd - this.distOffset;
           if (!r || this.local(r)) continue;
           if (!r.net) { r.dist = d; r.x = x; }
           r.net = { d, x, v, age: 0 };
@@ -585,7 +624,7 @@ export class Race {
       case 'use': {
         const r = this.byId(msg.id);
         if (!r) break;
-        if (msg.item === 'glue') this.hazards.push({ ...msg.h, age: 0 });
+        if (msg.item === 'glue') { if ((msg.h.st | 0) === (this.stageIdx | 0)) this.hazards.push({ ...msg.h, age: 0 }); }
         else if (msg.item === 'rocket' && msg.to) {
           this.rockets.push({ from: r.id, to: msg.to, d: r.dist + 1, x: r.x, age: 0 });
           if (msg.to === this.me.id) this.emit('banner', { text: '🚀 VUURPIJL OP KOMST!', color: '#ff3b3b' });
