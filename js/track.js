@@ -173,7 +173,7 @@ function build(def) {
   // loopt een oprit schuin vanaf de weg, zodat je er zonder berm op en af kunt.
   let cut = null;
   if (def.cut) {
-    const [cs, cl] = def.cut, RAMP = 30, s0 = cs / SEG, cn = cl / SEG;
+    const [cs, cl] = def.cut, RAMP = 10, s0 = cs / SEG, cn = cl / SEG;
     const side = Math.sign(segs[s0 + (cn >> 1)].curve) || 1;
     const centre = (d) => {
       const k = Math.max(0, Math.min(1, d < RAMP ? d / RAMP : (cl - d) / RAMP));
@@ -181,7 +181,7 @@ function build(def) {
     };
     for (let k = 0; k < cn; k++) {
       const onRamp = k * SEG < RAMP || (k + 1) * SEG > cl - RAMP;
-      segs[s0 + k].cut = { a: centre(k * SEG), b: centre((k + 1) * SEG), hw: onRamp ? 0.15 : CUT_HW, ramp: onRamp };
+      segs[s0 + k].cut = { a: centre(k * SEG), b: centre((k + 1) * SEG), hw: onRamp ? CUT_HW + 0.02 : CUT_HW, ramp: onRamp };
     }
     cut = { start: cs, end: cs + cl, side };
   }
