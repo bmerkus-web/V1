@@ -191,3 +191,29 @@ test('Zonder stuurhulp duwt een bocht je naar buiten', () => {
   for (let i = 0; i < 25; i++) race.update(0.04);
   assert.ok(race.me.x < -0.1, `x = ${race.me.x}`); // bocht naar rechts duwt naar links
 });
+
+test('Short cut: oprit sluit aan op de weg, pad loont, ernaast is berm', () => {
+  for (const d of TRACK_DEFS) {
+    const t = getTrack(d.id), cut = t.cut;
+    assert.ok(cut && cut.end - cut.start >= 120, d.id);
+    const cs = t.segs.filter((s) => s.cut);
+    assert.ok(Math.abs(cs[0].cut.a) < 1 && Math.abs(cs[cs.length - 1].cut.b) < 1, 'op- en afrit beginnen op de weg');
+    assert.ok(cs.every((s) => Math.sign(s.cut.a) === cut.side && Math.sign(s.curve) === cut.side), 'pad ligt in de binnenbocht');
+    // aaneengesloten: einde van elk stukje = begin van het volgende
+    for (let i = 1; i < cs.length; i++) assert.ok(Math.abs(cs[i].cut.a - cs[i - 1].cut.b) < 1e-9);
+  }
+  const run = (x) => {
+    const { race } = simulate({ track: 'kosmo', laps: 1, bots: 0, maxTime: 10, useItems: false });
+    const cut = race.track.cut, me = race.me;
+    me.dist = cut.start + 50; me.v = 10;
+    const d0 = me.dist;
+    for (let i = 0; i < 40; i++) { me.x = x; race.update(0.04); }
+    return { d: me.dist - d0, me };
+  };
+  const side = getTrack('kosmo').cut.side;
+  const path = run(side * 1.28), edge = run(side * 0.95), berm = run(side * 1.08);
+  assert.equal(path.me.onCut, true); assert.equal(path.me.berm, false);
+  assert.equal(berm.me.onCut, false); assert.equal(berm.me.berm, true);
+  assert.ok(path.d > edge.d * 1.08, `pad ${path.d} vs binnenkant weg ${edge.d}`);
+  assert.ok(berm.d < edge.d, 'in de berm verlies je');
+});

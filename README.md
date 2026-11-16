@@ -13,6 +13,7 @@ Het is een web-app zonder installatie: hij draait in **Chrome op een Android-tab
 - **Echt sturen** met de Elite Sterzo Smart. Zonder Sterzo: pijltjestoetsen of knoppen op het scherm.
 - **6 power-ups** – Turbo, Schild, Vuurpijl, Lijmklodder, Magneet en Tegenwind. Wie achteraan rijdt krijgt de sterkste.
 - **Ideale lijn** – de binnenbocht is korter; bochten duwen je naar buiten, dus goed sturen levert meters op. Blitzjes liggen in slalom en turbostroken zijn smal.
+- **Short cut** – elke baan heeft één smal pad door een binnenbocht: winst voor wie strak stuurt, berm voor wie mist.
 - **Kwak** – stuur tegen een renner aan die vlak naast je rijdt: hij verliest een blitzje en is even trager.
 - **Blitzjes (bliksemschichtjes voor extra snelheid), turbostroken, slipstream en raketstart.**
 - **3 banen** – Neon Polder (vlak), Vulkaanpas (lange klim) en Kosmodroom (bochtig, steile muur).

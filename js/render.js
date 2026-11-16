@@ -140,6 +140,11 @@ export class Renderer {
         for (const l of [-1 / 3, 1 / 3]) this._quad(a.X + w1 * l, a.Y, w1 * 0.014, b.X + w2 * l, b.Y, w2 * 0.014);
         c.globalAlpha = 1;
       }
+      if (seg.cut) { // short-cut-pad door de berm
+        const cu = seg.cut;
+        c.fillStyle = alt ? '#ffd166' : '#a8791f';
+        this._quad(a.X + w1 * cu.a, a.Y, w1 * cu.hw, b.X + w2 * cu.b, b.Y, w2 * cu.hw);
+      }
       if (seg.pad) {
         const p = seg.pad, blink = (Math.floor(t * 8) + seg.i) % 3;
         c.fillStyle = blink === 0 ? '#fff36b' : blink === 1 ? '#ff9a1c' : '#ff5a1c';
