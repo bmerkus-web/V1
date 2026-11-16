@@ -3,7 +3,8 @@ import { mulberry, hashStr, mod } from './util.js';
 
 export const SEG = 5; // meter per wegsegment
 export const ROAD_W = 4.5;
-export const CUT_X = 1.28, CUT_HW = 0.115; // short cut: midden en halve breedte (in halve wegbreedtes) // halve wegbreedte in meter
+export const CUT_X = 1.28, CUT_HW = 0.115;
+export const KERB = CUT_X - CUT_HW; // buitenrand van de kerbstones = binnenrand van het short-cut-pad // short cut: midden en halve breedte (in halve wegbreedtes) // halve wegbreedte in meter
 
 const T = (len, curve = 0, grade = 0, zone = null) => ({ len, curve, grade, zone });
 const sprint = (name) => ({ type: 'sprint', name });
@@ -168,7 +169,7 @@ function build(def) {
   for (let d = 520; d < total - 300; d += 900) padAt(d, [-0.5, 0, 0.5][Math.floor(rng() * 3)]);
   for (const z of zones) if (z.type === 'sprint') padAt(z.start + 20, 0);
 
-  // Short cut: een smal pad door de binnenberm van een scherpe bocht. Aan het begin en eind
+  // Geheime short cut: een smal, onzichtbaar pad vlak buiten de kerbstones van een scherpe bocht. Aan het begin en eind
   // loopt een oprit schuin vanaf de weg, zodat je er zonder berm op en af kunt.
   let cut = null;
   if (def.cut) {
@@ -180,7 +181,7 @@ function build(def) {
     };
     for (let k = 0; k < cn; k++) {
       const onRamp = k * SEG < RAMP || (k + 1) * SEG > cl - RAMP;
-      segs[s0 + k].cut = { a: centre(k * SEG), b: centre((k + 1) * SEG), hw: onRamp ? 0.15 : CUT_HW };
+      segs[s0 + k].cut = { a: centre(k * SEG), b: centre((k + 1) * SEG), hw: onRamp ? 0.15 : CUT_HW, ramp: onRamp };
     }
     cut = { start: cs, end: cs + cl, side };
   }
