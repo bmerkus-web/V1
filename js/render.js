@@ -136,9 +136,15 @@ export class Renderer {
       c.fillStyle = seg.zone === 'sprint' ? '#39ffb0' : seg.zone === 'climb' ? '#ff7b1c' : th.rumble[0];
       const kc = (1 + KERB) / 2, kh = (KERB - 1) / 2;
       for (let q = 0; q < 2; q++) { // twee blokjes per wegsegment, met evenveel ruimte ertussen
-        const k1 = q ? this._pt(seg, 0.5, 0) : a, k2 = this._pt(seg, q ? 0.75 : 0.25, 0);
+        const t1 = q ? 0.5 : 0, t2 = t1 + 0.25;
+        const k1 = q ? this._pt(seg, 0.5, 0) : a, k2 = this._pt(seg, t2, 0);
         for (const sd of [-1, 1]) {
-          if (seg.cut && seg.cut.ramp && Math.sign(seg.cut.a) === sd) continue;
+          const cu = seg.cut && Math.sign(seg.cut.a) === sd ? seg.cut : null;
+          if (cu) { // tweede rij kerbstones langs de andere kant van het short-cut-pad
+            const o1 = cu.a + (cu.b - cu.a) * t1 + sd * (cu.hw + kh), o2 = cu.a + (cu.b - cu.a) * t2 + sd * (cu.hw + kh);
+            this._quad(k1.X + k1.u * ROAD_W * o1, k1.Y, k1.u * ROAD_W * kh, k2.X + k2.u * ROAD_W * o2, k2.Y, k2.u * ROAD_W * kh);
+            if (cu.ramp) continue; // het gat: hier steek je over
+          }
           this._quad(k1.X + sd * k1.u * ROAD_W * kc, k1.Y, k1.u * ROAD_W * kh, k2.X + sd * k2.u * ROAD_W * kc, k2.Y, k2.u * ROAD_W * kh);
         }
       }
