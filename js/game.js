@@ -2,7 +2,7 @@
 import { SEG, ROAD_W } from './track.js';
 import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
-import { submitTime, getTime, setGhost, submitPower, store, save } from './storage.js';
+import { submitTime, getTime, setGhost, getGhost, submitPower, store, save } from './storage.js';
 
 export const ITEMS = {
   turbo: { name: 'Turbo', icon: '⚡', hint: 'Korte megaversnelling' },
@@ -65,7 +65,10 @@ export class Race {
     this.lastLap = null;
     this.prs = []; // behaalde PR's deze race
     this.ghostDelta = null;
-    this.ghostRider = this.ghost ? { id: 'ghost', name: 'PR', color: '#ffffff', kind: 'ghost', dist: -3, x: 0, v: 0, mask: 0, bolts: 0, cadence: 80 } : null;
+    this.ghostRider = this.ghost ? { id: 'ghost', gk: 'race', name: 'PR race', color: '#ffffff', kind: 'ghost', dist: -3, x: 0, v: 0, mask: 0, bolts: 0, cadence: 80 } : null;
+    this.ghostRiders = this.ghostRider ? [this.ghostRider] : []; // alle spoken die nu meerijden (race, ronde, segment)
+    this.trace = []; // [tijd, afstand, x] elke halve seconde: grondstof voor ronde- en segmentspoken
+    this.zoneGhost = {};
     this.rec = [];
     this.recAt = 0;
     this.stats = { sumP: 0, n: 0, maxP: 0, secs: [], secAcc: 0, secN: 0, secT: 0, best: { 5: 0, 60: 0, 300: 0 }, maxV: 0, sumHr: 0, nHr: 0, maxHr: 0, log: [] };
@@ -85,7 +88,8 @@ export class Race {
       }
     }
     this.t0 = this.lapStart = this.time;
-    if (cfg.rolling) { this.state = 'race'; this.countdown = 0; this.startedAt ||= Date.now(); }
+    this.lapD0 = this.me.dist; // waar ik was toen deze ronde begon (t.o.v. de streep)
+    if (cfg.rolling) { this.state = 'race'; this.countdown = 0; this.startedAt ||= Date.now(); this._startGhost('lap', `${this.track.id}|lapghost`, 'PR ronde', 0); }
     this.rank();
   }
 
@@ -139,6 +143,7 @@ export class Race {
       if (this.countdown <= 0) {
         this.state = 'race';
         this.startedAt ||= Date.now();
+        this._startGhost('lap', `${this.track.id}|lapghost`, 'PR ronde', 0);
         this.emit('go');
         if (this.launch > this.profile.ftp * 1.2) {
           me.fx.boost = 2.5;
@@ -175,6 +180,7 @@ export class Race {
     this.hazards = this.hazards.filter((h) => h.age < 45);
     this.rank();
     this._ghost(dt);
+    this._ghosts();
 
     const seg = this.track.segAt(me.dist);
     this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) - (me.fx.boost > 0 ? 1.5 : 0);
@@ -305,13 +311,15 @@ export class Race {
     }
     // Spook opnemen (2x per seconde)
     this.recAt -= dt;
-    if (this.recAt <= 0) { this.recAt += 0.5; this.rec.push(Math.round(me.dist * 10) / 10, Math.round(me.x * 100)); }
+    if (this.recAt <= 0) { this.recAt += 0.5; this.rec.push(Math.round(me.dist * 10) / 10, Math.round(me.x * 100)); this.trace.push(this.time, me.dist, me.x); }
 
     if (me.dist < 0 || this.free) return;
     const m1 = mod(me.dist, L), m0 = mod(me.dist - me.v * dt, L);
     for (const z of this.track.zones) {
       if (m0 < z.start && m1 >= z.start) {
         this.zoneStart[z.id] = this.time;
+        this.zoneGhost[z.id] = { d0: m1 - z.start, base: me.dist - m1 + z.start };
+        this._startGhost('seg', `${id}|segghost|${z.id}`, 'PR ' + z.name, this.zoneGhost[z.id].base);
         this.activeZone = { zone: z, t0: this.time, pr: getTime(this.ns, `${id}|seg|${z.id}`) };
         this.emit('sfx', 'zone');
         this.emit('banner', { text: (z.type === 'sprint' ? '⚡ SPRINT: ' : '⛰️ KLIM: ') + z.name, sub: this.activeZone.pr ? 'PR ' + fmtTime(this.activeZone.pr) : 'Zet een eerste tijd!', color: z.type === 'sprint' ? '#39ffb0' : '#ff7b1c' });
@@ -322,19 +330,27 @@ export class Race {
         this.activeZone = null;
         me.bolts = Math.min(10, me.bolts + 1);
         this._time(`${id}|seg|${z.id}`, t, z.name);
+        const zg = this.zoneGhost[z.id];
+        if (zg) this._saveGhost(`${id}|segghost|${z.id}`, t, this.time - t, zg.base, zg.d0);
+        this.ghostRiders = this.ghostRiders.filter((g) => g.gk !== 'seg');
       }
     }
     const lap = Math.floor(me.dist / L);
     if (lap > (this._lap || 0)) {
       this._lap = lap;
-      const t = this.time - this.lapStart;
+      const t = this.time - this.lapStart, key = `${id}|lap`;
+      // Ronderecords tellen altijd; ook bij een vliegende start (zoals elke ronde na de eerste).
+      if (this.laps > 1 || this.training) {
+        this._time(key, t, 'Ronde');
+        if (lap < this.laps) this.emit('sfx', 'lap');
+        if (lap === this.laps - 1 && this.laps > 1) this.emit('banner', { text: 'LAATSTE RONDE!', color: '#ff3fa4' });
+      } else if (submitTime(this.ns, key, t).isPR) this.prs.push({ label: 'Ronde', t, prev: null });
+      this._saveGhost(`${id}|lapghost`, t, this.lapStart, (lap - 1) * L, this.lapD0);
       this.lapStart = this.time;
       this.lastLap = t;
-      if (this.laps > 1) {
-        if (!this.training) this._time(`${id}|lap`, t, 'Ronde'); // in een training start je vliegend: geen ronde-PR
-        if (lap < this.laps) this.emit('sfx', 'lap');
-        if (lap === this.laps - 1) this.emit('banner', { text: 'LAATSTE RONDE!', color: '#ff3fa4' });
-      }
+      this.lapD0 = me.dist - lap * L;
+      if (lap < this.laps || this.open) this._startGhost('lap', `${id}|lapghost`, 'PR ronde', lap * L);
+      else this.ghostRiders = this.ghostRiders.filter((g) => g.gk !== 'lap');
     }
     if (me.finished) {
       if (!this.training) {
@@ -388,18 +404,64 @@ export class Race {
     if (!g) return;
     const d = this.ghost.d, n = d.length / 2;
     const f = this.time / 0.5, i = Math.floor(f);
-    if (i >= n - 1) { g.dist = d[(n - 1) * 2]; g.v = 0; this.ghostDelta = null; g.hidden = true; return; }
+    if (i >= n - 1) { g.dist = d[(n - 1) * 2]; g.v = 0; g.delta = null; g.hidden = true; return; }
     g.dist = lerp(d[i * 2], d[i * 2 + 2], f - i);
     g.x = lerp(d[i * 2 + 1], d[i * 2 + 3], f - i) / 100;
     g.v = (d[i * 2 + 2] - d[i * 2]) / 0.5;
     // Tijdsverschil: wanneer was het spook op mijn huidige afstand?
     const md = this.me.dist;
     let lo = 0, hi = n - 1;
-    if (md <= d[0] || md > d[hi * 2] || this.me.finished) { if (this.me.finished) return; this.ghostDelta = null; return; }
+    if (md <= d[0] || md > d[hi * 2] || this.me.finished) { if (this.me.finished) return; g.delta = null; return; }
     while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (d[mid * 2] < md) lo = mid; else hi = mid; }
     const span = d[hi * 2] - d[lo * 2];
     const tg = (lo + (span > 0 ? (md - d[lo * 2]) / span : 0)) * 0.5;
-    this.ghostDelta = this.time - tg;
+    g.delta = this.time - tg;
+  }
+
+  // Start een ronde- of segmentspook: mijn beste opgenomen poging, die nu naast me begint.
+  _startGhost(gk, key, name, base) {
+    this.ghostRiders = this.ghostRiders.filter((g) => g.gk !== gk);
+    if (this.free || !(gk === 'lap' ? this.ghostLap : this.ghostSeg)) return;
+    const s = getGhost(this.ns, key)?.s;
+    if (!s || s.length < 6) return;
+    this.ghostRiders.push({ id: 'ghost-' + gk, gk, name, color: '#ffffff', kind: 'ghost', dist: base + s[1], x: s[2] / 100, v: 0, mask: 0, bolts: 0, cadence: 85, s, t0: this.time, base, i: 0, j: 0, delta: null });
+  }
+
+  // Bewaart deze poging als spook als hij sneller is dan het spook dat er al was.
+  _saveGhost(key, t, tStart, base, d0) {
+    const old = getGhost(this.ns, key);
+    if (old && old.t <= t) return;
+    const tr = this.trace, r1 = (v) => Math.round(v * 10) / 10, s = [0, r1(d0), 0];
+    for (let i = 0; i < tr.length; i += 3) if (tr[i] > tStart + 0.01 && tr[i] < tStart + t - 0.01) s.push(Math.round((tr[i] - tStart) * 100) / 100, r1(tr[i + 1] - base), Math.round(tr[i + 2] * 100));
+    s.push(Math.round(t * 100) / 100, r1(this.me.dist - base), Math.round(this.me.x * 100));
+    s[2] = s[5];
+    setGhost(this.ns, key, { t, s });
+    save();
+  }
+
+  // Beweegt de ronde- en segmentspoken en kiest welk tijdsverschil in beeld komt.
+  _ghosts() {
+    for (const g of this.ghostRiders) {
+      const s = g.s;
+      if (!s) continue; // het race-spook loopt via _ghost()
+      const n = s.length / 3, tr = this.time - g.t0;
+      if (tr >= s[(n - 1) * 3]) { g.hidden = true; g.delta = null; continue; }
+      while (g.i < n - 2 && s[(g.i + 1) * 3] <= tr) g.i++;
+      const a = g.i * 3, f = clamp((tr - s[a]) / Math.max(1e-6, s[a + 3] - s[a]), 0, 1);
+      g.dist = g.base + lerp(s[a + 1], s[a + 4], f);
+      g.x = lerp(s[a + 2], s[a + 5], f) / 100;
+      g.v = (s[a + 4] - s[a + 1]) / Math.max(1e-6, s[a + 3] - s[a]);
+      const md = this.me.dist - g.base; // wanneer was het spook waar ik nu ben?
+      if (md > s[1] && md <= s[(n - 1) * 3 + 1]) {
+        while (g.j < n - 2 && s[(g.j + 1) * 3 + 1] < md) g.j++;
+        const b = g.j * 3, span = s[b + 4] - s[b + 1];
+        g.delta = tr - (s[b] + (span > 0 ? (md - s[b + 1]) / span : 0) * (s[b + 3] - s[b]));
+      } else g.delta = null;
+    }
+    this.ghostRiders = this.ghostRiders.filter((g) => !(g.s && g.hidden));
+    const pick = ['seg', 'lap', 'race'].map((k) => this.ghostRiders.find((g) => g.gk === k && g.delta != null)).find(Boolean);
+    this.ghostDelta = pick ? pick.delta : null;
+    this.ghostLabel = pick ? { seg: 'segment', lap: 'ronde', race: 'race' }[pick.gk] : '';
   }
 
   // ---------- items ----------

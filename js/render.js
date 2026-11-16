@@ -180,8 +180,7 @@ export class Renderer {
       r._ph = (r._ph || 0) + ((r.cadence || 0) / 60) * Math.PI * 2 * dt;
       put(r.dist, { rider: r });
     }
-    const gr = race.ghostRider;
-    if (gr && !gr.hidden) { gr._ph = (gr._ph || 0) + 8 * dt; put(gr.dist, { rider: gr, ghost: true }); }
+    for (const gr of race.ghostRiders) if (!gr.hidden) { gr._ph = (gr._ph || 0) + 8 * dt; put(gr.dist, { rider: gr, ghost: true }); }
     for (const h of race.hazards) put(h.d, { glue: h });
     for (const p of race.rockets) put(p.d, { rocket: p });
 
