@@ -1,4 +1,7 @@
 // Rit exporteren als TCX-bestand (voor Strava, Garmin Connect, TrainingPeaks, ...).
+// Strava gebruikt de hoogte uit het bestand alleen als de naam van het apparaat eindigt op
+// "with barometer"; anders rekent het de hoogte zelf uit en komt een indoorrit op 0 uit.
+const BASE_ALT = 50; // de start ligt op 50 m, zodat de hoogte nooit negatief wordt
 const iso = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
 const xml = (s) => String(s).replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -9,7 +12,7 @@ export function buildTcx({ startedAt, log, name }) {
   const kJ = log.reduce((s, p, i) => s + p[2] * (i ? p[0] - log[i - 1][0] : 1), 0) / 1000;
   const hrs = log.map((p) => p[4]).filter((h) => h > 0);
   const pts = log.map(([t, d, w, cad, hr, v, alt]) =>
-    `<Trackpoint><Time>${iso(startedAt + t * 1000)}</Time><AltitudeMeters>${(Math.round(alt * 10) / 10 || 0).toFixed(1)}</AltitudeMeters><DistanceMeters>${d.toFixed(1)}</DistanceMeters>` +
+    `<Trackpoint><Time>${iso(startedAt + t * 1000)}</Time><AltitudeMeters>${(BASE_ALT + alt).toFixed(1)}</AltitudeMeters><DistanceMeters>${d.toFixed(1)}</DistanceMeters>` +
     (hr > 0 ? `<HeartRateBpm><Value>${Math.round(hr)}</Value></HeartRateBpm>` : '') +
     `<Cadence>${Math.round(cad)}</Cadence><Extensions><ns3:TPX><ns3:Speed>${v.toFixed(2)}</ns3:Speed><ns3:Watts>${Math.round(w)}</ns3:Watts></ns3:TPX></Extensions></Trackpoint>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -21,7 +24,7 @@ export function buildTcx({ startedAt, log, name }) {
 <Track>
 ${pts}
 </Track></Lap><Notes>${xml(name)}</Notes>
-<Creator xsi:type="Device_t" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Name>Watt Blitz</Name><UnitId>0</UnitId><ProductID>0</ProductID></Creator>
+<Creator xsi:type="Device_t" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Name>Watt Blitz with barometer</Name><UnitId>0</UnitId><ProductID>0</ProductID></Creator>
 </Activity></Activities></TrainingCenterDatabase>
 `;
 }

@@ -19,6 +19,7 @@ Het is een web-app zonder installatie: hij draait in **Chrome op een Android-tab
 - **3 banen** – Neon Polder (vlak), Vulkaanpas (lange klim) en Kosmodroom (bochtig, steile muur).
 - **Solo** – tot 5 bots op vier niveaus, PR's voor sprints, klimmen, rondes en races, een spook van je beste race, vermogensrecords (5 s / 1 min / 5 min) en levels.
 - **Spoken** – je beste race, ronde en segment rijden als spook met je mee, met live tijdsverschil; per soort aan of uit te zetten bij de start.
+- **Klassement** – beste ronde- en segmenttijden van jou en van iedereen met wie je in een kamer hebt gezeten (geen server: tijden worden in de kamer uitgewisseld).
 - **Training** – stel je eigen parcours samen uit etappes (baan + rondes), met 7 minuten warming-up en cooling-down. Tussen de etappes rijd je door een teleportboog. Solo, met bots of met vrienden.
 - **Multiplayer** – tot 6 renners via een kamercode van 4 letters; lege plekken vul je met bots.
 - **Eerlijke modus** – vermogen telt t.o.v. ieders FTP, zodat verschillende niveaus samen kunnen racen. Staat die uit, dan telt watt per kilo.

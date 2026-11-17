@@ -9,6 +9,7 @@ import { store, save, COLORS, getTime, getGhost, levelOf } from './storage.js';
 import { Room, makeCode } from './net.js';
 import { fmtTime, fmtDelta, clamp, mod } from './util.js';
 import { buildTcx, tcxFilename } from './export.js';
+import { boardKeys, boardRows, mergeEntry, entriesToShare } from './board.js';
 
 const $ = (id) => document.getElementById(id);
 const P = store.profile;
@@ -30,6 +31,7 @@ function show(name) {
   $('ui').scrollTop = 0;
   if (name === 'home') renderHome();
   if (name === 'records') renderRecords();
+  if (name === 'board') renderBoard();
 }
 let toastT = null;
 function toast(msg) {
@@ -117,6 +119,7 @@ $('b-center').onclick = () => { sterzo.calibrate(); toast('Stuur staat nu recht'
 
 for (const b of document.querySelectorAll('[data-go]')) b.onclick = () => show(b.dataset.go);
 $('b-records').onclick = () => show('records');
+$('b-board').onclick = () => show('board');
 $('b-help').onclick = () => show('help');
 $('b-settings').onclick = () => {
   $('p-feel').value = P.trainerFeel; $('p-feel-v').textContent = P.trainerFeel + '%';
@@ -255,10 +258,10 @@ function leaveRoom() {
   if (room) { room.onClosed = () => {}; room.close(); room = null; }
 }
 function wireRoom() {
-  room.onRoster = () => { if (!race) renderSetup(); };
+  room.onRoster = () => { if (!race) renderSetup(); shareBoard(); };
   room.onSettings = (s) => { Object.assign(sel, s); if (!race) renderSetup(); };
   room.onStart = (cfg) => startRace(cfg);
-  room.onGame = (m) => { if (m.t === 'left') training?.gone.add(m.id); race?.onNet(m); };
+  room.onGame = (m) => { if (m.t === 'board') { mergeEntry(m.e); return; } if (m.t === 'left') training?.gone.add(m.id); race?.onNet(m); };
   room.onLobby = () => { endRace(); show('setup'); renderSetup(); };
   room.onClosed = (why) => { room = null; endRace(); show('home'); toast(why || 'Verbinding verbroken'); };
 }
@@ -295,6 +298,27 @@ $('b-copy').onclick = async () => {
   const url = HOSTED ? room.code : `${location.origin}${location.pathname}?join=${room.code}`;
   try { await navigator.clipboard.writeText(url); toast('Link gekopieerd'); } catch (e) { toast(url); }
 };
+
+// ---------- klassement ----------
+// Stuurt mijn tijden (en wat ik van anderen weet) naar de kamer, rustig één voor één.
+let boardTimer = null;
+function shareBoard() {
+  if (!room) return;
+  clearInterval(boardTimer);
+  const list = entriesToShare();
+  boardTimer = setInterval(() => {
+    const e = list.shift();
+    if (!e || !room) { clearInterval(boardTimer); return; }
+    room.send({ t: 'board', e });
+  }, 450);
+}
+function renderBoard() {
+  const keys = boardKeys();
+  $('board').innerHTML = TRACK_DEFS.map((d) => `<div class="card board"><h2>${d.name}</h2>${keys.filter((k) => k.track === d.id).map((k) => {
+    const rows = boardRows(k.key).slice(0, 8);
+    return `<h3>${esc(k.label)}</h3>` + (rows.length ? '<table>' + rows.map((r, i) => `<tr class="${r.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(r.name)}${r.me ? ' (jij)' : ''}</td><td>${fmtTime(r.t, 2)}</td></tr>`).join('') + '</table>' : '<p class="small">Nog geen tijden.</p>');
+  }).join('')}</div>`).join('');
+}
 
 // ---------- records ----------
 function renderRecords() {
@@ -490,6 +514,7 @@ function togglePause() {
 
 function showResults() {
   if (!race) return;
+  shareBoard(); // nieuwe tijden meteen delen met de kamer
   const r = race;
   const render = () => {
     if (race !== r) return;
@@ -507,7 +532,7 @@ function showResults() {
       <div class="statgrid">
         <div><b>${Math.round(avgP)} W</b>gemiddeld</div><div><b>${Math.round(st.maxP)} W</b>piek</div>
         <div><b>${Math.round(st.best[5])} W</b>beste 5 s</div><div><b>${((r.courseLen / me.finishTime) * 3.6).toFixed(1)}</b>km/u gem.</div>
-        <div><b>${(st.maxV * 3.6).toFixed(0)}</b>km/u top</div>${st.nHr ? `<div><b>${Math.round(st.sumHr / st.nHr)}</b>❤ gemiddeld</div><div><b>${st.maxHr}</b>❤ max</div>` : ''}<div><b>${Math.round(st.secs.reduce((a, w) => a + w, 0) / 1000)} kJ</b>arbeid</div>
+        <div><b>${(st.maxV * 3.6).toFixed(0)}</b>km/u top</div><div><b>${(st.km || 0).toFixed(1)}</b>km totaal</div><div><b>${Math.round(st.hm || 0)}</b>hoogtemeters</div>${st.nHr ? `<div><b>${Math.round(st.sumHr / st.nHr)}</b>❤ gemiddeld</div><div><b>${st.maxHr}</b>❤ max</div>` : ''}<div><b>${Math.round(st.secs.reduce((a, w) => a + w, 0) / 1000)} kJ</b>arbeid</div>
       </div>
       ${r.ns === 'demo' ? '<p class="small">Demo-modus: tijden tellen apart van je trainer-records.</p>' : ''}
       ${canSave(r) ? '<div class="menu">' + (r.saved ? '<p class="small">Rit opgeslagen. Upload het bestand op <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a>.</p>' : SAVE_BTN) + '</div>' : ''}
@@ -566,10 +591,15 @@ function hud(dt) {
   $('h-hr').classList.toggle('hidden', !me.hr);
   $('h-hr-v').textContent = me.hr || '';
   $('h-draft').classList.toggle('hidden', !me.draft);
-  const ln = $('h-line'), gain = me.finished ? 0 : me.line || 0;
-  ln.classList.toggle('hidden', Math.abs(gain) < 0.012 || Math.abs(me.x) > 1); // naast de weg: geen melding (de short cut blijft geheim)
-  ln.classList.toggle('bad', gain < 0);
-  ln.textContent = gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`;
+  // Eén regel voor je lijn: berm (kost), short cut (winst) of binnen-/buitenbocht.
+  const ln = $('h-line'), gain = me.finished && !r.free ? 0 : me.line || 0;
+  const cut = me.onCut && Math.abs(me.x) > 1;
+  ln.classList.toggle('hidden', !me.berm && Math.abs(gain) < 0.012);
+  ln.classList.toggle('bad', me.berm || gain < 0);
+  ln.textContent = me.berm ? `⚠️ BERM${me.bermCost != null ? ` −${Math.round(me.bermCost * 100)}%` : ''}`
+    : cut ? `🔀 SHORT CUT +${(gain * 100).toFixed(0)}%`
+    : gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`;
+  $('h-tot').textContent = `${(r.stats.km || 0).toFixed(2)} km · ${Math.round(r.stats.hm || 0)} hm`;
   $('h-item-n').textContent = me.item ? ITEMS[me.item].name : 'spatie';
   const d = $('h-delta');
   if (r.ghostDelta != null) {
@@ -650,4 +680,4 @@ const join = new URLSearchParams(location.search).get('join') || (/^#join-([a-z]
 if (join) { $('j-code').value = join.toUpperCase().slice(0, 4); show('join'); }
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 if (HOSTED) $('b-copy').textContent = 'Code kopiëren';
-window.__wb = { get race() { return race; }, sel, trainer, sterzo, hrm, renderer }; // voor testen/debuggen
+window.__wb = { get race() { return race; }, sel, trainer, sterzo, hrm, renderer, store }; // voor testen/debuggen
