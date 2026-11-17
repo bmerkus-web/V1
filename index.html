@@ -43,6 +43,7 @@
     </div>
     <div class="menu">
       <button id="b-records" class="ghost">🏆 Records</button>
+      <button id="b-board" class="ghost">🏅 Klassement</button>
       <button id="b-settings" class="ghost">⚙️ Instellingen</button>
       <button id="b-help" class="ghost">❓ Uitleg</button>
       <button id="b-fs" class="ghost">⛶ Volledig scherm</button>
@@ -97,6 +98,13 @@
     <div class="menu"><button class="ghost" data-go="home">← Terug</button><button id="b-dojoin" class="big">Verbinden</button></div>
   </section>
 
+  <section id="s-board" class="screen hidden">
+    <h2>Klassement</h2>
+    <p class="small">Beste ronde- en segmenttijden met een echte trainer. Tijden van anderen komen binnen zodra je samen in een kamer zit; iedereen geeft daarbij ook door wat hij van anderen weet. Bots tellen niet mee.</p>
+    <div id="board" class="cols"></div>
+    <div class="menu"><button class="ghost" data-go="home">← Terug</button></div>
+  </section>
+
   <section id="s-records" class="screen hidden">
     <h2>Records</h2>
     <div class="row"><select id="r-ns"><option value="real">Met trainer</option><option value="demo">Demo-modus</option></select></div>
@@ -128,6 +136,7 @@
       <p><b>Ideale lijn:</b> de binnenbocht is korter, de buitenbocht langer. Snijd bochten aan de binnenkant aan en je wint meters zonder harder te trappen – maar een bocht duwt je naar buiten, dus je moet ervoor sturen.</p>
       <p><b>Kerbstones:</b> de blokjes langs de weg zijn de rand. Daarbuiten rijd je in de berm en rem je af. Elke baan heeft ook één geheime short cut – let goed op de kerbstones.</p>
       <p><b>Training:</b> kies bij de start <i>Training</i> en stel je eigen parcours samen uit etappes (baan + aantal rondes), met 7 minuten warming-up en cooling-down. Aan het eind van een etappe rijd je door een teleportboog naar de volgende baan. Je hele rit komt als één bestand in je Strava-export.</p>
+      <p><b>Botsing:</b> rijd je achterop iemand, dan verlies je snelheid en moet je even herstellen. Stuur er dus omheen – of deel van opzij een kwak uit.</p>
       <p><b>Kwak:</b> rijd vlak naast iemand en stuur naar hem toe. Hij schiet opzij, verliest een blitzje en is een paar tellen trager. Een schild houdt een kwak tegen.</p>
       <p><b>Slipstream:</b> rijd vlak achter iemand voor minder luchtweerstand. <b>Raketstart:</b> trap boven 120% FTP als het aftellen eindigt.</p>
       <p><b>Records en spoken:</b> jaag op PR's voor sprints, klimmen, rondes en hele races. Je beste race, ronde en segment kunnen als spook met je meerijden; bij de start kies je welke je wilt zien.</p>
@@ -139,7 +148,7 @@
 <!-- ============ HUD ============ -->
 <div id="hud" class="hidden">
   <div class="h-tl"><div id="h-pos">1<small>/6</small></div><div id="h-lap"></div></div>
-  <div class="h-tc"><div id="h-time">0:00.0</div><div id="h-delta"></div><div id="h-zone" class="hidden"></div></div>
+  <div class="h-tc"><div id="h-time">0:00.0</div><div id="h-tot"></div><div id="h-delta"></div><div id="h-zone" class="hidden"></div></div>
   <div class="h-tr"><div id="h-rank"></div><div id="h-feed"></div></div>
   <div class="h-bl">
     <div id="h-watt">0<small>W</small></div>

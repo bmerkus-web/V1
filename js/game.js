@@ -1,6 +1,6 @@
 // Race-logica: renners, items, bots, zones/PR's, spook en netwerk-synchronisatie.
 import { SEG, ROAD_W } from './track.js';
-import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
+import { stepSpeed, fxMask, bermCost, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
 import { submitTime, getTime, setGhost, getGhost, submitPower, store, save } from './storage.js';
 
@@ -99,8 +99,8 @@ export class Race {
       id: r.id, name: r.name, color: r.color, kind: r.kind,
       dist: -3 - row * 4, x: [-0.5, 0, 0.5][col], v: 0, power: 0, cadence: 0, steer: 0,
       item: null, roulette: 0, bolts: 0, draft: false, mask: 0,
-      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0 },
-      kwakCd: 0, kwakSafe: 0,
+      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0 },
+      kwakCd: 0, kwakSafe: 0, bumpCd: 0,
       finished: false, finishTime: null, rank: i + 1, bell: 0, net: null,
     };
     if (r.kind === 'bot') {
@@ -183,7 +183,7 @@ export class Race {
     this._ghosts();
 
     const seg = this.track.segAt(me.dist);
-    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) - (me.fx.boost > 0 ? 1.5 : 0);
+    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
     this._net(dt);
   }
 
@@ -194,6 +194,7 @@ export class Race {
     if (r.bell > 0) r.bell -= dt;
     if (r.kwakCd > 0) r.kwakCd -= dt;
     if (r.kwakSafe > 0) r.kwakSafe -= dt;
+    if (r.bumpCd > 0) r.bumpCd -= dt;
     const seg = this.track.segAt(r.dist);
     if (e.spin > 0) steer += Math.sin(this.clock * 22) * 0.9;
     r.steer = lerp(r.steer, steer, Math.min(1, dt * 10));
@@ -209,7 +210,16 @@ export class Race {
     if (Math.abs(r.x) > lim) r.x -= Math.sign(r.x) * Math.min(Math.abs(r.x) - lim, 1.5 * dt);
     const cc = seg.cut ? seg.cut.a + (seg.cut.b - seg.cut.a) * (mod(r.dist, SEG) / SEG) : 0;
     r.onCut = !!seg.cut && Math.abs(r.x - cc) < seg.cut.hw;
+    const wasBerm = r.berm;
     r.berm = Math.abs(r.x) > 1 && !r.onCut;
+    if (r === this.me) {
+      r.bermCost = r.berm ? bermCost(power, seg.grade) : null;
+      if (r.berm && !wasBerm && !r.finished && this.clock - (this._bermAt || -9) > 4) {
+        this._bermAt = this.clock;
+        this.emit('banner', { text: '⚠️ BERM!', sub: 'stuur terug naar de weg', color: '#ff6b6b' });
+        this.emit('sfx', 'drop'); this.emit('shake', 5);
+      }
+    }
 
     // Slipstream en magneet
     r.draft = false;
@@ -223,8 +233,12 @@ export class Race {
       const side = o.x - r.x;
       if (!this.free && r.kwakCd <= 0 && (!r.ai || r.ai.kwakT > 0) && !(o.kwakSafe > 0) && this.time > 3 && !r.finished && !o.finished &&
         Math.abs(gap) < 1.8 && Math.abs(side) > 0.04 && Math.abs(side) < 0.32 && steer * Math.sign(side) > 0.4) this._kwak(r, o, Math.sign(side));
-      // Lichte botsing: wie achterop rijdt wijkt uit.
-      if (gap > 0 && gap < 1.6 && Math.abs(o.x - r.x) < 0.16) r.x += (r.x >= o.x ? 1 : -1) * dt * 0.8;
+      // Botsing: wie achterop iemand rijdt wijkt uit, en verliest snelheid als hij harder ging.
+      // (Een gestuurde kwak van opzij is iets anders: die kost de ander iets, niet jou.)
+      if (gap > 0 && gap < 1.6 && Math.abs(o.x - r.x) < 0.16) {
+        r.x += (r.x >= o.x ? 1 : -1) * dt * 0.8;
+        if (!this.free && r.bumpCd <= 0 && r.v > o.v + 0.4 && !r.finished && !o.finished && this.time > 3) this._bump(r, o);
+      }
     }
     const prev = r.dist;
     r.v = stepSpeed(r, power, seg.grade, dt, pull);
@@ -292,6 +306,11 @@ export class Race {
   // Voortgang van mijzelf: zones, rondes, finish, statistiek.
   _meProgress(dt) {
     const me = this.me, st = this.stats, L = this.L, id = this.track.id;
+    // Totaal van de hele rit (ook in- en uitrijden): kilometers en hoogtemeters.
+    st.km = (st.km || 0) + (me.v * dt * (1 + (me.line || 0))) / 1000;
+    const y = this.track.yAt(me.dist);
+    if (this._lastY != null && y > this._lastY && y - this._lastY < 3) st.hm = (st.hm || 0) + y - this._lastY;
+    this._lastY = y;
     st.sumP += me.power; st.n++;
     if (me.hr > 0) { st.sumHr += me.hr; st.nHr++; st.maxHr = Math.max(st.maxHr, me.hr); }
     st.maxP = Math.max(st.maxP, me.power);
@@ -500,6 +519,18 @@ export class Race {
     for (const o of this.riders) if (this.local(o) && o !== src && o.dist > src.dist && !o.finished) this.hit(o, 'storm', src.id);
   }
 
+  // r rijdt achterop o: r valt terug tot onder de snelheid van o en moet even herstellen.
+  _bump(r, o) {
+    r.bumpCd = 2.5;
+    r.v = Math.max(o.v * 0.92, r.v * 0.75);
+    r.fx.bump = 1.2;
+    r.hitAt = this.clock;
+    if (r === this.me) {
+      this.emit('banner', { text: '💢 BOTSING!', sub: `achterop ${o.name} – snelheid kwijt`, color: '#ff6b6b' });
+      this.emit('sfx', 'drop'); this.emit('shake', 7);
+    }
+  }
+
   // r geeft o een zet opzij (dir = richting van de zet: -1 links, +1 rechts).
   _kwak(r, o, dir) {
     r.kwakCd = r.kind === 'bot' ? 10 : 2.5; // bots houden zich wat in
@@ -618,6 +649,9 @@ export class Race {
         const o = this.riders.find((q) => q !== r && !q.finished && Math.abs(q.dist - r.dist) < 1.6 && Math.abs(q.x - r.x) > 0.08 && Math.abs(q.x - r.x) < 0.3);
         if (o) { tx = o.x; ai.kwakT = 0.8; }
       }
+      // Niet achterop een tragere renner rijden: eromheen sturen.
+      const blk = this.riders.find((q) => q !== r && q.dist - r.dist > 0 && q.dist - r.dist < 8 && Math.abs(q.x - tx) < 0.2 && q.v < r.v + 0.3);
+      if (blk && !(ai.kwakT > 0)) tx = blk.x + (r.x >= blk.x ? 0.34 : -0.34);
       ai.tx = clamp(tx, -0.85, 0.85);
       // Short cut: betere bots nemen hem vaker en strakker.
       const cut = this.track.cut;

@@ -303,3 +303,59 @@ test('Ronde- en segmentspook: beste poging rijdt mee en geeft het tijdsverschil'
   simulate({ ...opts, effort: 0.9, maxTime: 120, extra: { ghostLap: false, ghostSeg: false, ns: 'real' }, onTick: (r) => { any += r.ghostRiders.length; } });
   assert.equal(any, 0);
 });
+
+test('Botsing: achterop iemand rijden kost snelheid, ernaast rijden niet', () => {
+  const { race, events } = simulate({ laps: 1, bots: 1, maxTime: 20, useItems: false });
+  const me = race.me, o = race.riders[1];
+  const place = (dx) => { o.dist = me.dist + 1.2; o.x = me.x + dx; o.v = 7; me.v = 11; me.bumpCd = 0; me.fx.bump = 0; o.kwakCd = 9; };
+  place(0.4); race.update(0.04);
+  assert.equal(me.fx.bump, 0, 'naast elkaar: geen botsing');
+  place(0.05); race.update(0.04);
+  assert.ok(me.fx.bump > 1 && me.v < 8.5, `achterop: v=${me.v}`); // een kwart van je snelheid kwijt
+  assert.ok(events.some(([t, d]) => t === 'banner' && d.text.includes('BOTSING')));
+  const v = me.v; place(0.05); me.v = v; me.bumpCd = 2; race.update(0.04);
+  assert.ok(me.v > v * 0.9, 'niet twee keer achter elkaar gestraft');
+});
+
+test('Berm: kost flink snelheid, trainer wordt zwaarder en je krijgt een melding', async () => {
+  const { bermCost } = await import('../js/physics.js');
+  const c = bermCost(200, 0);
+  assert.ok(c > 0.25 && c < 0.7, `kost ${c}`);
+  assert.equal(bermCost(0, 0), null);
+  const { race, events } = simulate({ track: 'polder', laps: 1, bots: 0, maxTime: 10, useItems: false });
+  const g0 = race.trainerGrade;
+  race.me.x = 1.3; race.update(0.04); race.update(0.04);
+  assert.equal(race.me.berm, true);
+  assert.ok(race.me.bermCost > 0.25);
+  assert.ok(race.trainerGrade > g0 + 3.5, 'trainer voelt de berm');
+  assert.ok(events.some(([t, d]) => t === 'banner' && d.text.includes('BERM')));
+});
+
+test('Ritstatistiek: kilometers en hoogtemeters lopen mee', () => {
+  const { race } = simulate({ track: 'vulkaan', laps: 1, bots: 0, useItems: false });
+  assert.ok(Math.abs(race.stats.km - 5) < 0.1, `km ${race.stats.km}`);
+  assert.ok(Math.abs(race.stats.hm - getTrack('vulkaan').climbTotal) < 3, `hm ${race.stats.hm}`);
+});
+
+test('Klassement: tijden van anderen samenvoegen en sorteren', async () => {
+  const { mergeEntry, boardRows, myEntry } = await import('../js/board.js');
+  const { store } = await import('../js/storage.js');
+  store.pr.real['polder|lap'] = { t: 400 };
+  assert.equal(myEntry().recs['polder|lap'], 400);
+  assert.equal(mergeEntry({ pid: 'x1', name: 'Tim', recs: { 'polder|lap': 390, 'polder|seg|dijksprint': 31, 'nep|lap': 1, 'polder|race|2': 5 } }), true);
+  mergeEntry({ pid: 'x2', name: '<b>Lisa</b> met een veel te lange naam', recs: { 'polder|lap': 410 } });
+  mergeEntry({ pid: 'x1', name: 'Tim', recs: { 'polder|lap': 395 } }); // trager: telt niet
+  mergeEntry({ pid: 'x3', name: 'Vals', recs: { 'polder|lap': 0.5 } }); // onmogelijke tijd
+  assert.equal(mergeEntry({ pid: store.pid, name: 'ik', recs: { 'polder|lap': 1 } }), false);
+  const rows = boardRows('polder|lap');
+  assert.deepEqual(rows.map((r) => [r.name.slice(0, 3), r.t, r.me]), [['Tim', 390, false], [store.profile.name.slice(0, 3), 400, true], ['<b>', 410, false]]);
+  assert.ok(rows[2].name.length <= 14);
+  assert.equal(Object.keys(store.board.x1.recs).length, 2, 'alleen bekende ronde- en segmentsleutels');
+});
+
+test('TCX: hoogte uit het bestand wordt door Strava gebruikt', async () => {
+  const { buildTcx } = await import('../js/export.js');
+  const tcx = buildTcx({ startedAt: 0, log: [[1, 0, 200, 90, 0, 8, -0.4], [2, 8, 200, 90, 0, 8, 12.3]], name: 'x' });
+  assert.ok(tcx.includes('<Name>Watt Blitz with barometer</Name>'));
+  assert.ok(tcx.includes('<AltitudeMeters>49.6</AltitudeMeters>') && tcx.includes('<AltitudeMeters>62.3</AltitudeMeters>'));
+});
