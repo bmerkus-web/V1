@@ -266,6 +266,13 @@ export class Race {
     r.mask = fxMask(r);
   }
 
+  // Een box of blitzje is gepakt: hier laten verdwijnen en de anderen laten weten,
+  // anders blijft hij op hun scherm liggen en kunnen ze hem nog een keer pakken.
+  _took(o, secs) {
+    this.objCool[o.id] = this.time + secs;
+    this.room?.send({ t: 'pick', o: o.id, c: secs, st: this.stageIdx | 0 });
+  }
+
   _pickups(r, prev) {
     const tr = this.track, isMe = r === this.me;
     const s0 = Math.floor(mod(prev, this.L) / SEG), s1 = Math.floor(mod(r.dist, this.L) / SEG);
@@ -277,10 +284,10 @@ export class Race {
         const passed = m1 >= m0 ? o.d > m0 && o.d <= m1 : o.d > m0 || o.d <= m1;
         if (!passed) continue;
         if (o.type === 'box' && Math.abs(o.x - r.x) < 0.2) {
-          this.objCool[o.id] = this.time + 5;
+          this._took(o, 5);
           if (!r.item && r.roulette <= 0) { r.roulette = 1.3; if (isMe) this.emit('sfx', 'box'); }
         } else if (o.type === 'bolt' && Math.abs(o.x - r.x) < 0.14) {
-          this.objCool[o.id] = this.time + 15;
+          this._took(o, 15);
           if (isMe && r.bolts === 9) this.emit('banner', { text: '⚡ FULL BLITZ! ⚡', sub: '20% minder luchtweerstand', color: '#ffd166' });
           r.bolts = Math.min(10, r.bolts + 1);
           if (isMe) this.emit('sfx', 'bolt');
@@ -729,6 +736,12 @@ export class Race {
           this.rockets.push({ from: r.id, to: msg.to, d: r.dist + 1, x: r.x, age: 0 });
           if (msg.to === this.me.id) this.emit('banner', { text: '🚀 VUURPIJL OP KOMST!', color: '#ff3b3b' });
         } else if (msg.item === 'storm') this._storm(r);
+        break;
+      }
+      case 'pick': {
+        const id = msg.o;
+        if ((msg.st | 0) !== (this.stageIdx | 0) || !Number.isInteger(id) || id < 0 || id >= this.objCool.length) break;
+        this.objCool[id] = Math.max(this.objCool[id], this.time + Math.min(20, Math.max(0, +msg.c || 0)));
         break;
       }
       case 'hazgone': this.hazards = this.hazards.filter((h) => h.id !== msg.hid); break;
