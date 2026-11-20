@@ -84,6 +84,20 @@ function devStatus() {
   if (!bleSupported()) $('ble-note').textContent = 'Deze browser ondersteunt geen Bluetooth. Gebruik Chrome op Android of Mac (via https). Tot dan: demo-modus met ↑ / Shift / ←→.';
 }
 trainer.onstatus = sterzo.onstatus = hrm.onstatus = devStatus;
+// Meldingen als een apparaat onverwacht wegvalt en weer terugkomt.
+function watchDevice(d) {
+  d.onlost = () => toast(`${d.label}: verbinding kwijt – opnieuw verbinden…${d instanceof ZwiftPad ? ' (druk op een knop als hij slaapt)' : ''}`);
+  d.onback = () => toast(`${d.label} weer verbonden ✓`);
+}
+[trainer, sterzo, hrm].forEach(watchDevice);
+$('b-diag').onclick = () => {
+  const t = (ms) => new Date(ms).toLocaleTimeString('nl-NL');
+  const devs = [trainer, sterzo, hrm, ...pads].filter((d) => d.device);
+  const body = devs.length ? devs.map((d) => `<p><b>${esc(d.label)} – ${esc(d.name)}</b> ${d.connected ? '✓ verbonden' : d._wantConnected ? '⚠️ opnieuw verbinden…' : 'losgekoppeld'}</p><div class="diag">${d.log.map(([ms, ev]) => `${t(ms)}  ${esc(ev)}`).join('\n') || '–'}</div>`).join('')
+    : '<p class="small">Nog geen apparaten gekoppeld.</p>';
+  overlay(`<h2>Verbindingen</h2>${body}<p class="small">Valt er iets weg, maak dan een schermafbeelding van dit scherm; dan zie ik wat er gebeurde.</p><div class="menu"><button class="big" id="ov-close">Sluiten</button></div>`);
+  $('ov-close').onclick = hideOverlay;
+};
 async function connect(dev, label) {
   audio.unlock();
   if (dev.connected) { dev.disconnect(); dev.device = null; devStatus(); return; }
@@ -116,6 +130,7 @@ $('b-pads').onclick = async () => {
     was = a;
   };
   pad.onstatus = () => { if (!pad.connected) input.setPad(pad, 0, 0); devStatus(); };
+  watchDevice(pad);
   try {
     await pad.connect();
     if (pads.some((p) => p.device?.id === pad.device.id)) { toast('Deze knop was al gekoppeld'); return; }
@@ -598,6 +613,9 @@ function hud(dt) {
   $('h-cad').textContent = Math.round(me.cadence);
   $('h-grade').textContent = r.track.segAt(me.dist).grade.toFixed(1);
   $('h-bolts').textContent = `⚡ ${me.bolts}/10${me.bolts >= 10 ? ' FULL BLITZ' : ''}`;
+  const lost = [trainer, sterzo, hrm, ...pads].filter((d) => d._wantConnected && !d.connected);
+  $('h-dev').classList.toggle('hidden', !lost.length);
+  $('h-dev').textContent = lost.length ? `⚠️ ${lost.map((d) => d.label).join(', ')} kwijt – opnieuw verbinden…` : '';
   $('h-gear').classList.toggle('hidden', !P.vshift);
   $('h-gear').textContent = `⚙ ${getGear()}/${GEARS}`;
   $('h-bolts').title = `${me.bolts * 2}% minder luchtweerstand`;

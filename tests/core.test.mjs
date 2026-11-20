@@ -385,3 +385,66 @@ test('Virtueel schakelen: 24 versnellingen, begrensd, en de trainer voelt het ve
   assert.equal(g, 800);
   while (getGear() < NEUTRAL) shift(1);
 });
+
+// Nep-Bluetooth-knop om het (her)verbinden te testen zonder hardware.
+function fakePad(name = 'Zwift Click') {
+  const chars = { async: new EventTarget(), tx: new EventTarget(), rx: { writes: 0, writeValueWithoutResponse: async () => { chars.rx.writes++; } } };
+  for (const c of [chars.async, chars.tx]) c.startNotifications = async () => {};
+  const dev = new EventTarget();
+  Object.assign(dev, { name, connects: 0, failNext: 0 });
+  const server = { getPrimaryService: async () => ({ getCharacteristic: async (u) => (u.endsWith('2-19ca-4651-86e5-fa29dcdd09d1') ? chars.async : u.startsWith('00000003') ? chars.rx : chars.tx) }) };
+  dev.gatt = {
+    connected: false,
+    connect: async () => { dev.connects++; if (dev.failNext > 0) { dev.failNext--; throw new Error('niet bereikbaar'); } dev.gatt.connected = true; return server; },
+    disconnect: () => { if (!dev.gatt.connected) return; dev.gatt.connected = false; setTimeout(() => dev.dispatchEvent(new Event('gattserverdisconnected')), 0); },
+  };
+  const send = (...bytes) => { const e = new Event('characteristicvaluechanged'); Object.defineProperty(e, 'target', { value: { value: new DataView(Uint8Array.from(bytes).buffer) } }); chars.async.dispatchEvent(e); };
+  return { dev, chars, send, drop: () => dev.gatt.disconnect() };
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('Zwift-knop: stopbericht en elke minuut ongemerkt vernieuwen, zonder dubbele berichten', async () => {
+  const { ZwiftPad, PAD_REFRESH_MS } = await import('../js/ble.js');
+  const f = fakePad();
+  globalThis.navigator ??= {};
+  Object.defineProperty(globalThis.navigator, 'bluetooth', { value: { requestDevice: async () => f.dev }, configurable: true });
+  const pad = new ZwiftPad();
+  let msgs = 0, lost = 0;
+  pad.onpad = () => msgs++;
+  pad.onlost = () => lost++;
+  await pad.connect();
+  assert.ok(pad.connected && f.dev.connects === 1 && f.chars.rx.writes === 1);
+  // stopbericht: volledig opnieuw verbinden, zonder alarm
+  f.send(0xff, 0x05, 0x00, 0xea, 0x05);
+  await wait(400);
+  assert.equal(f.dev.connects, 2); assert.equal(f.chars.rx.writes, 2); assert.equal(lost, 0); assert.ok(pad.connected);
+  // na herverbinden komt elk bericht één keer binnen
+  f.send(0x23, 0x08, 0xbf, 0xff, 0x0f);
+  assert.equal(msgs, 1); assert.equal(pad.kind, 'ride'); assert.ok(pad.pressed);
+  // elke minuut: niet terwijl een knop is ingedrukt, wel daarna
+  assert.equal(pad.keepAlive(performance.now() + PAD_REFRESH_MS + 1), false);
+  f.send(0x23, 0x08, 0xff, 0xff, 0x0f);
+  assert.equal(pad.keepAlive(performance.now() + PAD_REFRESH_MS + 1), true);
+  await wait(400);
+  assert.equal(f.dev.connects, 3); assert.equal(lost, 0);
+  pad.disconnect();
+});
+
+test('Apparaat: na wegvallen blijft het opnieuw proberen tot het lukt', async () => {
+  const { ZwiftPad } = await import('../js/ble.js');
+  const f = fakePad('Zwift Play');
+  Object.defineProperty(globalThis.navigator, 'bluetooth', { value: { requestDevice: async () => f.dev }, configurable: true });
+  const pad = new ZwiftPad();
+  let lost = 0, back = 0;
+  pad.onlost = () => lost++; pad.onback = () => back++;
+  await pad.connect();
+  f.dev.failNext = 2; // de eerste twee pogingen mislukken (bv. knop slaapt)
+  f.drop();
+  await wait(50);
+  assert.equal(lost, 1); assert.equal(pad.connected, false);
+  await wait(3600);
+  assert.equal(back, 1); assert.ok(pad.connected); assert.equal(f.dev.connects, 4);
+  assert.ok(pad.log.some(([, e]) => e.includes('poging 1 mislukt')) && pad.log.some(([, e]) => e.includes('weer verbonden (poging 3)')));
+  assert.equal(pad.needsRefresh, false, 'Play hoeft niet elke minuut vernieuwd');
+  pad.disconnect();
+});
