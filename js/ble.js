@@ -57,38 +57,98 @@ export function simParamsCommand(gradePct, crr = 0.004, cw = 0.51) {
   return b;
 }
 
+// Breekt een Bluetooth-stap af als die blijft hangen (dat gebeurt soms bij een slapend apparaat).
+function withTimeout(p, ms, what) {
+  let t;
+  return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(what)), ms); })]).finally(() => clearTimeout(t));
+}
+
 class Device {
-  constructor() {
+  constructor(label = 'Apparaat') {
     this.device = null;
     this.connected = false;
     this.name = '';
+    this.label = label;
+    this.log = []; // [tijd, gebeurtenis] voor het diagnosescherm
     this.onstatus = () => {};
+    this.onlost = () => {}; // verbinding onverwacht weg
+    this.onback = () => {}; // weer terug na herverbinden
     this._wantConnected = false;
+    this._refreshing = false;
+    this._reconnecting = false;
+  }
+  _log(ev) {
+    this.log.push([Date.now(), ev]);
+    if (this.log.length > 60) this.log.shift();
   }
   async _open(options) {
     this.device = await navigator.bluetooth.requestDevice(options);
     this.name = this.device.name || 'apparaat';
     this._wantConnected = true;
-    this.device.addEventListener('gattserverdisconnected', () => this._lost());
+    this.device.addEventListener('gattserverdisconnected', () => this._onDisconnect());
     await this._attach();
+    this._log('verbonden');
   }
   async _attach() {
-    const server = await this.device.gatt.connect();
-    await this._setup(server);
+    try {
+      const server = await withTimeout(this.device.gatt.connect(), 10000, 'verbinden duurt te lang');
+      await withTimeout(this._setup(server), 10000, 'opstarten duurt te lang');
+    } catch (e) {
+      try { this.device.gatt.disconnect(); } catch (_) { /* negeer */ }
+      throw e;
+    }
     this.connected = true;
     this.onstatus();
   }
-  async _lost() {
+  _onDisconnect() {
+    if (this._refreshing || !this._wantConnected) return; // zelf verbroken: geen alarm
+    this._log('verbinding verbroken');
     this.connected = false;
     this.onstatus();
-    for (let i = 0; this._wantConnected && i < 30; i++) {
-      await sleep(Math.min(8000, 1000 + i * 1000));
-      if (!this._wantConnected) return;
-      try { await this._attach(); return; } catch (e) { /* opnieuw proberen */ }
+    this.onlost();
+    this._reconnect();
+  }
+  // Blijft opnieuw proberen zolang de verbinding gewenst is: eerst snel, daarna elke 5 seconden.
+  async _reconnect() {
+    if (this._reconnecting) return;
+    this._reconnecting = true;
+    for (let i = 0; this._wantConnected; i++) {
+      await sleep([300, 1000, 2000, 3000][i] ?? 5000);
+      if (!this._wantConnected) break;
+      try {
+        await this._attach();
+        this._log(`weer verbonden (poging ${i + 1})`);
+        this.onback();
+        break;
+      } catch (e) {
+        if (i < 5 || i % 12 === 0) this._log(`poging ${i + 1} mislukt: ${e.message}`);
+      }
+    }
+    this._reconnecting = false;
+  }
+  // Verbreekt de verbinding en maakt hem meteen opnieuw, zonder alarm (voor de Click v2).
+  async refresh(reason) {
+    if (!this.connected || this._refreshing || this._reconnecting) return;
+    this._refreshing = true;
+    this._log('vernieuwen: ' + reason);
+    try {
+      try { this.device.gatt.disconnect(); } catch (_) { /* negeer */ }
+      await sleep(250);
+      await this._attach();
+      this._log('vernieuwd');
+      this._refreshing = false;
+    } catch (e) {
+      this._log('vernieuwen mislukt: ' + e.message);
+      this._refreshing = false;
+      this.connected = false;
+      this.onstatus();
+      this.onlost();
+      this._reconnect();
     }
   }
   disconnect() {
     this._wantConnected = false;
+    this._log('losgekoppeld');
     try { this.device?.gatt?.disconnect(); } catch (e) { /* negeer */ }
     this.connected = false;
     this.onstatus();
@@ -97,7 +157,7 @@ class Device {
 
 export class Trainer extends Device {
   constructor() {
-    super();
+    super('Trainer');
     this.power = 0;
     this.cadence = 0;
     this.lastData = 0;
@@ -174,7 +234,7 @@ export class Trainer extends Device {
 
 export class HeartRate extends Device {
   constructor() {
-    super();
+    super('Hartslagmeter');
     this.bpm = 0;
     this.lastData = 0;
   }
@@ -273,35 +333,65 @@ export function parseZwiftPad(bytes) {
   return out;
 }
 
+// De Click v2 stopt in andere apps dan Zwift na ongeveer een minuut met berichten sturen.
+// Het rechter knopje blijft werken als we hem op tijd opnieuw verbinden; dat doen we ongemerkt
+// elke 50 seconden, op een moment dat er geen knop is ingedrukt.
+export const PAD_REFRESH_MS = 50000;
+
 export class ZwiftPad extends Device {
   constructor() {
-    super();
+    super('Zwift-knop');
     this.onpad = () => {};
+    this.kind = null; // 'play' | 'click' | 'ride' (Ride of Click v2), zodra er een bericht is geweest
+    this.pressed = false;
+    this.lastData = 0;
+    this._lastRefresh = 0;
+    // Vaste functie: zo wordt hij bij herverbinden niet dubbel aan dezelfde kenmerken gehangen.
+    this._onData = (e) => {
+      const v = e.target.value, bytes = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+      if (bytes[0] === 0xff) { this._log('stopbericht van de knop'); this.refresh('stopbericht'); return; }
+      const a = parseZwiftPad(bytes);
+      if (!a) return;
+      this.kind = a.kind;
+      this.pressed = a.left > 0 || a.right > 0 || a.item || a.bell || a.up || a.down;
+      this.lastData = performance.now();
+      this.onpad(a);
+    };
+    this._timer = null;
+  }
+  get needsRefresh() {
+    return /click/i.test(this.name) && this.kind !== 'click'; // Click v2 (de eerste Click heeft dit niet nodig)
+  }
+  // Wordt elke paar seconden aangeroepen.
+  keepAlive(now = performance.now()) {
+    if (!this.connected || !this.needsRefresh || this.pressed) return false;
+    if (now - this._lastRefresh < PAD_REFRESH_MS) return false;
+    this.refresh('elke minuut (Click v2)');
+    return true;
   }
   async connect() {
     await this._open({
       filters: [{ namePrefix: 'Zwift' }, { services: [ZWIFT_SVC] }, { services: [ZWIFT_SVC_RIDE] }],
       optionalServices: [ZWIFT_SVC, ZWIFT_SVC_RIDE],
     });
+    clearInterval(this._timer);
+    this._timer = setInterval(() => this.keepAlive(), 3000);
+  }
+  disconnect() {
+    clearInterval(this._timer);
+    super.disconnect();
   }
   async _setup(server) {
     let svc;
     try { svc = await server.getPrimaryService(ZWIFT_SVC_RIDE); } catch (e) { svc = await server.getPrimaryService(ZWIFT_SVC); }
     const [async_, rx, tx] = await Promise.all([svc.getCharacteristic(ZWIFT_ASYNC), svc.getCharacteristic(ZWIFT_RX), svc.getCharacteristic(ZWIFT_TX)]);
-    const hello = () => rx.writeValueWithoutResponse(new TextEncoder().encode('RideOn')).catch(() => {});
-    let lastHello = 0;
-    const onData = (e) => {
-      const v = e.target.value, bytes = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-      // De Click v2 meldt na een tijdje dat hij stopt (0xff ...); dan melden we ons opnieuw aan.
-      if (bytes[0] === 0xff && performance.now() - lastHello > 2000) { lastHello = performance.now(); hello(); return; }
-      const a = parseZwiftPad(bytes);
-      if (a) { this.lastData = performance.now(); this.onpad(a); }
-    };
-    async_.addEventListener('characteristicvaluechanged', onData);
-    tx.addEventListener('characteristicvaluechanged', onData);
+    async_.addEventListener('characteristicvaluechanged', this._onData);
+    tx.addEventListener('characteristicvaluechanged', this._onData);
     await async_.startNotifications();
     await tx.startNotifications().catch(() => {});
-    await hello();
+    await rx.writeValueWithoutResponse(new TextEncoder().encode('RideOn'));
+    this.pressed = false;
+    this._lastRefresh = performance.now();
   }
 }
 
@@ -310,7 +400,7 @@ const loadCodes = () => (codesPromise ||= fetch('data/sterzo-challenge-codes.dat
 
 export class Sterzo extends Device {
   constructor() {
-    super();
+    super('Sterzo');
     this.angle = 0; // graden, + = rechts
     this.center = 0;
     this.lastData = 0;
