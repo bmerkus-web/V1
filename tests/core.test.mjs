@@ -475,3 +475,30 @@ test('Kwak: geen automatische terugkwak, wel bewust na 2 seconden; botsing blijf
   race.update(0.04);
   assert.ok(o.fx.bump > 0, 'gever krijgt botsingsstraf');
 });
+
+test('Multiplayer: wat een ander pakt, verdwijnt ook bij mij', async () => {
+  const { Race } = await import('../js/game.js');
+  const sent = [];
+  const room = { send: (m) => sent.push(m) };
+  const mk = (meId) => new Race({ track: getTrack('polder'), laps: 1, seed: 1, room, isHost: meId === 'p0', ns: 'demo',
+    riders: [{ id: 'p0', name: 'A', color: '#fff', kind: meId === 'p0' ? 'me' : 'remote' }, { id: 'p1', name: 'B', color: '#000', kind: meId === 'p1' ? 'me' : 'remote' }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  const a = mk('p0'), b = mk('p1');
+  for (const r of [a, b]) { r.countdown = 0; r.update(0.04); }
+  // A rijdt over een blitzje
+  const bolt = a.track.objects.find((o) => o.type === 'bolt');
+  a.me.dist = bolt.d - 1; a.me.x = bolt.x; a.me.v = 10;
+  a.update(0.2);
+  assert.equal(a.me.bolts, 1);
+  const msg = sent.find((m) => m.t === 'pick');
+  assert.ok(msg && msg.o === bolt.id);
+  // B ontvangt het bericht: het blitzje is weg, B kan het niet meer pakken
+  b.onNet(msg);
+  b.me.dist = bolt.d - 1; b.me.x = bolt.x; b.me.v = 10;
+  b.update(0.2);
+  assert.equal(b.me.bolts, 0);
+  // onzin wordt genegeerd
+  b.onNet({ t: 'pick', o: 99999, c: 15 }); b.onNet({ t: 'pick', o: 'x', c: 15 }); b.onNet({ t: 'pick', o: 1, c: 15, st: 3 });
+  assert.equal(b.objCool[1], 0);
+});
