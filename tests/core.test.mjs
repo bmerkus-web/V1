@@ -448,3 +448,30 @@ test('Apparaat: na wegvallen blijft het opnieuw proberen tot het lukt', async ()
   assert.equal(pad.needsRefresh, false, 'Play hoeft niet elke minuut vernieuwd');
   pad.disconnect();
 });
+
+test('Kwak: geen automatische terugkwak, wel bewust na 2 seconden; botsing blijft mogelijk', async () => {
+  const { Race } = await import('../js/game.js');
+  const setup = () => {
+    const { race } = simulate({ laps: 1, bots: 1, maxTime: 15, useItems: false });
+    const me = race.me, o = race.riders[1];
+    const hits = [];
+    const orig = race.hit.bind(race);
+    race.hit = (r, kind, by, dir) => { if (kind === 'kwak') hits.push([+race.time.toFixed(2), r === me ? 'mij' : 'bot']); return orig(r, kind, by, dir); };
+    o.ai.kwakT = 0; o.kwakCd = 9; me.kwakCd = 0; me.kwakSafe = 0; o.kwakSafe = 0;
+    o.dist = me.dist + 0.3; o.x = -0.15; me.x = 0.05; o.v = me.v = 9;
+    race._kwak(o, me, 1); // de bot kwakt mij naar rechts
+    return { race, me, o, hits };
+  };
+  // ik stuur meteen terug naar links (naar de bot toe): geen terugkwak in de eerste 2 s
+  let { race, me, o, hits } = setup();
+  for (let i = 0; i < 45; i++) { o.x = -0.15; o.dist = me.dist + 0.3; race.getSteer = () => (me.x > o.x + 0.1 ? -1 : 0); race.update(0.04); }
+  assert.deepEqual(hits.map((h) => h[1]), ['mij'], JSON.stringify(hits));
+  // daarna wel, als ik er bewust naartoe stuur
+  for (let i = 0; i < 25; i++) { o.x = me.x - 0.2; o.dist = me.dist + 0.3; race.getSteer = () => -1; race.update(0.04); }
+  assert.ok(hits.some((h) => h[1] === 'bot' && h[0] >= race.time - 1.1), JSON.stringify(hits));
+  // botsing: de gever rijdt kort na de kwak achterop de ontvanger en wordt wel gestraft
+  ({ race, me, o } = setup());
+  o.dist = me.dist - 1.2; o.x = me.x; o.v = me.v + 2; o.bumpCd = 0;
+  race.update(0.04);
+  assert.ok(o.fx.bump > 0, 'gever krijgt botsingsstraf');
+});
