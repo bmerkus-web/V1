@@ -117,6 +117,8 @@
     <div class="card">
       <label>Trainer-gevoel helling <input id="p-feel" type="range" min="0" max="100" step="10"><b id="p-feel-v"></b></label>
       <p class="small">Hoe sterk je KICKR klimmetjes laat voelen. 0% = altijd vlak, 100% = de echte helling.</p>
+      <label class="check"><input id="p-vshift" type="checkbox"> Virtueel schakelen</label>
+      <p class="small">Voor een Zwift Cog, Zwift Ride of een fiets zonder versnellingen op de trainer. De schakelknoppen van je Zwift-knoppen (of Q en E) maken de trainer lichter of zwaarder, in 24 versnellingen. Zet dit uit als je gewoon met je eigen versnellingen schakelt; de knoppen gebruiken dan een power-up.</p>
       <label class="check"><input id="p-assist" type="checkbox"> Stuurhulp in bochten</label>
       <p class="small">Uit (standaard): een bocht duwt je naar buiten, harder naarmate je sneller gaat. Aan: je blijft vanzelf op de weg.</p>
       <label class="check"><input id="p-music" type="checkbox"> Muziek</label>
@@ -131,6 +133,7 @@
       <p><b>Trappen = gas.</b> Je watts bepalen je snelheid. In de eerlijke modus telt je vermogen t.o.v. je FTP, zodat vrienden van verschillend niveau samen kunnen racen. Staat die uit, dan telt je watt per kilo: een lichte en een zware renner met hetzelfde aantal W/kg zijn even snel.</p>
       <p><b>Sturen</b> met je Sterzo (of ←/→, of de knoppen op het scherm). Pak <b>?-boxen</b> voor power-ups, <b>⚡blitzjes</b> (elk blitzje 2% minder luchtweerstand; bij 10 heb je FULL BLITZ; een treffer kost je er een paar) en rijd over <b>turbostroken</b>.</p>
       <p><b>Power-up gebruiken:</b> spatie / Enter / 1, of tik op het vakje. <b>B</b> = bel. <b>C</b> = stuur recht zetten. <b>M</b> = muziek. <b>F</b> = volledig scherm. <b>Esc</b> = pauze.</p>
+      <p><b>Virtueel schakelen</b> (zet het aan bij Instellingen): <b>Ride</b> rechts = zwaarder, links = lichter. <b>Click (twee knopjes)</b>: + = zwaarder, − = lichter. <b>Play</b>: zijknop rechts = zwaarder, links = lichter. <b>Eerste Click</b>: + en − schakelen (dan niet meer sturen). Toetsenbord: E = zwaarder, Q = lichter.</p>
       <p><b>Zwift-knoppen:</b> koppel elke knop apart (tik per knop opnieuw op <i>Zwift-knoppen</i>). <b>Click (twee knopjes):</b> links ←/→ = sturen, ↑ = power-up, ↓ = bel; rechts Z/A = sturen, Y = power-up, B = bel; − en + = power-up. <b>Play:</b> pijltjes ←/→ of de flippers = sturen, ↑ / A / Z / zijknop = power-up, ↓ / Y / B = bel. <b>Eerste Click:</b> − en + = sturen, beide tegelijk = power-up.</p>
       <div id="help-items" class="items"></div>
       <p><b>Ideale lijn:</b> de binnenbocht is korter, de buitenbocht langer. Snijd bochten aan de binnenkant aan en je wint meters zonder harder te trappen – maar een bocht duwt je naar buiten, dus je moet ervoor sturen.</p>
@@ -154,6 +157,7 @@
     <div id="h-watt">0<small>W</small></div>
     <div class="h-sub"><span id="h-spd">0</span> km/u · <span id="h-cad">0</span> rpm · <span id="h-grade">0</span>%</div>
     <div id="h-hr" class="hidden">❤ <span id="h-hr-v">0</span></div>
+    <div id="h-gear" class="hidden"></div>
     <div id="h-draft" class="hidden">💨 SLIPSTREAM</div>
     <div id="h-line" class="hidden"></div>
   </div>

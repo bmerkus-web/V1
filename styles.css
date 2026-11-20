@@ -85,6 +85,9 @@ tr.me td { color: var(--gold); font-weight: 800; }
 .h-bl { left: 14px; bottom: 64px; }
 #h-watt { font-size: clamp(48px, 11vh, 96px); line-height: .9; } #h-watt small { font-size: .35em; color: var(--cyan); margin-left: 4px; }
 .h-sub { font-size: clamp(14px, 2.8vh, 20px); font-style: normal; font-weight: 700; }
+#h-gear { font-size: clamp(16px, 3.2vh, 24px); color: var(--cyan); font-style: normal; font-weight: 800; }
+#h-gear.pop { animation: gearpop .35s ease-out; }
+@keyframes gearpop { from { transform: scale(1.35); color: #fff; } }
 #h-hr { color: #ff6b8b; font-size: clamp(20px, 4vh, 32px); }
 #h-tot { font-size: clamp(13px, 2.4vh, 17px); font-style: normal; font-weight: 700; }
 .board h3 { margin: 8px 0 2px; font-size: 14px; color: var(--gold); }
