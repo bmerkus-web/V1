@@ -10,6 +10,7 @@ Het is een web-app zonder installatie: hij draait in **Chrome op een Android-tab
 - **Hartslagmeter** – koppel een Bluetooth-hartslagband en zie je hartslag tijdens de race en in de uitslag.
 - **Zwift-knoppen** – Play, Click en Ride/Click v2: sturen en power-ups vanaf je stuur.
 - **Naar Strava** – sla je rit na afloop op als `.tcx` (vermogen, hartslag, cadans, afstand, hoogte) en upload hem op strava.com/upload/select.
+- **Virtueel schakelen** – voor een Zwift Cog of Zwift Ride: 24 virtuele versnellingen via de schakelknoppen (of Q/E), aan te zetten bij Instellingen.
 - **Echt sturen** met de Elite Sterzo Smart. Zonder Sterzo: pijltjestoetsen of knoppen op het scherm.
 - **6 power-ups** – Turbo, Schild, Vuurpijl, Lijmklodder, Magneet en Tegenwind. Wie achteraan rijdt krijgt de sterkste.
 - **Ideale lijn** – de binnenbocht is korter; bochten duwen je naar buiten, dus goed sturen levert meters op. Blitzjes liggen in slalom en turbostroken zijn smal.

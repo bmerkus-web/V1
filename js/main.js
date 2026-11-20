@@ -9,6 +9,7 @@ import { store, save, COLORS, getTime, getGhost, levelOf } from './storage.js';
 import { Room, makeCode } from './net.js';
 import { fmtTime, fmtDelta, clamp, mod } from './util.js';
 import { buildTcx, tcxFilename } from './export.js';
+import { GEARS, getGear, shift, gearOffset } from './gears.js';
 import { boardKeys, boardRows, mergeEntry, entriesToShare } from './board.js';
 
 const $ = (id) => document.getElementById(id);
@@ -98,11 +99,20 @@ $('b-pads').onclick = async () => {
   audio.unlock();
   if (!bleSupported()) { toast('Bluetooth werkt alleen in Chrome (Android / Mac) via https.'); return; }
   const pad = new ZwiftPad();
-  let was = { item: false, bell: false };
-  pad.onpad = (a) => {
+  let was = {};
+  pad.onpad = (raw) => {
+    const a = { ...raw };
+    if (P.vshift) {
+      if (a.kind === 'click') a.left = a.right = 0; // eerste Click: + en − schakelen in plaats van sturen
+    } else if (a.kind !== 'click') {
+      a.item = a.item || a.up || a.down; // geen virtueel schakelen: schakelknoppen = power-up
+      a.up = a.down = false;
+    } else a.up = a.down = false;
     input.setPad(pad, a.left, a.right);
     if (a.item && !was.item) input.trigger('item');
     if (a.bell && !was.bell) input.trigger('bell');
+    if (a.up && !was.up) input.trigger('gearUp');
+    if (a.down && !was.down) input.trigger('gearDown');
     was = a;
   };
   pad.onstatus = () => { if (!pad.connected) input.setPad(pad, 0, 0); devStatus(); };
@@ -123,11 +133,11 @@ $('b-board').onclick = () => show('board');
 $('b-help').onclick = () => show('help');
 $('b-settings').onclick = () => {
   $('p-feel').value = P.trainerFeel; $('p-feel-v').textContent = P.trainerFeel + '%';
-  $('p-assist').checked = P.assist; $('p-music').checked = P.music; $('p-sfx').checked = P.sfx;
+  $('p-vshift').checked = P.vshift; $('p-assist').checked = P.assist; $('p-music').checked = P.music; $('p-sfx').checked = P.sfx;
   show('settings');
 };
 $('p-feel').oninput = (e) => { P.trainerFeel = +e.target.value; $('p-feel-v').textContent = P.trainerFeel + '%'; save(); };
-for (const k of ['assist', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };
+for (const k of ['vshift', 'assist', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };
 audio.setOptions(P.music, P.sfx);
 $('help-items').innerHTML = Object.values(ITEMS).map((i) => `<div>${i.icon} <b>${i.name}</b> – ${i.hint}</div>`).join('');
 
@@ -401,6 +411,7 @@ function startRace(cfg) {
   $('hud').classList.remove('hidden');
   $('h-count').textContent = '';
   renderer.resize();
+  if (P.vshift && trainer.connected && !trainer.canControl) toast('Je trainer accepteert geen weerstandsopdrachten, dus virtueel schakelen werkt niet.');
   if (P.music) audio.startMusic();
   navigator.wakeLock?.request('screen').then((w) => { wake = w; }).catch(() => {});
 }
@@ -587,6 +598,8 @@ function hud(dt) {
   $('h-cad').textContent = Math.round(me.cadence);
   $('h-grade').textContent = r.track.segAt(me.dist).grade.toFixed(1);
   $('h-bolts').textContent = `⚡ ${me.bolts}/10${me.bolts >= 10 ? ' FULL BLITZ' : ''}`;
+  $('h-gear').classList.toggle('hidden', !P.vshift);
+  $('h-gear').textContent = `⚙ ${getGear()}/${GEARS}`;
   $('h-bolts').title = `${me.bolts * 2}% minder luchtweerstand`;
   $('h-hr').classList.toggle('hidden', !me.hr);
   $('h-hr-v').textContent = me.hr || '';
@@ -646,12 +659,17 @@ function frame(now) {
   if (input.take('pause')) togglePause();
   if (input.take('item')) race.useItem();
   if (input.take('bell')) race.bell();
+  const gu = input.take('gearUp'), gd = input.take('gearDown');
+  if (P.vshift && (gu || gd) && shift(gu ? 1 : -1)) {
+    audio.sfx('tick');
+    const el = $('h-gear'); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  }
   const frameDt = dt;
   if (!paused) {
     while (dt > 0.0001 && race) { const step = Math.min(dt, 0.04); race.update(step); dt -= step; }
     if (!race) return;
     audio.setIntensity(race.me.power / (P.ftp * 1.5));
-    trainer.setGrade(race.state === 'race' ? race.trainerGrade : 0);
+    trainer.setGrade((race.state === 'race' ? race.trainerGrade : 0) + (P.vshift ? gearOffset() : 0));
   }
   renderer.draw(race, paused ? 0 : frameDt);
   hud(frameDt);

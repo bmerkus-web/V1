@@ -11,6 +11,7 @@ let demoPower = 0;
 const ACTIONS = {
   Space: 'item', Enter: 'item', Digit1: 'item', KeyX: 'item',
   KeyB: 'bell', Digit2: 'bell',
+  KeyE: 'gearUp', KeyQ: 'gearDown',
   KeyC: 'center', KeyM: 'music', Escape: 'pause', KeyP: 'pause', KeyF: 'fullscreen',
 };
 

@@ -102,24 +102,32 @@ test('Zwift-knoppen: Play, Click en Ride', async () => {
   const { parseZwiftPad } = await import('../js/ble.js');
   const u = (...b) => Uint8Array.from(b);
   // Play links (veld 1 = 1), pijl links ingedrukt (veld 3 = 0), rest los
+  const idle = { left: 0, right: 0, item: false, bell: false, up: false, down: false };
   let a = parseZwiftPad(u(0x07, 0x08, 1, 0x10, 1, 0x18, 0, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 1));
-  assert.deepEqual(a, { left: 1, right: 0, item: false, bell: false });
+  assert.deepEqual(a, { ...idle, kind: 'play', left: 1 });
   // Play rechts (veld 1 = 0), A ingedrukt (veld 4 = 0), flipper half (zigzag 100 = 50)
   a = parseZwiftPad(u(0x07, 0x08, 0, 0x10, 1, 0x18, 1, 0x20, 0, 0x28, 1, 0x30, 1, 0x38, 1, 0x40, 100));
   assert.equal(a.item, true); assert.equal(a.bell, false); assert.equal(a.right, 0.5);
   // Alles los
   a = parseZwiftPad(u(0x07, 0x08, 0, 0x10, 1, 0x18, 1, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 1));
-  assert.deepEqual(a, { left: 0, right: 0, item: false, bell: false });
+  assert.deepEqual(a, { ...idle, kind: 'play' });
+  assert.equal(parseZwiftPad(u(0x07, 0x08, 0, 0x10, 1, 0x18, 1, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 0)).up, true); // zijknop rechts
+  assert.equal(parseZwiftPad(u(0x07, 0x08, 1, 0x10, 1, 0x18, 1, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 0)).down, true); // zijknop links
   // Click: plus = rechts, beide = power-up
-  assert.equal(parseZwiftPad(u(0x37, 0x08, 0, 0x10, 1)).right, 1);
+  a = parseZwiftPad(u(0x37, 0x08, 0, 0x10, 1));
+  assert.ok(a.right === 1 && a.up && !a.down);
   assert.equal(parseZwiftPad(u(0x37, 0x08, 0, 0x10, 0)).item, true);
   // Ride: alle bits aan = niets ingedrukt; bit 0x1 uit = links
-  assert.deepEqual(parseZwiftPad(u(0x23, 0x08, 0xff, 0xff, 0x0f)), { left: 0, right: 0, item: false, bell: false });
+  assert.deepEqual(parseZwiftPad(u(0x23, 0x08, 0xff, 0xff, 0x0f)), { ...idle, kind: 'ride' });
   assert.equal(parseZwiftPad(u(0x23, 0x08, 0xfe, 0xff, 0x0f)).left, 1); // pijl links
   assert.equal(parseZwiftPad(u(0x23, 0x08, 0xef, 0xff, 0x0f)).right, 1); // A (0x10) = rechts sturen
   assert.equal(parseZwiftPad(u(0x23, 0x08, 0xff, 0xfe, 0x0f)).left, 1); // Z (0x80) = links sturen
   assert.equal(parseZwiftPad(u(0x23, 0x08, 0xbf, 0xff, 0x0f)).item, true); // Y (0x40)
-  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xff, 0xdf, 0x0f)).item, true); // + (0x1000)
+  a = parseZwiftPad(u(0x23, 0x08, 0xff, 0xdf, 0x0f)); // + rechts (0x1000)
+  assert.ok(a.up && !a.down && !a.item);
+  a = parseZwiftPad(u(0x23, 0x08, 0xff, 0xfd, 0x0f)); // − links (0x100)
+  assert.ok(a.down && !a.up && !a.item);
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xff, 0xf7, 0x0f)).item, true); // power-up-knop links (0x400)
   assert.equal(parseZwiftPad(u(0x23, 0x08, 0xdf, 0xff, 0x0f)).bell, true); // B (0x20)
   // Onbekend type (bv. batterij) wordt genegeerd
   assert.equal(parseZwiftPad(u(0x19, 0x10, 80)), null);
@@ -358,4 +366,22 @@ test('TCX: hoogte uit het bestand wordt door Strava gebruikt', async () => {
   const tcx = buildTcx({ startedAt: 0, log: [[1, 0, 200, 90, 0, 8, -0.4], [2, 8, 200, 90, 0, 8, 12.3]], name: 'x' });
   assert.ok(tcx.includes('<Name>Watt Blitz with barometer</Name>'));
   assert.ok(tcx.includes('<AltitudeMeters>49.6</AltitudeMeters>') && tcx.includes('<AltitudeMeters>62.3</AltitudeMeters>'));
+});
+
+test('Virtueel schakelen: 24 versnellingen, begrensd, en de trainer voelt het verschil', async () => {
+  const { GEARS, NEUTRAL, getGear, shift, gearOffset } = await import('../js/gears.js');
+  const { simParamsCommand } = await import('../js/ble.js');
+  assert.equal(getGear(), NEUTRAL);
+  assert.equal(gearOffset(), 0);
+  for (let i = 0; i < 30; i++) shift(1);
+  assert.equal(getGear(), GEARS);
+  assert.equal(shift(1), false, 'niet verder dan de zwaarste');
+  assert.ok(gearOffset() > 5);
+  for (let i = 0; i < 30; i++) shift(-1);
+  assert.equal(getGear(), 1);
+  assert.ok(gearOffset() < -5);
+  // zwaarste versnelling op 2% helling gaat als ruim 8% naar de trainer
+  const g = new DataView(simParamsCommand(2 + gearOffset(GEARS)).buffer).getInt16(3, true);
+  assert.equal(g, 800);
+  while (getGear() < NEUTRAL) shift(1);
 });
