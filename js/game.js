@@ -16,6 +16,8 @@ export const ITEMS = {
 export const BOT_NAMES = ['Turbo Tess', 'Watt Wout', 'Sprint Sanne', 'Klim Kees', 'Demarrage Daan', 'Bidon Bram', 'Kopman Koen'];
 // Ideale lijn: binnendoor is korter. Echte meetkunde (straal R = SEG²/bocht), iets aangedikt.
 const LINE_K = (ROAD_W / (SEG * SEG)) * 1.3;
+// Na een kwak kunnen gever en ontvanger elkaar zo lang niet kwakken (een botsing kan wel).
+const KWAK_CALM = 2;
 const CUT_BONUS = 0.12; // extra voortgang op het short-cut-pad
 
 export const DIFFICULTY = { makkelijk: 0.7, normaal: 0.82, zwaar: 0.93, beul: 1.05 };
@@ -548,6 +550,7 @@ export class Race {
     else if (kind === 'storm') r.fx.storm = 6;
     if (kind === 'kwak') {
       r.kwakSafe = 3;
+      r.kwakCd = Math.max(r.kwakCd || 0, KWAK_CALM); // terugsturen naar je lijn is geen terugkwak
       if (!blocked) {
         r.fx.kwak = 2.5; r.v *= 0.93; r.x = clamp(r.x + dir * 0.22, -1.45, 1.45);
         if (r.bolts > 0) { r.bolts--; r.blitzLost = true; }
@@ -562,6 +565,7 @@ export class Race {
   _hitFx(r, kind, by, blocked, lost = false) {
     const src = this.byId(by);
     if (kind === 'kwak') {
+      if (src) src.kwakSafe = Math.max(src.kwakSafe || 0, KWAK_CALM); // de gever is even beschermd (op elk scherm)
       if (!blocked) r.kwakAt = this.clock;
       r.kwakLost = lost;
       if (r === this.me) {
