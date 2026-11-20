@@ -9,6 +9,7 @@ import { store, save, COLORS, getTime, getGhost, levelOf } from './storage.js';
 import { Room, makeCode } from './net.js';
 import { fmtTime, fmtDelta, clamp, mod } from './util.js';
 import { buildTcx, tcxFilename } from './export.js';
+import { grab, compose } from './shot.js';
 import { GEARS, getGear, shift, gearOffset } from './gears.js';
 import { boardKeys, boardRows, mergeEntry, entriesToShare } from './board.js';
 
@@ -407,6 +408,7 @@ const getSteer = (dt) => clamp(input.steer(dt) + sterzo.steer, -1, 1);
 
 let profDots = {};
 function startRace(cfg) {
+  rideShot = null;
   lastCfg = cfg;
   hideOverlay();
   training = null;
@@ -505,8 +507,32 @@ function hideOverlay() { $('overlay').classList.add('hidden'); clearInterval(res
 
 // Rit als .tcx-bestand opslaan; dat bestand kun je bij Strava uploaden.
 const SAVE_BTN = '<button class="ghost" id="ov-save">💾 Rit opslaan voor Strava</button>';
+const SHOT_BTN = '<button class="ghost" id="ov-shot">📸 Ritfoto opslaan</button>';
+let rideShot = null; // momentopname net na de start
+
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+function rideImage(r) {
+  const st = r.stats, me = r.me, secs = st.secs.length;
+  const avgP = secs ? st.secs.reduce((a, w) => a + w, 0) / secs : 0;
+  const when = new Date(r.startedAt || Date.now()).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+  const where = r.training ? `Training · ${training ? training.count : ''} etappes` : r.track.name;
+  const stats = [[`${(st.km || 0).toFixed(1)} km`, 'afstand'], [fmtTime(secs, 0), 'tijd'], [`${Math.round(avgP)} W`, 'gemiddeld'], [`${Math.round(st.hm || 0)} m`, 'hoogtemeters']];
+  if (me.finished && r.riders.length > 1) stats.push([`${me.rank}/${r.riders.length}`, 'plaats']);
+  return compose(rideShot || grab($('game')), `${where} · ${when}`, stats); // te vroeg gestopt: het beeld van nu
+}
 const canSave = (r) => r.ns === 'real' && r.stats.log.length > 5;
 function wireSave(r) {
+  const sb = $('ov-shot');
+  if (sb) sb.onclick = () => rideImage(r).toBlob((blob) => {
+    download(blob, tcxFilename(r.startedAt || Date.now()).replace('.tcx', '.jpg'));
+    sb.textContent = '📸 Ritfoto opgeslagen ✓';
+  }, 'image/jpeg', 0.92);
   const b = $('ov-save');
   if (!b) return;
   b.onclick = () => {
@@ -530,7 +556,7 @@ function togglePause() {
     <button class="big" id="ov-resume">Verder rijden</button>
     ${room ? '' : '<button class="ghost" id="ov-restart">Opnieuw</button>'}
     ${race.timed && (race.mode === 'cool' || !room) ? `<button class="ghost" id="ov-skip">${race.mode === 'warm' ? 'Warming-up' : 'Cooling-down'} overslaan</button>` : ''}
-    <button class="ghost" id="ov-quit">Stoppen</button></div>${canSave(race) ? '<div class="menu">' + SAVE_BTN + '</div>' : ''}`);
+    <button class="ghost" id="ov-quit">Stoppen</button></div><div class="menu">${canSave(race) ? SAVE_BTN : ''}${race.stats.secs.length > 5 ? SHOT_BTN : ''}</div>`);
   wireSave(race);
   $('ov-resume').onclick = () => { paused = false; hideOverlay(); };
   if (!room) $('ov-restart').onclick = () => startRace({ ...lastCfg, seed: (Math.random() * 1e9) | 0 });
@@ -561,7 +587,7 @@ function showResults() {
         <div><b>${(st.maxV * 3.6).toFixed(0)}</b>km/u top</div><div><b>${(st.km || 0).toFixed(1)}</b>km totaal</div><div><b>${Math.round(st.hm || 0)}</b>hoogtemeters</div>${st.nHr ? `<div><b>${Math.round(st.sumHr / st.nHr)}</b>❤ gemiddeld</div><div><b>${st.maxHr}</b>❤ max</div>` : ''}<div><b>${Math.round(st.secs.reduce((a, w) => a + w, 0) / 1000)} kJ</b>arbeid</div>
       </div>
       ${r.ns === 'demo' ? '<p class="small">Demo-modus: tijden tellen apart van je trainer-records.</p>' : ''}
-      ${canSave(r) ? '<div class="menu">' + (r.saved ? '<p class="small">Rit opgeslagen. Upload het bestand op <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a>.</p>' : SAVE_BTN) + '</div>' : ''}
+      <div class="menu">${canSave(r) ? (r.saved ? '<p class="small">Rit opgeslagen. Upload het bestand op <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a>.</p>' : SAVE_BTN)  : ''}${SHOT_BTN}</div>
       <div class="menu">${room ? (room.isHost ? '<button class="big" id="ov-lobby">Terug naar kamer</button>' : '<p class="small">Wacht op de host voor de volgende race…</p><button class="ghost" id="ov-quit">Verlaten</button>')
         : '<button class="big" id="ov-again">Nog een keer</button><button class="ghost" id="ov-quit">Menu</button>'}</div>`);
     if ($('ov-lobby')) $('ov-lobby').onclick = quitToMenu;
@@ -690,6 +716,13 @@ function frame(now) {
     trainer.setGrade((race.state === 'race' ? race.trainerGrade : 0) + (P.vshift ? gearOffset() : 0));
   }
   renderer.draw(race, paused ? 0 : frameDt);
+  // Ritfoto: kort na de start (bij een training: na de start van de eerste etappe), op een moment
+  // dat er iemand vlak voor je rijdt; lukt dat niet binnen 12 seconden, dan alsnog.
+  if (!rideShot && race.state === 'race' && !race.free) {
+    const t = race.time - race.t0, me = race.me;
+    const ahead = race.riders.some((o) => o !== me && o.dist - me.dist > 3 && o.dist - me.dist < 40);
+    if ((t >= 3 && ahead) || t >= 12) rideShot = grab($('game'));
+  }
   hud(frameDt);
 }
 requestAnimationFrame(frame);
