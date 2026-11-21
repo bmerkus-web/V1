@@ -256,30 +256,52 @@ export class Renderer {
     c.fillStyle = smooth; // gootjes
     for (const sd of [-1, 1]) this._quad(a.X + sd * (w1 - g1 / 2), a.Y, g1 / 2, b.X + sd * (w2 - g2 / 2), b.Y, g2 / 2);
     if (n > 40) return; // ver weg: alleen de grondkleur (de voegen)
-    // Kleine, ongeveer vierkante keitjes (~32 cm) in halfsteensverband, met wat kleurverschil.
+    // Kleine, ongeveer vierkante keitjes (~32 cm) in halfsteensverband. Elke steen is een trapezium
+    // langs de perspectieflijnen, zodat de voegen naar de horizon lopen; elke hoek wijkt een beetje
+    // af (alleen naar binnen, dus de stenen overlappen nooit) voor de hobbelige look.
     const S = 0.32, uMid = (a.u + b.u) / 2, pxH = a.Y - b.Y;
     const rows = Math.max(1, Math.min(16, Math.round(pxH / Math.max(2.5, S * uMid))));
     const inner = (seg.wA + seg.wB) / 2 - GUTTER, across = Math.max(4, Math.round((inner * ROAD_W * 2) / S));
     const shades = ['#8b8496', '#7e778a', '#98919f'];
-    const rects = [[], [], []];
+    const stones = [[], [], []];
+    const halfAt = (t) => seg.wA + (seg.wB - seg.wA) * t - GUTTER; // in wegbreedtes
     for (let r = 0; r < rows; r++) {
       const t1 = r / rows, t2 = (r + 1) / rows;
-      const p1 = this._pt(seg, t1, 0), p2 = this._pt(seg, t2, 0);
+      const p1 = this._pt(seg, t1, 0), p2 = this._pt(seg, t2, 0); // p1 dichtbij (onder), p2 verder (boven)
       const rowH = p1.Y - p2.Y;
       if (rowH < 2) continue;
-      const pm = (p1.u + p2.u) / 2, half = pm * ROAD_W * (seg.wA + (seg.wB - seg.wA) * (t1 + t2) / 2 - GUTTER);
-      const cx = (p1.X + p2.X) / 2, sw = (half * 2) / across, gap = Math.max(0.6, sw * 0.12), off = ((seg.i * rows + r) % 2) * 0.5;
+      const k1 = p1.u * ROAD_W, k2 = p2.u * ROAD_W, h1 = halfAt(t1), h2 = halfAt(t2);
+      const sw1 = (2 * h1) / across, sw2 = (2 * h2) / across;
+      const gx = Math.max(0.12, 0.7 / (sw2 * k2)); // voeg als deel van een steen, minstens ~0,7 px
+      const gy = Math.max(0.6, rowH * 0.1), off = ((seg.i * rows + r) % 2) * 0.5;
+      const yb = p1.Y - gy * 0.5, yt = p2.Y + gy * 0.5;
       for (let k = -1; k < across; k++) {
-        let x0 = cx - half + (k + off) * sw, x1 = x0 + sw - gap;
-        if (x1 <= cx - half || x0 >= cx + half) continue;
-        x0 = Math.max(x0, cx - half); x1 = Math.min(x1, cx + half);
-        rects[(seg.i * 7 + r * 13 + k * 5 + 99) % 3].push(x0, p2.Y + gap * 0.5, x1 - x0, rowH - gap);
+        const f0 = (k + off) / across, f1 = (k + off + 1 - gx) / across; // positie over de weg, 0..1
+        if (f1 <= 0 || f0 >= 1) continue;
+        const a0 = Math.max(0, f0), a1 = Math.min(1, f1);
+        let hsh = (seg.i * 73856093) ^ (r * 19349663) ^ ((k + 7) * 83492791);
+        hsh = (hsh ^ (hsh >>> 13)) * 1274126177;
+        const j = (bit) => ((hsh >>> bit) & 7) / 7; // 0..1
+        const jx = 0.1, jy = rowH * 0.12; // tot 10% van een steenbreedte en 12% van de rijhoogte
+        // hoeken: linksonder, rechtsonder, rechtsboven, linksboven
+        const L1 = a0 + (f0 >= 0 ? j(0) * jx / across : 0), R1 = a1 - (f1 <= 1 ? j(3) * jx / across : 0);
+        const L2 = a0 + (f0 >= 0 ? j(6) * jx / across : 0), R2 = a1 - (f1 <= 1 ? j(9) * jx / across : 0);
+        stones[(seg.i * 7 + r * 13 + k * 5 + 99) % 3].push(
+          p1.X + k1 * (L1 * 2 - 1) * h1, yb - j(12) * jy,
+          p1.X + k1 * (R1 * 2 - 1) * h1, yb - j(15) * jy,
+          p2.X + k2 * (R2 * 2 - 1) * h2, yt + j(18) * jy,
+          p2.X + k2 * (L2 * 2 - 1) * h2, yt + j(21) * jy);
       }
     }
     for (let sh = 0; sh < 3; sh++) {
+      const q = stones[sh];
+      if (!q.length) continue;
       c.fillStyle = shades[sh];
-      const q = rects[sh];
-      for (let i = 0; i < q.length; i += 4) c.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]);
+      c.beginPath();
+      for (let i = 0; i < q.length; i += 8) {
+        c.moveTo(q[i], q[i + 1]); c.lineTo(q[i + 2], q[i + 3]); c.lineTo(q[i + 4], q[i + 5]); c.lineTo(q[i + 6], q[i + 7]); c.closePath();
+      }
+      c.fill();
     }
   }
 
