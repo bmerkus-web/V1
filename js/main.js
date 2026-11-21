@@ -570,6 +570,22 @@ function wkBias(d) {
   wk.bias = clamp(Math.round((wk.bias + d) * 100) / 100, -0.3, 0.3);
   audio.sfx('tick'); toast(wk.bias ? `Doel ${wk.bias > 0 ? '+' : ''}${Math.round(wk.bias * 100)}%` : 'Doel weer zoals gepland');
 }
+function wkErg() {
+  if (!wk) return;
+  wk.erg = !wk.erg;
+  toast(wk.erg ? 'ERG aan: de trainer houdt het doel vast' : 'ERG uit: je voelt weer de helling');
+}
+// Knoppen op het scherm (reageren meteen, ook als er al een vinger op TRAP staat). Overslaan vraagt een tweede tik.
+let skipArm = 0;
+$('wk-easy').addEventListener('pointerdown', (e) => { e.preventDefault(); if (wk) wkBias(-0.05); });
+$('wk-hard').addEventListener('pointerdown', (e) => { e.preventDefault(); if (wk) wkBias(0.05); });
+$('wk-skip').addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const b = $('wk-skip');
+  if (performance.now() < skipArm) { skipArm = 0; b.classList.remove('confirm'); b.textContent = '⏭'; wkSkip(); return; }
+  skipArm = performance.now() + 3000; b.classList.add('confirm'); b.textContent = 'Zeker? ⏭';
+  setTimeout(() => { if (performance.now() >= skipArm) { b.classList.remove('confirm'); b.textContent = '⏭'; } }, 3100);
+});
 function wkSkip() {
   if (!wk || !race || race.state !== 'race') return;
   const p = wkAt(wk.w, wkTime());
@@ -611,6 +627,7 @@ function startRace(cfg) {
   wk = cfg.workout ? { w: cfg.workout, bias: 0, erg: !!cfg.erg, log: [], sec: -1, bi: -1, p3: 0, beep: 4 } : null;
   $('hud').classList.toggle('workout', !!wk); $('hud').classList.toggle('wkgame', !!wk && !!cfg.wgame);
   $('wk').classList.toggle('hidden', !wk);
+  (wk && cfg.wgame ? $('wk-l') : $('wk')).appendChild($('wk-ctl'));
   lastCfg = cfg;
   hideOverlay();
   training = null;
@@ -772,7 +789,7 @@ function togglePause() {
   if ($('ov-skip')) $('ov-skip').onclick = () => { const r = race; paused = false; hideOverlay(); r.timed = 0.001; };
   if (wk) {
     $('ov-wkskip').onclick = () => { paused = false; hideOverlay(); wkSkip(); };
-    $('ov-erg').onclick = () => { wk.erg = !wk.erg; paused = false; hideOverlay(); toast(wk.erg ? 'ERG aan: de trainer houdt het doel vast' : 'ERG uit: je voelt weer de helling'); };
+    $('ov-erg').onclick = () => { paused = false; hideOverlay(); wkErg(); };
     $('ov-easy').onclick = () => wkBias(-0.05);
     $('ov-hard').onclick = () => wkBias(0.05);
     if (race.time - race.t0 > 60) $('ov-quit').onclick = () => finishWorkout(true); // gestopt: toch even nabespreken
@@ -1047,6 +1064,7 @@ function frame(now) {
   if (input.take('bell')) race.bell();
   const gu = input.take('gearUp'), gd = input.take('gearDown');
   if (input.take('skip')) wkSkip();
+  if (input.take('erg')) wkErg();
   if (wk && (gu || gd)) wkBias(gu ? 0.05 : -0.05); // workout: schakelknoppen maken het 5% zwaarder of lichter
   else if (P.vshift && (gu || gd) && shift(gu ? 1 : -1)) {
     audio.sfx('tick');

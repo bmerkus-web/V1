@@ -203,6 +203,12 @@ small.pen { color: var(--gold); font-weight: 700; }
 #hud.wkgame #wk-next { display: none; }
 #wk-chart { left: 50%; bottom: 10px; transform: translateX(-50%); width: min(820px, 64vw); height: 90px; border-radius: 12px; background: rgba(8, 2, 24, .55); }
 #hud.wkgame #wk-chart { transform: translateX(-58%); width: min(700px, 56vw); }
+#wk-ctl { right: 22px; bottom: 112px; display: flex; gap: 8px; pointer-events: auto; }
+#wk-ctl button { touch-action: none; min-width: 58px; height: 46px; padding: 0 12px; border-radius: 12px; font: 800 16px system-ui, sans-serif; color: #fff;
+  background: rgba(8, 2, 24, .6); border: 2px solid rgba(255, 255, 255, .28); text-shadow: none; }
+#wk-ctl button:active { background: rgba(255, 255, 255, .2); }
+#wk-ctl button.confirm { border-color: var(--gold); color: var(--gold); min-width: 92px; }
+#wk-l #wk-ctl { position: static; margin-top: 10px; } /* spelmodus: onder het blok, want rechts staan de stand, de power-up en de stuurknoppen */
 .wk-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin-bottom: 10px; }
 .wk-card { position: relative; text-align: left; padding: 10px; border-radius: 12px; background: #0d0626; border: 2px solid transparent; color: var(--text); }
 .wk-card.sel { border-color: var(--gold); }
