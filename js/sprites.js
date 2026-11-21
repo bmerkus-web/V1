@@ -118,18 +118,20 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   c.fillStyle = '#0c0c14'; c.fillRect(-0.045 * u, -0.7 * u, 0.09 * u, 0.7 * u);
   c.fillStyle = '#c9c9d9'; c.fillRect(-0.012 * u, -0.66 * u, 0.024 * u, 0.62 * u);
   if (m & 2) { c.fillStyle = '#b44dff'; c.beginPath(); c.ellipse(0, -0.05 * u, 0.3 * u, 0.1 * u, 0, 0, 7); c.fill(); }
-  if (m & 128) { // lekke band: witte straaltjes lucht die uit het achterwiel spuiten
+  if (m & 128) { // lekke band: witte straaltjes lucht die aan één kant uit het achterwiel spuiten
+    if (r._flatSide == null) r._flatSide = Math.random() < 0.5 ? -1 : 1; // per lekke band links of rechts
+    const side = r._flatSide;
     c.lineCap = 'round';
-    for (let i = 0; i < 10; i++) {
-      const k = (t * 3 + i / 10) % 1, side = i % 2 ? 1 : -1;
-      const ang = 0.15 + (i % 5) * 0.3 + Math.sin(t * 17 + i) * 0.1; // schuin omhoog en opzij
-      const r0 = (0.06 + k * 0.5) * u, len = (0.18 + 0.12 * (1 - k)) * u;
-      const x0 = side * Math.cos(ang) * r0, y0 = -0.08 * u - Math.sin(ang) * r0 * 0.9;
-      c.strokeStyle = `rgba(255,255,255,${0.95 * (1 - k * 0.85)})`; c.lineWidth = Math.max(1.5, 0.04 * u * (1 - k * 0.5));
+    for (let i = 0; i < 9; i++) {
+      const k = (t * 3 + i / 9) % 1;
+      const ang = 0.1 + (i % 5) * 0.22 + Math.sin(t * 17 + i) * 0.08; // schuin omhoog en naar buiten
+      const r0 = (0.05 + k * 0.55) * u, len = (0.2 + 0.14 * (1 - k)) * u;
+      const x0 = side * Math.cos(ang) * r0, y0 = -0.1 * u - Math.sin(ang) * r0 * 0.9;
+      c.strokeStyle = `rgba(255,255,255,${0.95 * (1 - k * 0.85)})`; c.lineWidth = Math.max(1.5, 0.045 * u * (1 - k * 0.5));
       c.beginPath(); c.moveTo(x0, y0); c.lineTo(x0 + side * Math.cos(ang) * len, y0 - Math.sin(ang) * len * 0.9); c.stroke();
     }
-    c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(0, -0.06 * u, (0.18 + 0.04 * Math.sin(t * 20)) * u, 0.06 * u, 0, 0, 7); c.fill();
-  }
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(side * 0.08 * u, -0.07 * u, (0.12 + 0.03 * Math.sin(t * 20)) * u, 0.05 * u, 0, 0, 7); c.fill();
+  } else r._flatSide = null;
   // benen
   const ph = r._ph || 0;
   c.lineCap = 'round';
@@ -261,14 +263,14 @@ export function drawTacks(c, X, Y, u, hw, seed) {
 }
 
 // Scooter (gangmaker) van achteren, met bestuurder.
-export function drawScooter(c, X, Y, u) {
+export function drawScooter(c, X, Y, u, color = '#7df9ff') {
   c.save(); c.translate(X, Y);
   c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(0, 0, 0.5 * u, 0.1 * u, 0, 0, 7); c.fill();
   c.fillStyle = '#0c0c14'; c.fillRect(-0.07 * u, -0.45 * u, 0.14 * u, 0.45 * u); // achterwiel
   c.fillStyle = '#ff3fa4'; c.beginPath(); c.moveTo(-0.3 * u, -0.4 * u); c.lineTo(0.3 * u, -0.4 * u); c.lineTo(0.24 * u, -0.85 * u); c.lineTo(-0.24 * u, -0.85 * u); c.fill(); // kap
   c.fillStyle = '#ff3b3b'; c.fillRect(-0.12 * u, -0.6 * u, 0.24 * u, 0.08 * u); // achterlicht
   c.fillStyle = '#ffe26b'; c.fillRect(-0.2 * u, -0.92 * u, 0.4 * u, 0.1 * u); // nummerplaat
-  c.fillStyle = '#23233a'; c.beginPath(); c.moveTo(-0.24 * u, -0.85 * u); c.quadraticCurveTo(-0.3 * u, -1.4 * u, -0.18 * u, -1.55 * u); c.lineTo(0.18 * u, -1.55 * u); c.quadraticCurveTo(0.3 * u, -1.4 * u, 0.24 * u, -0.85 * u); c.fill(); // bestuurder
+  c.fillStyle = shade(color, 1.3); c.beginPath(); c.moveTo(-0.24 * u, -0.85 * u); c.quadraticCurveTo(-0.3 * u, -1.4 * u, -0.18 * u, -1.55 * u); c.lineTo(0.18 * u, -1.55 * u); c.quadraticCurveTo(0.3 * u, -1.4 * u, 0.24 * u, -0.85 * u); c.fill(); // bestuurder
   c.fillStyle = '#f5f5ff'; c.beginPath(); c.ellipse(0, -1.72 * u, 0.17 * u, 0.18 * u, 0, 0, 7); c.fill(); // helm
   c.fillStyle = '#15152a'; c.fillRect(-0.14 * u, -1.74 * u, 0.28 * u, 0.06 * u);
   c.restore();
@@ -286,16 +288,15 @@ export function drawCar(c, X, Y, u, color = '#f5f5ff') {
   c.fillStyle = '#f5f5ff'; c.fillRect(-0.95 * u, -0.74 * u, 1.9 * u, 0.1 * u); // witte ploegstreep
   c.fillStyle = '#ff3b3b'; c.fillRect(-0.9 * u, -0.92 * u, 0.2 * u, 0.12 * u); c.fillRect(0.7 * u, -0.92 * u, 0.2 * u, 0.12 * u); // achterlichten
   c.fillStyle = '#15152a'; c.fillRect(-0.6 * u, -1.52 * u, 1.2 * u, 0.05 * u); // dakdrager
-  for (const [bx, by, fc] of [[-0.3, 0, '#ff3fa4'], [0.05, -0.06, '#7df9ff'], [0.38, 0, '#ffd166']]) { // drie fietsen op het dak (van opzij getekend, zodat je ze herkent)
-    const x = bx * u, y = (-1.52 + by) * u, r = 0.2 * u;
-    c.strokeStyle = '#0c0c14'; c.lineWidth = Math.max(1, 0.04 * u);
-    c.beginPath(); c.arc(x - 0.26 * u, y - r, r, 0, 7); c.stroke(); // wielen
-    c.beginPath(); c.arc(x + 0.26 * u, y - r, r, 0, 7); c.stroke();
-    c.strokeStyle = fc; c.lineWidth = Math.max(1, 0.045 * u); // frame
-    c.beginPath(); c.moveTo(x - 0.26 * u, y - r); c.lineTo(x - 0.05 * u, y - r * 2.3); c.lineTo(x + 0.18 * u, y - r * 2.3); c.lineTo(x + 0.26 * u, y - r);
-    c.moveTo(x - 0.26 * u, y - r); c.lineTo(x + 0.02 * u, y - r); c.lineTo(x - 0.05 * u, y - r * 2.3); c.moveTo(x + 0.02 * u, y - r); c.lineTo(x + 0.18 * u, y - r * 2.3); c.stroke();
-    c.fillStyle = '#15152a'; c.fillRect(x - 0.1 * u, y - r * 2.5, 0.1 * u, 0.035 * u); // zadel
-    c.strokeStyle = '#2b2540'; c.lineWidth = Math.max(1, 0.03 * u); c.beginPath(); c.moveTo(x + 0.18 * u, y - r * 2.3); c.lineTo(x + 0.22 * u, y - r * 2.6); c.stroke(); // stuur
+  for (const [bx, fc] of [[-0.42, '#ff3fa4'], [-0.14, '#7df9ff'], [0.14, '#ffd166'], [0.42, '#39ffb0']]) { // vier fietsen rechtop, van achteren gezien
+    const x = bx * u, y = -1.52 * u;
+    c.fillStyle = '#0c0c14'; c.beginPath(); c.ellipse(x, y - 0.3 * u, 0.045 * u, 0.3 * u, 0, 0, 7); c.fill(); // achterband
+    c.fillStyle = '#9aa3b5'; c.beginPath(); c.ellipse(x, y - 0.3 * u, 0.015 * u, 0.24 * u, 0, 0, 7); c.fill(); // velg
+    c.strokeStyle = fc; c.lineWidth = Math.max(1.5, 0.06 * u); // zitbuis
+    c.beginPath(); c.moveTo(x, y - 0.32 * u); c.lineTo(x, y - 0.74 * u); c.stroke();
+    c.fillStyle = '#15152a'; c.fillRect(x - 0.06 * u, y - 0.8 * u, 0.12 * u, 0.06 * u); // zadel
+    c.strokeStyle = '#2b2540'; c.lineWidth = Math.max(1, 0.035 * u); // stuur met beugels
+    c.beginPath(); c.moveTo(x - 0.11 * u, y - 0.6 * u); c.lineTo(x - 0.11 * u, y - 0.68 * u); c.lineTo(x + 0.11 * u, y - 0.68 * u); c.lineTo(x + 0.11 * u, y - 0.6 * u); c.stroke();
   }
   c.restore();
 }

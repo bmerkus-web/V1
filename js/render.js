@@ -184,7 +184,7 @@ export class Renderer {
     for (const h of race.hazards) put(h.d, { haz: h });
     for (const r of race.riders) {
       const m = r.mask || 0;
-      if (r.fx?.scooter > 0 || m & 1024) put(r.dist + 7, { scooter: { x: r.scooterX ?? r.x } });
+      if (r.fx?.scooter > 0 || m & 1024) put(r.dist + 7, { scooter: { x: r.scooterX ?? r.x, color: r.color } });
       const tow = r.fx?.tow > 0 || m & 512;
       if (tow || r.fx?.wheel > 0 || m & 256) { const side = (tow ? r.towSide : 0) || Math.sign(r.x || 1); put(r.dist + 0.3, { car: { x: side * 1.34, side, rider: r, tow } }); }
     }
@@ -223,7 +223,7 @@ export class Renderer {
             else if (h.type === 'tacks') drawTacks(c, p.X, p.Y, p.u, 0.5 * ROAD_W * p.u, (h.id || '').length * 7919 + 13);
             else drawGlue(c, p.X, p.Y, p.u, t);
           }
-          else if (o.scooter) { const p = this._pt(seg, o.t, o.scooter.x); drawScooter(c, p.X, p.Y, p.u * 1.5); }
+          else if (o.scooter) { const p = this._pt(seg, o.t, o.scooter.x); drawScooter(c, p.X, p.Y, p.u * 1.5, o.scooter.color); }
           else if (o.car) {
             const p = this._pt(seg, o.t, o.car.x), cr = o.car.rider;
             drawCar(c, p.X, p.Y, p.u * 1.15, cr.color);
