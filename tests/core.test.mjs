@@ -598,3 +598,88 @@ test('Bolletjestrui: snelste klimtijd in de race, af te pakken met een snellere 
   c.me.dist = z.end - 0.5; c.me.v = 10; c.update(0.1);
   assert.equal(c.komId, undefined);
 });
+
+test('Nieuwe power-ups: muur ervoor of erachter, punaises geven lek, schild helpt', () => {
+  const { race } = simulate({ track: 'polder', laps: 1, bots: 1, maxTime: 20, useItems: false });
+  const me = race.me, bot = race.riders[1];
+  // niet op kop: muur 30 m voor de renner vóór je
+  bot.dist = me.dist + 20; bot.x = 0.3; race.rank();
+  me.item = 'wall'; race.useItem(me);
+  let w = race.hazards.find((h) => h.type === 'wall');
+  assert.ok(w.front && Math.abs(w.d - (bot.dist + 30) % race.L) < 1 && w.life === 10);
+  // de bot knalt erop: 70% snelheid kwijt
+  const v = bot.v = 10; bot.dist = w.d - 1; bot.x = w.x + 0.4; bot.fx.shield = 0; race._pickups(bot, w.d - 2);
+  assert.ok(bot.v < v * 0.35 && bot.fx.spin > 0, 'muur raakt over de halve weg');
+  // ik kom er zelf ook langs: mijn eigen muur ervoor raakt mij ook
+  me.v = 10; me.fx.shield = 0; me.dist = w.d - 1; me.x = w.x - 0.4; race._pickups(me, w.d - 2);
+  assert.ok(me.v < 3.5, 'eigen muur ervoor raakt je ook');
+  // op kop: muur achter je
+  race.hazards = []; me.dist = bot.dist + 50; race.rank();
+  me.item = 'wall'; race.useItem(me);
+  w = race.hazards.find((h) => h.type === 'wall');
+  assert.ok(!w.front && w.life === 20 && mod(me.dist - w.d, race.L) < 4);
+  // punaises: lek, schild beschermt
+  race.hazards = []; bot.item = 'tacks'; race.useItem(bot);
+  const tk = race.hazards.find((h) => h.type === 'tacks');
+  me.fx.shield = 5; me.fx.flat = me.fx.wheel = 0; me.dist = tk.d - 1; me.x = tk.x + 0.45; race._pickups(me, tk.d - 2);
+  assert.equal(me.fx.flat + me.fx.wheel, 0, 'schild houdt punaises tegen');
+  tk.hitBy = []; me.fx.shield = 0; race._pickups(me, tk.d - 2);
+  assert.ok(me.fx.flat > 0 || me.fx.wheel > 0, 'lek door punaises');
+});
+function mod(a, n) { return ((a % n) + n) % n; }
+
+test('Lek: 30% trager tot de sealant dicht, kans groeit met berm-tikjes en tijd in de berm', () => {
+  const { race } = simulate({ track: 'polder', laps: 1, bots: 0, maxTime: 10, useItems: false });
+  const me = race.me;
+  race.rng = () => 0.9; // geen wielwissel
+  race._flat(me, 'berm');
+  assert.equal(me.fx.flat, 6);
+  me.x = 0; me.v = 10; const d0 = me.dist; race.update(0.04);
+  assert.ok(Math.abs((me.dist - d0) / (me.v * 0.04) - 0.7) < 0.03, '30% trager');
+  for (let i = 0; i < 160; i++) race.update(0.04);
+  assert.equal(me.fx.flat, 0, 'na 6 s dicht');
+  race.rng = () => 0.1; me.fx.flat = 0; race._flat(me, 'berm');
+  assert.equal(me.fx.wheel, 3, 'soms een wielwissel');
+  // berm-slijtage: elk tikje telt, en de tijd erin ook
+  me.fx.wheel = 0; me.bermWear = 0; race.rng = () => 0.99;
+  for (let k = 0; k < 5; k++) { me.x = 1.2; race.update(0.04); me.x = 0; race.update(0.04); }
+  assert.ok(me.bermWear > 4.5, `5 tikjes: ${me.bermWear}`);
+  const w0 = me.bermWear; me.x = 1.2; for (let i = 0; i < 25; i++) { me.x = 1.2; race.update(0.04); }
+  assert.ok(me.bermWear > w0 + 1.3, '1 s in de berm telt ook');
+});
+
+test('Plakbidon en scooter: voordeel alleen met goed sturen', () => {
+  const { race } = simulate({ track: 'polder', laps: 1, bots: 0, maxTime: 10, useItems: false });
+  const me = race.me;
+  race.rng = () => 0.99; // jury kijkt weg
+  me.x = 0.7; me.item = 'bottle'; race.useItem(me);
+  assert.equal(me.towSide, 1);
+  me.v = 10; let d0 = me.dist; race.update(0.04);
+  assert.ok(me.towing && (me.dist - d0) / (me.v * 0.04) > 1.3, 'mee getrokken');
+  race.getSteer = () => -1; for (let i = 0; i < 20; i++) race.update(0.04);
+  assert.equal(me.fx.tow, 0, 'te ver van de rand: bidon los');
+  race.getSteer = () => 0;
+  // scooter: halve luchtweerstand recht erachter
+  me.x = 0; me.item = 'scooter'; race.useItem(me);
+  race.update(0.04);
+  assert.ok(me.inScooter);
+  me.x = 0.5; race.update(0.04);
+  assert.ok(!me.inScooter, 'naast de scooter geen voordeel');
+});
+
+test('Jury: tijdstraf bij plakbidon en kwak, telt mee in de eindtijd', () => {
+  const { race } = simulate({ track: 'polder', laps: 1, bots: 1, maxTime: 10, useItems: false });
+  const me = race.me, o = race.riders[1];
+  race.rng = () => 0.01; // jury ziet alles
+  me.x = 0.7; me.item = 'bottle'; race.useItem(me);
+  assert.equal(me.penalty, 7);
+  // vuile kwak (de berm in) en gewone kwak
+  o.fx.shield = 0; o.x = 0.85; o.dist = me.dist; race._kwak(me, o, 1);
+  assert.equal(me.penalty, 12);
+  o.x = 0; o.fx.kwak = 0; o.kwakSafe = 0; race._kwak(me, o, 1);
+  assert.equal(me.penalty, 13);
+  // eindtijd inclusief straf
+  me.dist = race.total - 1; me.v = 10; race.update(0.2);
+  assert.ok(me.finished && me.finishTime > race.time + 12.5, `eindtijd ${me.finishTime} bij tijd ${race.time}`);
+  assert.equal(race.results().find((x) => x.me).penalty, 13);
+});

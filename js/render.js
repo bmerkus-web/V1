@@ -1,7 +1,7 @@
 // Pseudo-3D wegweergave op canvas (licht genoeg voor een oude Mac of tablet).
 import { SEG, ROAD_W, KERB } from './track.js';
 import { mod, clamp, mulberry } from './util.js';
-import { SCENERY, drawRider, drawBox, drawBolt, drawGlue, drawRocket } from './sprites.js';
+import { SCENERY, drawRider, drawBox, drawBolt, drawGlue, drawRocket, drawWall, drawTacks, drawScooter, drawCar } from './sprites.js';
 
 const ZS = 1.6, YS = 2.3, CURVE_VIS = 1.8; // visuele rek: diepte, hoogte, bochten
 const DRAW = 150, NEAR = 1.2, CAM_H = 3.4;
@@ -181,7 +181,12 @@ export class Renderer {
       put(r.dist, { rider: r });
     }
     for (const gr of race.ghostRiders) if (!gr.hidden) { gr._ph = (gr._ph || 0) + 8 * dt; put(gr.dist, { rider: gr, ghost: true }); }
-    for (const h of race.hazards) put(h.d, { glue: h });
+    for (const h of race.hazards) put(h.d, { haz: h });
+    for (const r of race.riders) {
+      const m = r.mask || 0;
+      if (r.fx?.scooter > 0 || m & 1024) put(r.dist + 7, { scooter: { x: r.scooterX ?? r.x } });
+      if (r.fx?.tow > 0 || m & 512 || r.fx?.wheel > 0 || m & 256) put(r.dist + 0.3, { car: { x: (r.fx?.tow > 0 || m & 512 ? r.towSide ?? Math.sign(r.x || 1) : Math.sign(r.x || 1)) * 1.34 } });
+    }
     for (const p of race.rockets) put(p.d, { rocket: p });
 
     // --- sprites van ver naar dichtbij ---
@@ -211,7 +216,14 @@ export class Renderer {
       if (list) {
         list.sort((p, q) => q.t - p.t);
         for (const o of list) {
-          if (o.glue) { const p = this._pt(seg, o.t, o.glue.x); drawGlue(c, p.X, p.Y, p.u, t); }
+          if (o.haz) {
+            const h = o.haz, p = this._pt(seg, o.t, h.x);
+            if (h.type === 'wall') drawWall(c, p.X, p.Y, p.u, 0.5 * ROAD_W * p.u, t);
+            else if (h.type === 'tacks') drawTacks(c, p.X, p.Y, p.u, 0.5 * ROAD_W * p.u, (h.id || '').length * 7919 + 13);
+            else drawGlue(c, p.X, p.Y, p.u, t);
+          }
+          else if (o.scooter) { const p = this._pt(seg, o.t, o.scooter.x); drawScooter(c, p.X, p.Y, p.u * 1.5); }
+          else if (o.car) { const p = this._pt(seg, o.t, o.car.x); drawCar(c, p.X, p.Y, p.u * 1.15); }
           else if (o.rocket) { const p = this._pt(seg, o.t, o.rocket.x); drawRocket(c, p.X, p.Y, p.u); }
           else {
             const r = o.rider, p = this._pt(seg, o.t, r.x);

@@ -118,6 +118,10 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   c.fillStyle = '#0c0c14'; c.fillRect(-0.045 * u, -0.7 * u, 0.09 * u, 0.7 * u);
   c.fillStyle = '#c9c9d9'; c.fillRect(-0.012 * u, -0.66 * u, 0.024 * u, 0.62 * u);
   if (m & 2) { c.fillStyle = '#b44dff'; c.beginPath(); c.ellipse(0, -0.05 * u, 0.3 * u, 0.1 * u, 0, 0, 7); c.fill(); }
+  if (m & 128) { // lekke band: wolkjes lucht bij het achterwiel
+    c.fillStyle = 'rgba(230,230,240,.55)';
+    for (let i = 0; i < 3; i++) { const k = (t * 2.5 + i / 3) % 1; c.beginPath(); c.arc((0.08 + k * 0.3) * u, (-0.1 - k * 0.25) * u, (0.04 + k * 0.08) * u, 0, 7); c.fill(); }
+  }
   // benen
   const ph = r._ph || 0;
   c.lineCap = 'round';
@@ -216,6 +220,64 @@ export function drawGlue(c, X, Y, u, t) {
   c.fillStyle = '#7a1fd1'; c.beginPath(); c.ellipse(X, Y, 0.9 * u, 0.22 * u, 0, 0, 7); c.fill();
   c.fillStyle = '#c56bff'; c.beginPath(); c.ellipse(X, Y - 0.08 * u, 0.6 * u, (0.2 + 0.04 * Math.sin(t * 5)) * u, 0, 0, 7); c.fill();
   c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.ellipse(X - 0.2 * u, Y - 0.14 * u, 0.12 * u, 0.05 * u, 0, 0, 7); c.fill();
+}
+
+// Muur: neonmuur met waarschuwingsstrepen. hw = halve breedte in pixels.
+export function drawWall(c, X, Y, u, hw, t) {
+  const h = 1.3 * u, x0 = X - hw, w = hw * 2;
+  c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(x0 + 0.1 * u, Y - 0.08 * u, w, 0.16 * u);
+  c.fillStyle = '#3a1d5c'; c.fillRect(x0, Y - h, w, h);
+  c.fillStyle = '#5a2d8c'; // stenen
+  const bh = h / 4, bw = 0.9 * u;
+  for (let row = 0; row < 4; row++) for (let x = (row % 2) * -bw / 2; x < w; x += bw) {
+    const a = Math.max(0, x), b = Math.min(w, x + bw - 0.08 * u);
+    if (b > a) c.fillRect(x0 + a, Y - h + row * bh + 0.05 * u, b - a, bh - 0.1 * u);
+  }
+  c.save(); c.beginPath(); c.rect(x0, Y - h - 0.35 * u, w, 0.35 * u); c.clip(); // waarschuwingsstrepen
+  c.fillStyle = '#ffd166'; c.fillRect(x0, Y - h - 0.35 * u, w, 0.35 * u); c.fillStyle = '#15152a';
+  for (let x = -0.35 * u; x < w; x += 0.5 * u) { c.beginPath(); c.moveTo(x0 + x, Y - h); c.lineTo(x0 + x + 0.25 * u, Y - h); c.lineTo(x0 + x + 0.6 * u, Y - h - 0.35 * u); c.lineTo(x0 + x + 0.35 * u, Y - h - 0.35 * u); c.fill(); }
+  c.restore();
+  c.strokeStyle = `rgba(255,63,164,${0.7 + 0.3 * Math.sin(t * 6)})`; c.lineWidth = Math.max(1, 0.06 * u); c.strokeRect(x0, Y - h - 0.35 * u, w, h + 0.35 * u);
+}
+
+// Punaises: glimmende puntjes over de breedte van de strook.
+export function drawTacks(c, X, Y, u, hw, seed) {
+  if (u < 3) return;
+  let s = seed;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 40; i++) {
+    const px = X + (rnd() * 2 - 1) * hw, py = Y + (rnd() - 0.5) * 0.5 * u, r = 0.07 * u;
+    c.fillStyle = '#9aa3b5'; c.beginPath(); c.moveTo(px, py - r * 1.6); c.lineTo(px + r, py); c.lineTo(px - r, py); c.fill();
+    c.fillStyle = '#ff3b3b'; c.beginPath(); c.arc(px, py - r * 1.6, r * 0.55, 0, 7); c.fill();
+  }
+}
+
+// Scooter (gangmaker) van achteren, met bestuurder.
+export function drawScooter(c, X, Y, u) {
+  c.save(); c.translate(X, Y);
+  c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(0, 0, 0.5 * u, 0.1 * u, 0, 0, 7); c.fill();
+  c.fillStyle = '#0c0c14'; c.fillRect(-0.07 * u, -0.45 * u, 0.14 * u, 0.45 * u); // achterwiel
+  c.fillStyle = '#ff3fa4'; c.beginPath(); c.moveTo(-0.3 * u, -0.4 * u); c.lineTo(0.3 * u, -0.4 * u); c.lineTo(0.24 * u, -0.85 * u); c.lineTo(-0.24 * u, -0.85 * u); c.fill(); // kap
+  c.fillStyle = '#ff3b3b'; c.fillRect(-0.12 * u, -0.6 * u, 0.24 * u, 0.08 * u); // achterlicht
+  c.fillStyle = '#ffe26b'; c.fillRect(-0.2 * u, -0.92 * u, 0.4 * u, 0.1 * u); // nummerplaat
+  c.fillStyle = '#23233a'; c.beginPath(); c.moveTo(-0.24 * u, -0.85 * u); c.quadraticCurveTo(-0.3 * u, -1.4 * u, -0.18 * u, -1.55 * u); c.lineTo(0.18 * u, -1.55 * u); c.quadraticCurveTo(0.3 * u, -1.4 * u, 0.24 * u, -0.85 * u); c.fill(); // bestuurder
+  c.fillStyle = '#f5f5ff'; c.beginPath(); c.ellipse(0, -1.72 * u, 0.17 * u, 0.18 * u, 0, 0, 7); c.fill(); // helm
+  c.fillStyle = '#15152a'; c.fillRect(-0.14 * u, -1.74 * u, 0.28 * u, 0.06 * u);
+  c.restore();
+}
+
+// Ploegwagen van achteren, met fietsen op het dak.
+export function drawCar(c, X, Y, u) {
+  c.save(); c.translate(X, Y);
+  c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.ellipse(0, 0, 1.0 * u, 0.15 * u, 0, 0, 7); c.fill();
+  c.fillStyle = '#0c0c14'; c.fillRect(-0.85 * u, -0.35 * u, 0.25 * u, 0.35 * u); c.fillRect(0.6 * u, -0.35 * u, 0.25 * u, 0.35 * u);
+  c.fillStyle = '#f5f5ff'; c.fillRect(-0.95 * u, -1.0 * u, 1.9 * u, 0.7 * u); // carrosserie
+  c.fillStyle = '#7df9ff'; c.beginPath(); c.moveTo(-0.75 * u, -1.0 * u); c.lineTo(0.75 * u, -1.0 * u); c.lineTo(0.6 * u, -1.45 * u); c.lineTo(-0.6 * u, -1.45 * u); c.fill(); // achterruit
+  c.fillStyle = '#ff3fa4'; c.fillRect(-0.95 * u, -0.72 * u, 1.9 * u, 0.12 * u); // ploegstreep
+  c.fillStyle = '#ff3b3b'; c.fillRect(-0.9 * u, -0.9 * u, 0.2 * u, 0.12 * u); c.fillRect(0.7 * u, -0.9 * u, 0.2 * u, 0.12 * u);
+  c.strokeStyle = '#2b2540'; c.lineWidth = Math.max(1, 0.05 * u); // fietsen op het dak
+  for (const fx of [-0.45, 0, 0.45]) { c.beginPath(); c.moveTo(fx * u, -1.45 * u); c.lineTo(fx * u, -2.0 * u); c.stroke(); c.beginPath(); c.arc(fx * u, -1.73 * u, 0.25 * u, 0, 7); c.stroke(); }
+  c.restore();
 }
 
 export function drawRocket(c, X, Y, u) {
