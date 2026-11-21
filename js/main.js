@@ -649,7 +649,6 @@ function hud(dt) {
   const w = r.warn;
   $('h-warn').classList.toggle('hidden', !w);
   if (w) $('h-warn').textContent = w.text;
-  $('h-item').classList.toggle('shield-now', !!w && me.item === 'shield');
   const green = r.greenId === me.id;
   $('h-green').classList.toggle('hidden', !green);
   if (green) $('h-green').innerHTML = JERSEY_SVG + (me.fx.sprint > 0 ? `Groene trui · +5% nog ${Math.ceil(me.fx.sprint)} s` : 'Groene trui');
