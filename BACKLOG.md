@@ -16,6 +16,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-03 | Virtueel schakelen op een Zwift Ride. Werkt het, reageert het snel genoeg, en voelt 0,5% per versnelling goed? | maat met Zwift Ride | S |
 | WB-04 | Afstellen op gevoel: breedte van de short cut (vooral in de afdaling van de Vulkaanpas), stuurdrempel van de kwak, hoe hard een bocht je naar buiten duwt, extra weerstand in de berm. | zelf | S |
 | WB-05 | Multiplayer met 5–6 spelers en via mobiel internet. Werkt het vinden van elkaar en blijft het soepel? | zelf | S |
+| WB-06 | Kasseien op de fiets: voelt het hobbelen van de trainer goed, is het gootje te vinden en niet te breed, en hoe vaak rijd je lek? Ook kijken of de tablet niet hapert op de stenen. | zelf | S |
 
 ## Volgende
 
@@ -26,6 +27,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-12 | Apparaten onthouden, zodat ze na verversen vanzelf terugkomen zonder keuzelijst (eerst nakijken of Chrome dat toestaat). | idee | M |
 | WB-13 | Eigen verbindingsdienst plus hulpserver (TURN) voor multiplayer, zodat het niet afhangt van de gratis PeerJS-dienst en ook op strenge netwerken werkt. | idee | M |
 | WB-19 | Chat in de lobby (en misschien snelle emoji's tijdens de race). | Sebas | M |
+| WB-46 | Sterren van een kasseienstrook laten meetellen (nu alleen een label). Voorstel: 3★ / 4★ / 5★ = 10% / 15% / 20% trager op de stenen, lage / normale / hoge kans op lek, licht / normaal / stevig hobbelen op de trainer, breed / normaal / smal gootje. Eerst WB-06 afwachten. | zelf | S |
 
 ## Publieke beta
 
@@ -64,6 +66,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- Kasseien als kleine stenen in perspectief, met neonvoegen in de polder en lava tussen basalt op de vulkaan; de hint "zoek het gootje" is weg
 - Kasseienstroken: De Hel van de Polder en de Basaltmuur (smallere weg, gootje, hobbelende trainer, meer lek)
 - Korte klap op de trainer bij het raken van de berm
 - WB-18 Rubber banding, aan te vinken bij de start (tijden tellen dan niet voor records)
