@@ -91,7 +91,6 @@ svg.jersey { height: 1.05em; width: auto; vertical-align: -0.15em; margin-right:
 #h-green { color: #39ffb0; font-size: clamp(15px, 3vh, 22px); font-style: normal; font-weight: 800; }
 #h-warn { background: rgba(120, 0, 20, .85); border: 2px solid #ff3b3b; border-radius: 10px; padding: 4px 12px; font-size: clamp(14px, 2.8vh, 20px); font-style: normal; animation: warnblink .4s infinite alternate; }
 @keyframes warnblink { to { background: rgba(200, 0, 40, .95); } }
-#h-item.shield-now { border-color: #7df9ff; box-shadow: 0 0 28px rgba(125, 249, 255, .9); }
 #h-gear { font-size: clamp(16px, 3.2vh, 24px); color: var(--cyan); font-style: normal; font-weight: 800; }
 #h-gear.pop { animation: gearpop .35s ease-out; }
 @keyframes gearpop { from { transform: scale(1.35); color: #fff; } }

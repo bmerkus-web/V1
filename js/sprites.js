@@ -127,6 +127,8 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     c.strokeStyle = '#15152a'; c.lineWidth = 0.13 * u; c.beginPath(); c.moveTo(s * 0.1 * u, -0.98 * u); c.lineTo(s * 0.14 * u, knee); c.stroke();
     c.fillStyle = '#f5f5ff'; c.fillRect(s * 0.12 * u - 0.05 * u, foot - 0.02 * u, 0.1 * u, 0.07 * u);
   }
+  // stuur (achter de romp, zodat alleen de uiteinden naast het lichaam te zien zijn)
+  c.strokeStyle = '#23233a'; c.lineWidth = 0.05 * u; c.beginPath(); c.moveTo(-0.34 * u, -1.08 * u); c.lineTo(0.34 * u, -1.08 * u); c.stroke();
   // romp
   const jersey = opts.green ? GREEN_DARK : r.color;
   c.fillStyle = jersey;
@@ -145,7 +147,6 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   // armen + stuur
   c.strokeStyle = jersey; c.lineWidth = 0.09 * u;
   for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 0.22 * u, -1.4 * u); c.lineTo(s * 0.31 * u, -1.1 * u); c.stroke(); }
-  c.strokeStyle = '#23233a'; c.lineWidth = 0.05 * u; c.beginPath(); c.moveTo(-0.34 * u, -1.08 * u); c.lineTo(0.34 * u, -1.08 * u); c.stroke();
   // helm
   c.fillStyle = shade(r.color, 1.35); c.beginPath(); c.ellipse(0, -1.62 * u, 0.15 * u, 0.16 * u, 0, 0, 7); c.fill();
   c.fillStyle = 'rgba(0,0,0,.35)'; for (const s of [-1, 0, 1]) c.fillRect(s * 0.07 * u - 0.015 * u, -1.74 * u, 0.03 * u, 0.16 * u);
