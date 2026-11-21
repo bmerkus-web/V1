@@ -564,3 +564,37 @@ test('Waarschuwing: vuurpijl richt eerst, tegenwind komt na een korte waarschuwi
   for (let i = 0; i < 45; i++) race.update(0.04);
   assert.ok(me.fx.storm > 0, 'na de waarschuwing komt hij');
 });
+
+test('Bolletjestrui: snelste klimtijd in de race, af te pakken met een snellere tijd', async () => {
+  const { Race } = await import('../js/game.js');
+  const sent = [];
+  const room = { send: (m) => sent.push(m) };
+  const mk = (meId) => new Race({ track: getTrack('vulkaan'), laps: 2, seed: 1, room, isHost: meId === 'p0', ns: 'demo',
+    riders: [{ id: 'p0', name: 'A', color: '#fff', kind: meId === 'p0' ? 'me' : 'remote' }, { id: 'p1', name: 'B', color: '#000', kind: meId === 'p1' ? 'me' : 'remote' }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  const a = mk('p0'), b = mk('p1');
+  for (const r of [a, b]) { r.countdown = 0; r.update(0.04); }
+  const z = a.track.zones.find((q) => q.type === 'climb');
+  const climb = (race, secs, lap = 0) => {
+    race.me.dist = lap * race.L + z.start - 0.5; race.me.v = 10; race.update(0.1);
+    race.time += secs - 0.2;
+    race.me.dist = lap * race.L + z.end - 0.5; race.update(0.1);
+  };
+  climb(a, 240);
+  assert.equal(a.komId, 'p0'); assert.ok(a.me.fx.kom > 29);
+  const m1 = sent.find((m) => m.t === 'kom');
+  assert.ok(m1 && Math.abs(m1.time - 240) < 0.5);
+  b.onNet(m1);
+  assert.equal(b.komId, 'p0');
+  climb(b, 250); // trager: geen trui
+  assert.equal(b.komId, 'p0'); assert.equal(b.me.fx.kom, 0);
+  climb(b, 230, 1); // sneller: trui over
+  assert.equal(b.komId, 'p1'); assert.ok(b.me.fx.kom > 29);
+  a.onNet(sent.filter((m) => m.t === 'kom').pop());
+  assert.equal(a.komId, 'p1');
+  // halverwege de klim instappen telt niet
+  const c = mk('p0'); c.countdown = 0; c.update(0.04);
+  c.me.dist = z.end - 0.5; c.me.v = 10; c.update(0.1);
+  assert.equal(c.komId, undefined);
+});

@@ -130,7 +130,7 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   // stuur (achter de romp, zodat alleen de uiteinden naast het lichaam te zien zijn)
   c.strokeStyle = '#23233a'; c.lineWidth = 0.05 * u; c.beginPath(); c.moveTo(-0.34 * u, -1.08 * u); c.lineTo(0.34 * u, -1.08 * u); c.stroke();
   // romp
-  const jersey = opts.green ? GREEN_DARK : r.color;
+  const jersey = opts.green ? GREEN_DARK : opts.polka ? '#fbfbff' : r.color;
   c.fillStyle = jersey;
   c.beginPath(); c.moveTo(-0.19 * u, -0.92 * u); c.quadraticCurveTo(-0.3 * u, -1.25 * u, -0.22 * u, -1.45 * u);
   c.lineTo(0.22 * u, -1.45 * u); c.quadraticCurveTo(0.3 * u, -1.25 * u, 0.19 * u, -0.92 * u); c.fill();
@@ -139,6 +139,17 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     c.fillStyle = GREEN_LIGHT;
     for (const sx of [-0.2, -0.08, 0.04, 0.16]) c.fillRect(sx * u, -1.46 * u, 0.06 * u, 0.56 * u);
     c.fillStyle = '#ffe26b'; c.strokeStyle = '#0b3d1f'; c.lineWidth = Math.max(1, 0.012 * u);
+    c.beginPath(); c.moveTo(0.05 * u, -1.38 * u); c.lineTo(-0.08 * u, -1.17 * u); c.lineTo(-0.005 * u, -1.17 * u);
+    c.lineTo(-0.05 * u, -0.99 * u); c.lineTo(0.09 * u, -1.22 * u); c.lineTo(0.015 * u, -1.22 * u); c.closePath(); c.fill(); c.stroke();
+    c.restore();
+  } else if (opts.polka) { // bolletjestrui: wit met rode stippen en een bliksem op de rug
+    c.save(); c.clip();
+    c.fillStyle = '#e8262c';
+    for (let row = 0; row < 6; row++) for (let col = 0; col < 5; col++) {
+      const px = (-0.24 + col * 0.12 + (row % 2) * 0.06) * u, py = (-1.43 + row * 0.1) * u;
+      c.beginPath(); c.arc(px, py, 0.026 * u, 0, 7); c.fill();
+    }
+    c.fillStyle = '#ffd166'; c.strokeStyle = '#7a0f12'; c.lineWidth = Math.max(1, 0.012 * u);
     c.beginPath(); c.moveTo(0.05 * u, -1.38 * u); c.lineTo(-0.08 * u, -1.17 * u); c.lineTo(-0.005 * u, -1.17 * u);
     c.lineTo(-0.05 * u, -0.99 * u); c.lineTo(0.09 * u, -1.22 * u); c.lineTo(0.015 * u, -1.22 * u); c.closePath(); c.fill(); c.stroke();
     c.restore();
