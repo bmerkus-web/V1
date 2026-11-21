@@ -1,6 +1,6 @@
 // Watt Blitz – menu's, HUD en de hoofdlus.
 import { TRACK_DEFS, getTrack } from './track.js';
-import { Race, ITEMS, BOT_NAMES } from './game.js';
+import { Race, ITEMS, BOT_NAMES, juryWhat } from './game.js';
 import { Renderer } from './render.js';
 import { Trainer, Sterzo, HeartRate, ZwiftPad, bleSupported } from './ble.js';
 import { input, bindTouch } from './input.js';
@@ -25,7 +25,7 @@ const hrm = new HeartRate();
 const pads = []; // gekoppelde Zwift-knoppen
 const HOSTED = !!window.claude?.use; // draait als Claude-artifact
 const renderer = new Renderer($('game'));
-let race = null, room = null, paused = false, lastCfg = null, resultsTimer = null;
+let race = null, room = null, paused = false, lastCfg = null, resultsTimer = null, rerenderResults = null, lobbyReady = false;
 const WARM_SECS = +new URLSearchParams(location.search).get('warm') || 420; // 7 minuten in- en uitrijden
 const T = (store.training ||= { plan: [{ track: 'polder', laps: 1 }, { track: 'vulkaan', laps: 1 }, { track: 'kosmo', laps: 1 }], warm: true, cool: true });
 const sel = { track: 'polder', laps: 2, botsOn: true, bots: 5, diff: 'normaal', fair: P.fair, rubber: false, mode: 'race', plan: T.plan, warm: T.warm, cool: T.cool };
@@ -325,8 +325,27 @@ function wireRoom() {
   room.onSettings = (s) => { Object.assign(sel, s); if (!race) renderSetup(); };
   room.onStart = (cfg) => startRace(cfg);
   room.onGame = (m) => { if (m.t === 'board') { mergeEntry(m.e); return; } if (m.t === 'left') training?.gone.add(m.id); race?.onNet(m); };
-  room.onLobby = () => { endRace(); show('setup'); renderSetup(); };
-  room.onClosed = (why) => { room = null; endRace(); show('home'); toast(why || 'Verbinding verbroken'); };
+  // De host gaat terug naar de kamer: wie nog rijdt rijdt uit, wie de uitslag bekijkt houdt die in beeld.
+  room.onLobby = () => {
+    if (race && !race.free) {
+      lobbyReady = true;
+      if (race.state === 'done') rerenderResults?.();
+      else toast('De host is terug in de kamer – rij je race gerust uit');
+      return;
+    }
+    endRace(); show('setup'); renderSetup();
+  };
+  // Kamer weg (bijv. de host is vertrokken): uitslag blijft staan, en een lopende rit kun je uitrijden (en opslaan).
+  room.onClosed = (why) => {
+    room = null;
+    if (race) {
+      race.room = null;
+      toast(race.state === 'done' ? (why || 'Verbinding verbroken') : `${why || 'Verbinding verbroken'} – je kunt je rit uitrijden`);
+      if (race.state === 'done') rerenderResults?.();
+      return;
+    }
+    endRace(); show('home'); toast(why || 'Verbinding verbroken');
+  };
 }
 $('b-host').onclick = async () => {
   audio.unlock();
@@ -445,7 +464,7 @@ const getSteer = (dt) => clamp(input.steer(dt) + sterzo.steer, -1, 1);
 
 let profDots = {};
 function startRace(cfg) {
-  rideShot = null;
+  rideShot = null; lobbyReady = false; rerenderResults = null;
   lastCfg = cfg;
   hideOverlay();
   training = null;
@@ -507,6 +526,7 @@ function launch(cfg, carry) {
     track, laps: st.laps, seed: cfg.seed + (training ? training.idx : 0), riders, room, isHost: iRunBots, ns: n,
     profile: { ...P, fair: cfg.fair }, difficulty: cfg.diff, rubber: !!cfg.rubber, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
   });
+  race.multi = !!room;
   drawProfile($('h-prof'), track, profDots);
   $('h-dots').innerHTML = '';
 }
@@ -521,6 +541,7 @@ function nextStage() {
 
 function endRace() {
   boxClear();
+  rerenderResults = null; lobbyReady = false;
   if (race) race.savePower();
   training = null;
   race = null;
@@ -540,7 +561,7 @@ function quitToMenu() {
   else { show('setup'); renderSetup(); }
 }
 
-function overlay(html) { $('overlay-card').innerHTML = html; $('overlay').classList.remove('hidden'); }
+function overlay(html) { const c = $('overlay-card'); c.innerHTML = html; c._v = null; $('overlay').classList.remove('hidden'); }
 function hideOverlay() { $('overlay').classList.add('hidden'); clearInterval(resultsTimer); }
 
 // Rit als .tcx-bestand opslaan; dat bestand kun je bij Strava uploaden.
@@ -602,41 +623,105 @@ function togglePause() {
   if ($('ov-skip')) $('ov-skip').onclick = () => { const r = race; paused = false; hideOverlay(); r.timed = 0.001; };
 }
 
+// Uitslag in stappen: eerst de voorlopige uitslag (zonder jury), dan de jurybeslissing per renner,
+// en dan de definitieve uitslag met wie er stegen of zakten, de segmentwinnaars en de eindtruien.
+// Het scherm hangt niet af van de host: gaat die terug naar de kamer of weg, dan blijft het gewoon staan.
+const WAIT_MAX = 90, PRE_SECS = 3.5, JURY_STEP = 2.2;
 function showResults() {
   if (!race) return;
   shareBoard(); // nieuwe tijden meteen delen met de kamer
   const r = race;
+  const rv = { phase: 'wait', t: performance.now(), mine: performance.now(), shown: -1 };
+  const go = (phase) => { rv.phase = phase; rv.t = performance.now(); rv.shown = -1; };
+  const secs = () => (performance.now() - rv.t) / 1000;
+  const fmt = (x) => (x != null ? fmtTime(x, 2) : '…');
+  const dot = (x) => `<span style="color:${esc(x.color)}">●</span>`;
+  const penList = (x) => {
+    const g = {};
+    for (const p of x.pens) { const k = juryWhat(p.why, null); (g[k] ||= { n: 0, secs: 0, vic: [] }); g[k].n++; g[k].secs += p.secs; if (p.vic) g[k].vic.push(p.vic); }
+    return Object.entries(g).map(([k, v]) => `${v.n > 1 ? v.n + '× ' : ''}${esc(k)}${v.vic.length ? ` <small>(${esc([...new Set(v.vic)].join(', '))})</small>` : ''} <b>+${v.secs} s</b>`).join('<br>');
+  };
+  const buttons = () => room
+    ? room.isHost ? '<button class="big" id="ov-lobby">Terug naar kamer</button>'
+      : lobbyReady ? '<button class="big" id="ov-room">Naar de kamer</button><button class="ghost" id="ov-quit">Verlaten</button>'
+        : '<p class="small">Wacht op de host voor de volgende race… Dit scherm blijft staan.</p><button class="ghost" id="ov-quit">Verlaten</button>'
+    : r.multi ? '<button class="big" id="ov-quit">Menu</button>'
+      : '<button class="big" id="ov-again">Nog een keer</button><button class="ghost" id="ov-quit">Menu</button>';
   const render = () => {
     if (race !== r) return;
     const res = r.results(), st = r.stats, me = r.me;
-    const avgP = st.n ? st.sumP / st.n : 0;
-    const win = me.rank === 1 && res.length > 1;
-    const rows = res.map((x) => `<tr class="${x.me ? 'me' : ''}"><td>${x.rank}</td><td><span style="color:${esc(x.color)}">●</span> ${esc(x.name)}</td><td>${x.time != null ? fmtTime(x.time, 2) : '…'}${x.penalty ? ` <small>⚖️ +${x.penalty} s</small>` : ''}</td></tr>`).join('');
-    const prs = r.prs.map((p) => `<li>${esc(p.label)}: ${fmtTime(p.t, 2)}${p.prev ? ` (${fmtDelta(p.t - p.prev)})` : ''}</li>`);
-    const pn = { 5: '5 s', 60: '1 min', 300: '5 min' };
-    for (const w of r.powerPRs || []) prs.push(`<li>Vermogen ${pn[w]}: ${Math.round(st.best[w])} W</li>`);
-    overlay(`<h2>${win ? '🥇 GEWONNEN!' : me.rank + 'e plaats'}</h2>
-      ${r.training ? `<p class="small">Training: ${training ? training.count : ''} etappe(s) · ${(r.courseLen / 1000).toFixed(1)} km. De tijd is die van de etappes samen, zonder in- en uitrijden.</p>` : ''}
-      <table>${rows}</table>
-      ${prs.length ? `<p><b>🏆 Nieuwe records</b></p><ul class="prlist">${prs.join('')}</ul>` : ''}
-      <div class="statgrid">
-        <div><b>${Math.round(avgP)} W</b>gemiddeld</div><div><b>${Math.round(st.maxP)} W</b>piek</div>
-        <div><b>${Math.round(st.best[5])} W</b>beste 5 s</div><div><b>${((r.courseLen / me.finishTime) * 3.6).toFixed(1)}</b>km/u gem.</div>
-        <div><b>${(st.maxV * 3.6).toFixed(0)}</b>km/u top</div><div><b>${(st.km || 0).toFixed(1)}</b>km totaal</div><div><b>${Math.round(st.hm || 0)}</b>hoogtemeters</div>${st.nHr ? `<div><b>${Math.round(st.sumHr / st.nHr)}</b>❤ gemiddeld</div><div><b>${st.maxHr}</b>❤ max</div>` : ''}<div><b>${Math.round(st.secs.reduce((a, w) => a + w, 0) / 1000)} kJ</b>arbeid</div>
-      </div>
-      ${r.ns === 'demo' ? '<p class="small">Demo-modus: tijden tellen apart van je trainer-records.</p>' : ''}
-      ${r.rubber ? '<p class="small">Rubber banding stond aan: tijden uit deze race tellen niet voor records.</p>' : ''}
-      <div class="menu">${canSave(r) ? (r.saved ? '<p class="small">Rit opgeslagen. Upload het bestand op <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a>.</p>' : SAVE_BTN)  : ''}${SHOT_BTN}</div>
-      <div class="menu">${room ? (room.isHost ? '<button class="big" id="ov-lobby">Terug naar kamer</button>' : '<p class="small">Wacht op de host voor de volgende race…</p><button class="ghost" id="ov-quit">Verlaten</button>')
-        : '<button class="big" id="ov-again">Nog een keer</button><button class="ghost" id="ov-quit">Menu</button>'}</div>`);
+    const done = res.filter((x) => x.finished);
+    const pending = res.some((x) => !x.finished && !x.dnf);
+    // fases doorlopen
+    if (rv.phase === 'wait' && (!pending || (performance.now() - rv.mine) / 1000 > WAIT_MAX)) go('pre');
+    const judged = done.filter((x) => x.penalty > 0).sort((a, b) => a.raw - b.raw);
+    if (rv.phase === 'pre' && secs() > PRE_SECS) go(judged.length ? 'jury' : 'final');
+    if (rv.phase === 'jury') {
+      const n = Math.min(judged.length, Math.floor(secs() / JURY_STEP) + 1);
+      if (n > rv.shown) { rv.shown = n; audio.sfx('whistle'); }
+      if (secs() > judged.length * JURY_STEP + 1.5) go('final');
+    }
+    const preRank = new Map([...done].sort((a, b) => a.raw - b.raw).map((x, i) => [x.id, i + 1]));
+    let body;
+    if (rv.phase === 'wait' || rv.phase === 'pre') {
+      const rows = [...res].sort((a, b) => (a.finished && b.finished ? a.raw - b.raw : a.finished ? -1 : b.finished ? 1 : 0))
+        .map((x) => `<tr class="${x.me ? 'me' : ''}"><td>${x.finished ? preRank.get(x.id) : x.dnf ? '–' : ''}</td><td>${dot(x)} ${esc(x.name)}</td><td>${x.finished ? fmt(x.raw) : x.dnf ? 'gestopt' : 'nog onderweg…'}</td></tr>`).join('');
+      body = `<h2>🏁 Binnen!</h2><p class="rv-sub">${rv.phase === 'wait' ? 'Voorlopige uitslag · wachten op de rest van het veld…' : 'Voorlopige uitslag · de jury beraadt zich… ⚖️'}</p>
+        <table class="rv-table">${rows}</table>
+        <div class="menu"><button class="ghost" id="ov-skip">${rv.phase === 'wait' ? 'Uitslag nu' : 'Overslaan'} ⏭</button></div>`;
+    } else if (rv.phase === 'jury') {
+      const items = judged.slice(0, rv.shown).map((x, i) => `<div class="jury-item${i === rv.shown - 1 ? ' new' : ''}${x.me ? ' me' : ''}"><div>${dot(x)} <b>${esc(x.name)}</b></div><div>${penList(x)}</div></div>`).join('');
+      body = `<div class="jury"><div class="jury-title">⚖️ JURYBESLISSING</div><p class="rv-sub">De jury heeft de beelden bekeken en deelt tijdstraffen uit.</p>${items}</div>
+        <div class="menu"><button class="ghost" id="ov-skip">Overslaan ⏭</button></div>`;
+    } else {
+      const cl = r.classification();
+      const icons = (id) => (cl.green?.id === id ? JERSEY_SVG : '') + (cl.kom?.id === id ? POLKA_SVG : '') + (cl.cass?.id === id ? CASS_SVG : '');
+      const rows = res.map((x, i) => {
+        const mv = x.finished && preRank.get(x.id) != null ? preRank.get(x.id) - x.rank : 0;
+        return `<tr class="rv-row${x.me ? ' me' : ''}" style="animation-delay:${(res.length - 1 - i) * 0.25}s"><td>${x.rank ?? '–'}</td><td>${dot(x)} ${esc(x.name)} ${icons(x.id)}</td>
+          <td>${x.dnf ? 'gestopt' : fmt(x.time)}${x.penalty ? ` <small class="pen">⚖️ +${x.penalty} s</small>` : ''}</td><td class="mv ${mv > 0 ? 'up' : mv < 0 ? 'down' : ''}">${mv > 0 ? '▲' + mv : mv < 0 ? '▼' + -mv : ''}</td></tr>`;
+      }).join('');
+      const win = me.rank === 1 && res.length > 1;
+      const ico = { sprint: '⚡', climb: '⛰️', cobble: '🪨' };
+      const segs = cl.segs.map((g) => `<li>${ico[g.type]} ${esc(g.zone)}: <b>${esc(g.name)}</b> ${g.type === 'sprint' ? `(${g.wins}× gewonnen)` : fmtTime(g.t, 1)}</li>`).join('');
+      const jer = [[cl.green, JERSEY_SVG, 'Groene trui', (n) => `${n} sprint${n > 1 ? 's' : ''}`], [cl.kom, POLKA_SVG, 'Bolletjestrui', (n) => `${n} klim${n > 1 ? 'men' : ''}`], [cl.cass, CASS_SVG, 'Gouden Kassei', (n) => `${n} strook${n > 1 ? 'en' : ''}`]]
+        .filter(([w]) => w).map(([w, svg, label, what]) => `<div class="jer">${svg}<span>${label}</span><b>${esc(w.name)}</b><small>${what(w.n)}</small></div>`).join('');
+      const prs = r.prs.map((p) => `<li>${esc(p.label)}: ${fmtTime(p.t, 2)}${p.prev ? ` (${fmtDelta(p.t - p.prev)})` : ''}</li>`);
+      const pn = { 5: '5 s', 60: '1 min', 300: '5 min' };
+      for (const w of r.powerPRs || []) prs.push(`<li>Vermogen ${pn[w]}: ${Math.round(st.best[w])} W</li>`);
+      const avgP = st.n ? st.sumP / st.n : 0;
+      const myPens = res.find((x) => x.me)?.pens.length ? `<p class="small">⚖️ Jouw straffen: ${penList(res.find((x) => x.me))}</p>` : '';
+      body = `<h2>${win ? '🥇 GEWONNEN!' : me.rank + 'e plaats'}</h2><p class="rv-sub">Definitieve uitslag${judged.length ? '' : ' · de jury zag niets bijzonders ✓'}${pending ? ' · nog niet iedereen is binnen' : ''}</p>
+        ${r.training ? `<p class="small">Training: ${training ? training.count : ''} etappe(s) · ${(r.courseLen / 1000).toFixed(1)} km. De tijd is die van de etappes samen, zonder in- en uitrijden.</p>` : ''}
+        <table class="rv-table">${rows}</table>${myPens}
+        ${jer ? `<p><b>Eindtruien</b></p><div class="jers">${jer}</div>` : ''}
+        ${segs ? `<p><b>Segmenten</b></p><ul class="segs">${segs}</ul>` : ''}
+        ${prs.length ? `<p><b>🏆 Nieuwe records</b></p><ul class="prlist">${prs.join('')}</ul>` : ''}
+        <div class="statgrid">
+          <div><b>${Math.round(avgP)} W</b>gemiddeld</div><div><b>${Math.round(st.maxP)} W</b>piek</div>
+          <div><b>${Math.round(st.best[5])} W</b>beste 5 s</div><div><b>${((r.courseLen / me.finishTime) * 3.6).toFixed(1)}</b>km/u gem.</div>
+          <div><b>${(st.maxV * 3.6).toFixed(0)}</b>km/u top</div><div><b>${(st.km || 0).toFixed(1)}</b>km totaal</div><div><b>${Math.round(st.hm || 0)}</b>hoogtemeters</div>${st.nHr ? `<div><b>${Math.round(st.sumHr / st.nHr)}</b>❤ gemiddeld</div><div><b>${st.maxHr}</b>❤ max</div>` : ''}<div><b>${Math.round(st.secs.reduce((a, w) => a + w, 0) / 1000)} kJ</b>arbeid</div>
+        </div>
+        ${r.ns === 'demo' ? '<p class="small">Demo-modus: tijden tellen apart van je trainer-records.</p>' : ''}
+        ${r.rubber ? '<p class="small">Rubber banding stond aan: tijden uit deze race tellen niet voor records.</p>' : ''}
+        <div class="menu">${canSave(r) ? (r.saved ? '<p class="small">Rit opgeslagen. Upload het bestand op <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a>.</p>' : SAVE_BTN) : ''}${SHOT_BTN}</div>
+        <div class="menu">${buttons()}</div>`;
+    }
+    const card = $('overlay-card');
+    if (card._v === body && !$('overlay').classList.contains('hidden')) return; // niets veranderd: laten staan (geen animaties opnieuw)
+    overlay(body);
+    card._v = body;
+    if ($('ov-skip')) $('ov-skip').onclick = () => { go(rv.phase === 'wait' ? 'pre' : 'final'); render(); };
     if ($('ov-lobby')) $('ov-lobby').onclick = quitToMenu;
+    if ($('ov-room')) $('ov-room').onclick = () => { endRace(); show('setup'); renderSetup(); };
     if ($('ov-again')) $('ov-again').onclick = () => startRace({ ...lastCfg, seed: (Math.random() * 1e9) | 0 });
     if ($('ov-quit')) $('ov-quit').onclick = quitToMenu;
     wireSave(r);
   };
+  rerenderResults = render;
   render();
   clearInterval(resultsTimer);
-  resultsTimer = setInterval(() => { if (r.riders.some((x) => !x.finished)) render(); }, 1500);
+  resultsTimer = setInterval(render, 250);
 }
 
 // ---------- HUD ----------
@@ -671,6 +756,9 @@ function hud(dt) {
   if (hudSlow > 0) return;
   hudSlow = 0.2;
   const total = r.riders.length;
+  // Binnen: plaats en stand verbergen, anders verklapt de HUD de uitslag voordat de jury beslist.
+  const over = r.state === 'done';
+  for (const id of ['h-pos', 'h-rank', 'h-feed']) $(id).classList.toggle('gone', over);
   setHTML($('h-pos'), `${me.rank}<small>/${total}</small>`);
   const left = r.timed ? fmtTime(Math.ceil(Math.max(0, r.timed - (r.time - r.t0))), 0) : '';
   setText($('h-lap'), r.mode === 'warm' ? `WARMING-UP · nog ${left}` : r.mode === 'cool' ? `COOLING-DOWN · nog ${left}`

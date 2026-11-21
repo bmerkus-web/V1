@@ -32,6 +32,7 @@ const STORM_DELAY = 1.5; // tegenwind komt na een korte waarschuwing
 // Jury: [kans, tijdstraf in s]. Afgestemd zodat het gemiddeld ongeveer quitte speelt met wat het oplevert:
 // plakbidon ≈ 1,4 s winst, vuile kwak (de berm in) ≈ 0,9 s, gewone kwak ≈ 0,05 s plus een blitzje.
 export const JURY = { bottle: [0.2, 7], dirty: [0.2, 5], kwak: [1 / 15, 1] };
+export const juryWhat = (why, vic) => why === 'bottle' ? 'plakbidon gezien' : why === 'dirty' ? `vuile kwak${vic ? `: ${vic} de berm in` : ''}` : why === 'kwak' ? `kwak${vic ? ` tegen ${vic}` : ''}` : 'overtreding';
 const TOW_BONUS = 0.35; // plakbidon: 35% sneller vooruit zolang je de bidon vasthoudt
 const WALL_W = 0.5, TACKS_W = 0.5; // halve breedte in halve wegbreedtes: samen de halve weg
 const FLAT = 0.3, FLAT_SECS = 6, WHEEL_SECS = 3; // lek: 30% trager tot de sealant dicht; soms een wielwissel
@@ -106,7 +107,7 @@ export class Race {
       for (const r of this.riders) {
         const o = c.riders[r.id];
         if (!o) continue;
-        r.bolts = o.bolts; r.item = this.free ? null : o.item; r.finished = o.finished; r.finishTime = o.finishTime; r.penalty = o.penalty || 0;
+        r.bolts = o.bolts; r.item = this.free ? null : o.item; r.finished = o.finished; r.finishTime = o.finishTime; r.penalty = o.penalty || 0; r.pens = o.pens || [];
         if (cfg.rolling) { r.dist = o.gap; r.x = o.x; r.v = o.v; }
       }
     }
@@ -114,6 +115,8 @@ export class Race {
     if (c?.greenId) this.greenId = c.greenId;
     if (c?.komId) { this.komId = c.komId; this.komBest = c.komBest; }
     if (c?.cassId) { this.cassId = c.cassId; this.cassBest = c.cassBest; }
+    if (c?.sprintWins) this.sprintWins = c.sprintWins;
+    if (c?.gone) this.gone = c.gone;
     this.lapD0 = this.me.dist; // waar ik was toen deze ronde begon (t.o.v. de streep)
     if (cfg.rolling) { this.state = 'race'; this.countdown = 0; this.startedAt ||= Date.now(); this._startGhost('lap', `${this.track.id}|lapghost`, 'PR ronde', 0); }
     this.rank();
@@ -126,7 +129,7 @@ export class Race {
       dist: -3 - row * 4, x: [-0.5, 0, 0.5][col], v: 0, power: 0, cadence: 0, steer: 0,
       item: null, roulette: 0, bolts: 0, draft: false, mask: 0,
       fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0, kom: 0, scooter: 0, tow: 0, flat: 0, wheel: 0, antilek: 0 },
-      bermWear: 0, penalty: 0,
+      bermWear: 0, penalty: 0, pens: [],
       kwakCd: 0, kwakSafe: 0, bumpCd: 0,
       finished: false, finishTime: null, rank: i + 1, bell: 0, net: null,
     };
@@ -476,10 +479,10 @@ export class Race {
   // Toestand die mee moet naar de volgende etappe. Afstanden t.o.v. de streep.
   carryOut() {
     const warm = this.mode === 'warm', riders = {};
-    for (const r of this.riders) riders[r.id] = { gap: warm ? 0 : r.dist - this.total, x: r.x, v: r.v, bolts: warm ? 0 : r.bolts, item: this.free ? null : r.item, finished: r.finished, finishTime: r.finishTime, penalty: r.penalty || 0 };
+    for (const r of this.riders) riders[r.id] = { gap: warm ? 0 : r.dist - this.total, x: r.x, v: r.v, bolts: warm ? 0 : r.bolts, item: this.free ? null : r.item, finished: r.finished, finishTime: r.finishTime, penalty: r.penalty || 0, pens: r.pens || [] };
     return {
       time: warm ? 0 : this.time, logT: warm ? this.logT + this.time : this.logT, logDist: this.logDist + Math.max(0, this.me.dist),
-      stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders, greenId: this.greenId, komId: this.komId, komBest: this.komBest, cassId: this.cassId, cassBest: this.cassBest,
+      stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders, greenId: this.greenId, komId: this.komId, komBest: this.komBest, cassId: this.cassId, cassBest: this.cassBest, sprintWins: this.sprintWins, gone: this.gone,
     };
   }
 
@@ -684,7 +687,7 @@ export class Race {
   _claimCass(key, id, t, zone) {
     const best = (this.cassBest ||= {});
     if (best[key] && best[key].t <= t) return false;
-    best[key] = { id, t };
+    best[key] = { id, t, zone };
     const prevId = this.cassId, r = this.byId(id), me = this.me;
     this.cassId = id;
     if (!r) return true;
@@ -700,7 +703,7 @@ export class Race {
   _claimKom(key, id, t, zone) {
     const best = (this.komBest ||= {});
     if (best[key] && best[key].t <= t) return false;
-    best[key] = { id, t };
+    best[key] = { id, t, zone };
     const prevId = this.komId, r = this.byId(id), me = this.me;
     this.komId = id;
     if (!r) return true;
@@ -732,7 +735,7 @@ export class Race {
     const cur = wins[key];
     if (cur && cur.at <= at) return false;
     const prevId = cur?.id;
-    wins[key] = { id, at };
+    wins[key] = { id, at, zone };
     const r = this.byId(id), me = this.me;
     if (prevId && prevId !== id) { const p = this.byId(prevId); if (p && this.local(p)) p.fx.sprint = 0; } // een ander was toch eerder
     this.greenId = id;
@@ -757,16 +760,18 @@ export class Race {
   }
 
   // Jury: tijdstraf die bij de eindtijd opgeteld wordt. why: 'bottle' | 'dirty' | 'kwak'
-  _jury(r, why) {
+  _jury(r, why, vic = null) {
     const [chance, secs] = JURY[why];
     if (this.rng() >= chance) return;
     r.penalty = (r.penalty || 0) + secs;
-    this.room?.send({ t: 'jury', id: r.id, secs, why });
-    this._juryFx(r, secs, why);
+    this.room?.send({ t: 'jury', id: r.id, secs, why, vic });
+    this._juryFx(r, secs, why, vic);
   }
 
-  _juryFx(r, secs, why) {
-    const what = { bottle: 'plakbidon gezien', dirty: 'vuile kwak', kwak: 'kwak' }[why] || 'overtreding';
+  // Elke straf wordt bewaard (waarvoor, wie je raakte, waar), zodat de uitslag het kan laten zien.
+  _juryFx(r, secs, why, vic = null) {
+    (r.pens ||= []).push({ why, secs, vic, km: Math.round(Math.max(0, r.dist) / 100) / 10 });
+    const what = juryWhat(why, vic);
     if (r === this.me) { this.emit('sfx', 'whistle'); this.emit('banner', { text: `⚖️ JURY: +${secs} s`, sub: what, color: '#ffd166' }); }
     else this.say(`⚖️ ${r.name} +${secs} s (${what})`);
   }
@@ -785,7 +790,7 @@ export class Race {
 
   // r geeft o een zet opzij (dir = richting van de zet: -1 links, +1 rechts).
   _kwak(r, o, dir) {
-    if (!(o.fx.shield > 0 || (o.mask & 4))) this._jury(r, Math.abs(o.x + dir * 0.22) > 1 ? 'dirty' : 'kwak'); // de berm in = vuile kwak
+    if (!(o.fx.shield > 0 || (o.mask & 4))) this._jury(r, Math.abs(o.x + dir * 0.22) > this.track.wAt(o.dist) ? 'dirty' : 'kwak', o.name); // de berm in = vuile kwak (op de kasseien is de weg smaller)
     r.kwakCd = r.kind === 'bot' ? 10 : 2.5; // bots houden zich wat in
     o.kwakSafe = 3;
     r.x -= dir * 0.05;
@@ -1015,8 +1020,9 @@ export class Race {
       case 'jury': {
         const r = this.byId(msg.id);
         if (!r || this.local(r) || typeof msg.secs !== 'number' || !(msg.secs > 0 && msg.secs <= 10)) break;
+        if (!JURY[msg.why]) break;
         r.penalty = (r.penalty || 0) + msg.secs;
-        this._juryFx(r, msg.secs, msg.why);
+        this._juryFx(r, msg.secs, msg.why, typeof msg.vic === 'string' ? msg.vic.slice(0, 30) : null);
         break;
       }
       case 'sprint': {
@@ -1035,7 +1041,8 @@ export class Race {
       case 'bell': { const r = this.byId(msg.id); if (r) { r.bell = 1; this.emit('sfx', 'bell'); } break; }
       case 'left': {
         const r = this.byId(msg.id);
-        if (r) { this.riders = this.riders.filter((o) => o !== r); this.say(`${r.name} is weg`); this.rank(); }
+        if (r && r.finished) { r.left = true; break; } // al binnen: blijft gewoon in de uitslag
+        if (r) { this.riders = this.riders.filter((o) => o !== r); (this.gone ||= []).push(r); this.say(`${r.name} is weg`); this.rank(); }
         break;
       }
     }
@@ -1043,7 +1050,42 @@ export class Race {
 
   results() {
     this.rank();
-    return this.order.map((r) => ({ id: r.id, name: r.name, color: r.color, rank: r.rank, time: r.finishTime, penalty: r.penalty || 0, me: r === this.me, kind: r.kind }));
+    const row = (r) => ({ id: r.id, name: r.name, color: r.color, rank: r.rank, time: r.finishTime, penalty: r.penalty || 0, pens: r.pens || [],
+      raw: r.finished ? r.finishTime - (r.penalty || 0) : null, finished: r.finished, me: r === this.me, kind: r.kind });
+    return [...this.order.map(row), ...(this.gone || []).map((r) => ({ ...row(r), rank: null, dnf: true }))];
+  }
+
+  // Segmentwinnaars en eindtruien voor de uitslag.
+  // Sprints: wie een sprint het vaakst won. Klimmen en kasseien: de snelste tijd per strook.
+  // Eindtrui: de meeste segmentzeges; bij gelijke stand de laatste sprintzege, of de kleinste opgetelde tijd.
+  classification() {
+    const name = (id) => this.byId(id)?.name || (this.gone || []).find((g) => g.id === id)?.name || '?';
+    const segs = [], green = {}, kom = {}, cass = {};
+    const bySprint = {};
+    for (const [key, w] of Object.entries(this.sprintWins || {})) {
+      const z = key.split('|').slice(0, 2).join('|');
+      const s = (bySprint[z] ||= { type: 'sprint', zone: w.zone || 'Sprint', wins: {} });
+      s.wins[w.id] = (s.wins[w.id] || 0) + 1;
+      (s.last ||= {})[w.id] = Math.max(s.last[w.id] || 0, w.at || 0);
+      const g = (green[w.id] ||= { n: 0, last: 0 }); g.n++; g.last = Math.max(g.last, w.at || 0);
+    }
+    for (const s of Object.values(bySprint)) {
+      const [id, n] = Object.entries(s.wins).sort((a, b) => b[1] - a[1] || s.last[b[0]] - s.last[a[0]])[0]; // gelijk: de laatste winnaar
+      segs.push({ type: 'sprint', zone: s.zone, id, name: name(id), wins: n });
+    }
+    for (const [type, best, tally] of [['climb', this.komBest, kom], ['cobble', this.cassBest, cass]]) {
+      for (const b of Object.values(best || {})) {
+        segs.push({ type, zone: b.zone || (type === 'climb' ? 'Klim' : 'Kasseien'), id: b.id, name: name(b.id), t: b.t });
+        const k = (tally[b.id] ||= { n: 0, sum: 0 }); k.n++; k.sum += b.t;
+      }
+    }
+    const top = (tally, tie) => { const e = Object.entries(tally).sort((a, b) => b[1].n - a[1].n || tie(a[1], b[1]))[0]; return e ? { id: e[0], name: name(e[0]), n: e[1].n } : null; };
+    return {
+      segs,
+      green: top(green, (a, b) => b.last - a.last),
+      kom: top(kom, (a, b) => a.sum - b.sum),
+      cass: top(cass, (a, b) => a.sum - b.sum),
+    };
   }
 }
 
