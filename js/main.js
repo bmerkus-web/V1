@@ -28,6 +28,10 @@ const sel = { track: 'polder', laps: 2, botsOn: true, bots: 5, diff: 'normaal', 
 let training = null; // lopende training: { stages, idx, courseLen, gone }
 
 // ---------- hulpjes ----------
+// Kleine groene trui (strepen + bliksem) voor meldingen en het lijstje rechtsboven.
+const JERSEY_SVG = '<svg class="jersey" viewBox="0 0 32 28" aria-hidden="true"><defs><clipPath id="jc"><path d="M10 1l-9 6 4 7 4-3v16h14V11l4 3 4-7-9-6c-1 3-3 4-6 4s-5-1-6-4z"/></clipPath></defs><g clip-path="url(#jc)"><rect width="32" height="28" fill="#15a34a"/><rect x="6" width="3.5" height="28" fill="#7cf0a6"/><rect x="13" width="3.5" height="28" fill="#7cf0a6"/><rect x="20" width="3.5" height="28" fill="#7cf0a6"/><path d="M18 8l-6 9h4l-2 8 7-10h-4l2-7z" fill="#ffe26b" stroke="#0b3d1f" stroke-width=".8"/></g><path d="M10 1l-9 6 4 7 4-3v16h14V11l4 3 4-7-9-6c-1 3-3 4-6 4s-5-1-6-4z" fill="none" stroke="#0b3d1f" stroke-width="1"/></svg>';
+const ICONS = { jersey: JERSEY_SVG };
+
 function show(name) {
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('hidden', s.id !== 's-' + name);
   $('ui').scrollTop = 0;
@@ -622,7 +626,7 @@ function hud(dt) {
   const bn = $('h-banner');
   if (bannerT <= 0 && banners.length) {
     const b = banners.shift();
-    bn.innerHTML = esc(b.text) + (b.sub ? `<small>${esc(b.sub)}</small>` : '');
+    bn.innerHTML = (b.icon ? ICONS[b.icon] || '' : '') + esc(b.text) + (b.sub ? `<small>${esc(b.sub)}</small>` : '');
     bn.style.color = b.color || '#fff';
     bn.classList.add('show');
     bannerT = 2.2;
@@ -644,11 +648,11 @@ function hud(dt) {
   $('h-dev').textContent = lost.length ? `⚠️ ${lost.map((d) => d.label).join(', ')} kwijt – opnieuw verbinden…` : '';
   const w = r.warn;
   $('h-warn').classList.toggle('hidden', !w);
-  if (w) $('h-warn').textContent = w.text + (me.item === 'shield' ? ' – SCHILD!' : '');
+  if (w) $('h-warn').textContent = w.text;
   $('h-item').classList.toggle('shield-now', !!w && me.item === 'shield');
   const green = r.greenId === me.id;
   $('h-green').classList.toggle('hidden', !green);
-  if (green) $('h-green').textContent = me.fx.sprint > 0 ? `🟢 Groene trui · +5% nog ${Math.ceil(me.fx.sprint)} s` : '🟢 Groene trui';
+  if (green) $('h-green').innerHTML = JERSEY_SVG + (me.fx.sprint > 0 ? `Groene trui · +5% nog ${Math.ceil(me.fx.sprint)} s` : 'Groene trui');
   $('h-gear').classList.toggle('hidden', !P.vshift);
   $('h-gear').textContent = `⚙ ${getGear()}/${GEARS}`;
   $('h-bolts').title = `${me.bolts * 2}% minder luchtweerstand`;
@@ -681,7 +685,7 @@ function hud(dt) {
     const gap = x === me ? '' : x.finished ? ' 🏁' : ` ${x.dist > me.dist ? '+' : '−'}${Math.abs(x.dist - me.dist).toFixed(0)}m`;
     return `<div class="${x === me ? 'me' : ''}"><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${gap}</div>`;
   }).join('');
-  $('h-feed').innerHTML = r.feed.filter((f) => r.clock - f.at < 6).map((f) => `<div>${esc(f.text)}</div>`).join('');
+  $('h-feed').innerHTML = r.feed.filter((f) => r.clock - f.at < 6).map((f) => `<div>${f.icon ? ICONS[f.icon] || '' : ''}${esc(f.text)}</div>`).join('');
   // stippen op het profiel
   const dots = $('h-dots');
   const list = [...r.riders, ...r.ghostRiders.filter((g) => !g.hidden)];

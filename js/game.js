@@ -123,7 +123,7 @@ export class Race {
 
   byId(id) { return this.riders.find((r) => r.id === id); }
   local(r) { return r.kind === 'me' || r.kind === 'bot'; }
-  say(text) { this.feed.push({ text, at: this.clock }); if (this.feed.length > 4) this.feed.shift(); }
+  say(text, icon = null) { this.feed.push({ text, icon, at: this.clock }); if (this.feed.length > 4) this.feed.shift(); }
 
   rank() {
     const s = [...this.riders].sort((a, b) =>
@@ -430,9 +430,6 @@ export class Race {
       this.warn = { text: '🚀 VUURPIJL OP KOMST', until: this.time + 0.1 };
       return;
     }
-    const L = this.L;
-    const glue = this.hazards.find((h) => { const dd = mod(h.d - me.dist, L); return dd > 2 && dd < 30 && Math.abs(h.x - me.x) < 0.3; });
-    if (glue) { this.warn = { text: '🟣 LIJM VOOR JE', until: this.time + 0.1 }; return; }
     if (this.warn && this.time > this.warn.until) this.warn = null;
   }
 
@@ -596,8 +593,8 @@ export class Race {
     this.greenId = id;
     if (!r) return true;
     if (this.local(r)) r.fx.sprint = SPRINT_SECS;
-    if (r === me) { this.emit('banner', { text: '🟢 GROENE TRUI!', sub: `${zone} gewonnen · ${SPRINT_SECS} s lang 5% sneller`, color: '#39ffb0' }); this.emit('sfx', 'pr'); }
-    else this.say(`🟢 ${r.name} wint de ${zone}`);
+    if (r === me) { this.emit('banner', { icon: 'jersey', text: 'GROENE TRUI!', sub: `${zone} gewonnen · ${SPRINT_SECS} s lang 5% sneller`, color: '#39ffb0' }); this.emit('sfx', 'pr'); }
+    else this.say(`${r.name} wint de ${zone}`, 'jersey');
     return true;
   }
 

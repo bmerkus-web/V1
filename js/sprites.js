@@ -96,6 +96,8 @@ function shade(hex, f) {
 }
 
 // Renner van achteren. (X,Y) = contactpunt met de weg, u = pixels per meter.
+const GREEN_DARK = '#15a34a', GREEN_LIGHT = '#7cf0a6';
+
 export function drawRider(c, X, Y, u, r, t, opts = {}) {
   const m = r.mask || 0;
   c.save();
@@ -126,11 +128,19 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     c.fillStyle = '#f5f5ff'; c.fillRect(s * 0.12 * u - 0.05 * u, foot - 0.02 * u, 0.1 * u, 0.07 * u);
   }
   // romp
-  const jersey = opts.green ? '#2fd36b' : r.color; // groene trui
+  const jersey = opts.green ? GREEN_DARK : r.color;
   c.fillStyle = jersey;
   c.beginPath(); c.moveTo(-0.19 * u, -0.92 * u); c.quadraticCurveTo(-0.3 * u, -1.25 * u, -0.22 * u, -1.45 * u);
   c.lineTo(0.22 * u, -1.45 * u); c.quadraticCurveTo(0.3 * u, -1.25 * u, 0.19 * u, -0.92 * u); c.fill();
-  c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(-0.035 * u, -1.44 * u, 0.07 * u, 0.5 * u);
+  if (opts.green) { // groene trui: lichtgroene strepen en een bliksem op de rug
+    c.save(); c.clip();
+    c.fillStyle = GREEN_LIGHT;
+    for (const sx of [-0.2, -0.08, 0.04, 0.16]) c.fillRect(sx * u, -1.46 * u, 0.06 * u, 0.56 * u);
+    c.fillStyle = '#ffe26b'; c.strokeStyle = '#0b3d1f'; c.lineWidth = Math.max(1, 0.012 * u);
+    c.beginPath(); c.moveTo(0.05 * u, -1.38 * u); c.lineTo(-0.08 * u, -1.17 * u); c.lineTo(-0.005 * u, -1.17 * u);
+    c.lineTo(-0.05 * u, -0.99 * u); c.lineTo(0.09 * u, -1.22 * u); c.lineTo(0.015 * u, -1.22 * u); c.closePath(); c.fill(); c.stroke();
+    c.restore();
+  } else { c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(-0.035 * u, -1.44 * u, 0.07 * u, 0.5 * u); }
   c.fillStyle = '#15152a'; c.fillRect(-0.19 * u, -0.98 * u, 0.38 * u, 0.1 * u);
   // armen + stuur
   c.strokeStyle = jersey; c.lineWidth = 0.09 * u;
