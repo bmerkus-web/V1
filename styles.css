@@ -119,6 +119,7 @@ svg.jersey { height: 1.05em; width: auto; vertical-align: -0.15em; margin-right:
 #h-count.pop { animation: pop .9s ease-out forwards; }
 @keyframes pop { from { transform: scale(1.6); opacity: 1; } to { transform: scale(.8); opacity: 0; } }
 .touch, #h-menu, #h-fs { position: absolute; pointer-events: auto; background: rgba(255, 255, 255, .12); border: 2px solid rgba(255, 255, 255, .3); font-style: normal; display: none; }
+.touch, #h-item { touch-action: none; } /* meerdere vingers tegelijk: geen zoom- of scrollgebaar */
 .touch { width: 16vw; max-width: 130px; height: 22vh; bottom: 30vh; font-size: 30px; }
 #t-left { left: 8px; } #t-right { right: 8px; } #t-pedal { right: 8px; bottom: calc(52vh + 10px); height: 12vh; font-size: 18px; }
 body.touchy .touch.on { display: block; }
