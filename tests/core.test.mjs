@@ -791,3 +791,34 @@ test('Kasseien: smallere weg, gootje op volle snelheid, midden 15% trager, meer 
   race.rng = () => 0.0001; me.fx.flat = me.fx.wheel = 0; me.dist = c.start + 200; me.x = 0; race.update(0.04);
   assert.ok(me.fx.flat > 0 || me.fx.wheel > 0, 'lek op de kasseien');
 });
+
+test('Uitslag: straffen met reden, segmentwinnaars en eindtruien', async () => {
+  const { Race } = await import('../js/game.js');
+  const race = new Race({ track: getTrack('polder'), laps: 2, seed: 1, room: null, isHost: true, ns: 'demo',
+    riders: [{ id: 'p0', name: 'A', color: '#fff', kind: 'me' }, { id: 'b0', name: 'B', color: '#000', kind: 'bot', skill: 0.5 }, { id: 'b1', name: 'C', color: '#888', kind: 'bot', skill: 0.5 }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  const [a, b, c] = race.riders;
+  // straf met slachtoffer
+  race.rng = () => 0;
+  race._kwak(a, b, 1);
+  assert.equal(a.pens.length, 1); assert.equal(a.pens[0].vic, 'B');
+  // segmenten
+  race._claimSprint('0|s1|0', 'b0', 100, 'Molensprint'); race._claimSprint('0|s1|1', 'p0', 400, 'Molensprint');
+  race._claimSprint('0|s2|0', 'b0', 200, 'Dijksprint');
+  race._claimKom('0|brug', 'b1', 40, 'De Brug');
+  race._claimCass('0|hel', 'p0', 62, 'Hel'); race._claimCass('0|hel', 'b1', 60, 'Hel');
+  const cl = race.classification();
+  assert.equal(cl.green.id, 'b0'); assert.equal(cl.green.n, 2);
+  assert.equal(cl.kom.id, 'b1'); assert.equal(cl.cass.id, 'b1');
+  const mol = cl.segs.find((s) => s.zone === 'Molensprint');
+  assert.equal(mol.id, 'p0', 'gelijk aantal zeges: de laatste winnaar');
+  assert.equal(cl.segs.find((s) => s.zone === 'Hel').t, 60);
+  // uitslag: tijd zonder straf apart
+  a.finished = true; a.penalty = 5; a.finishTime = 105;
+  const r0 = race.results().find((x) => x.id === 'p0');
+  assert.equal(r0.raw, 100); assert.equal(r0.penalty, 5);
+  // wie al binnen is en weggaat, blijft in de uitslag
+  race.onNet({ t: 'left', id: 'p0' });
+  assert.ok(race.results().some((x) => x.id === 'p0'));
+});

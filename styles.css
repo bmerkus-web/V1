@@ -134,3 +134,29 @@ body.touchy .touch.on { display: block; }
 .statgrid b { display: block; font-size: 22px; color: var(--text); }
 .prlist { color: var(--gold); font-weight: 700; margin: 0; padding-left: 18px; }
 #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #0d0626; border: 1px solid var(--pink); padding: 10px 18px; border-radius: 12px; font-weight: 700; z-index: 10; max-width: 90vw; }
+
+/* ---------- uitslag in stappen ---------- */
+.rv-sub { text-align: center; color: var(--dim); margin: -6px 0 10px; font-size: 14px; }
+.rv-table td:last-child { text-align: right; }
+.rv-row { animation: rvIn .45s both; }
+@keyframes rvIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.mv { width: 2.6em; font-weight: 800; font-size: 13px; }
+.mv.up { color: var(--green); } .mv.down { color: #ff6b6b; }
+small.pen { color: var(--gold); font-weight: 700; }
+.jury { text-align: center; padding: 6px 0; }
+.jury-title { font-size: clamp(26px, 6vw, 40px); font-weight: 900; font-style: italic; color: var(--gold); letter-spacing: .04em; animation: gavel .6s ease-out both;
+  text-shadow: 0 0 18px rgba(255, 209, 102, .55); }
+@keyframes gavel { 0% { transform: scale(1.6) rotate(-6deg); opacity: 0; } 60% { transform: scale(.94) rotate(1deg); opacity: 1; } 100% { transform: none; } }
+.jury-item { display: flex; justify-content: space-between; gap: 12px; align-items: center; text-align: left; background: #0d0626; border: 1px solid rgba(255, 209, 102, .35);
+  border-radius: 12px; padding: 10px 14px; margin: 8px 0; font-size: 15px; }
+.jury-item b { color: var(--gold); }
+.jury-item.me { border-color: var(--gold); box-shadow: 0 0 16px rgba(255, 209, 102, .35); }
+.jury-item.new { animation: stamp .5s ease-out both; }
+@keyframes stamp { 0% { transform: scale(1.25); opacity: 0; } 70% { transform: scale(.97); opacity: 1; } 100% { transform: none; } }
+.jers { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.jer { background: #0d0626; border-radius: 10px; padding: 8px 10px; display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; font-size: 13px; color: var(--dim); }
+.jer svg.jersey { grid-row: span 3; height: 34px; margin: 0; }
+.jer b { color: var(--text); font-size: 16px; }
+.segs { margin: 0; padding-left: 4px; list-style: none; font-size: 14px; line-height: 1.6; }
+
+#hud .gone { visibility: hidden; }
