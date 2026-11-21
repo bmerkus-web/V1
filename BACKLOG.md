@@ -66,6 +66,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- Gouden Kassei voor de snelste kasseientijd: 30 s een antilekband (geen lek, lopend lek meteen weg, berm half zo erg), te zien aan een gekleurde band en een gouden keitje bij de naam
 - Kasseien als kleine stenen in perspectief, met neonvoegen in de polder en lava tussen basalt op de vulkaan; de hint "zoek het gootje" is weg
 - Kasseienstroken: De Hel van de Polder en de Basaltmuur (smallere weg, gootje, hobbelende trainer, meer lek)
 - Korte klap op de trainer bij het raken van de berm

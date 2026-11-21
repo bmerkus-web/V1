@@ -599,6 +599,47 @@ test('Bolletjestrui: snelste klimtijd in de race, af te pakken met een snellere 
   assert.equal(c.komId, undefined);
 });
 
+test('Gouden Kassei: snelste over de kasseien, antilekband stopt lek, berm half zo erg', async () => {
+  const { Race } = await import('../js/game.js');
+  const sent = [];
+  const room = { send: (m) => sent.push(m) };
+  const mk = (meId) => new Race({ track: getTrack('polder'), laps: 2, seed: 1, room, isHost: meId === 'p0', ns: 'demo',
+    riders: [{ id: 'p0', name: 'A', color: '#fff', kind: meId === 'p0' ? 'me' : 'remote' }, { id: 'p1', name: 'B', color: '#000', kind: meId === 'p1' ? 'me' : 'remote' }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  const a = mk('p0'), b = mk('p1');
+  for (const r of [a, b]) { r.countdown = 0; r.update(0.04); }
+  const z = a.track.zones.find((q) => q.type === 'cobble');
+  const ride = (race, secs, lap = 0) => {
+    race.me.dist = lap * race.L + z.start - 0.5; race.me.v = 10; race.update(0.1);
+    race.time += secs - 0.2;
+    race.me.dist = lap * race.L + z.end - 0.5; race.update(0.1);
+  };
+  a.me.fx.flat = 4; // net lek
+  ride(a, 60);
+  assert.equal(a.cassId, 'p0');
+  assert.ok(a.me.fx.antilek > 29, 'antilekband');
+  assert.equal(a.me.fx.flat, 0, 'het lek is meteen weg');
+  a._flat(a.me, 'punaises');
+  assert.equal(a.me.fx.flat + a.me.fx.wheel, 0, 'geen lek met een antilekband, ook niet van punaises');
+  assert.ok(a.me.mask & 4096, 'te zien voor de anderen');
+  // berm: half zo veel verlies
+  a.me.dist = 200; a.me.x = 1.3; a.update(0.05);
+  assert.ok(a.me.berm); assert.ok(Math.abs(a.me.line + 0.2) < 1e-9);
+  const m1 = sent.find((m) => m.t === 'cass');
+  b.onNet(m1);
+  assert.equal(b.cassId, 'p0');
+  ride(b, 70); // trager: niets
+  assert.equal(b.cassId, 'p0'); assert.equal(b.me.fx.antilek, 0);
+  ride(b, 55, 1); // sneller: kassei over
+  assert.equal(b.cassId, 'p1'); assert.ok(b.me.fx.antilek > 29);
+  a.onNet(sent.filter((m) => m.t === 'cass').pop());
+  assert.equal(a.cassId, 'p1');
+  // na 30 s is de band weer gewoon
+  a.me.x = 0; for (let i = 0; i < 320; i++) a.update(0.1);
+  assert.equal(a.me.fx.antilek, 0);
+});
+
 test('Nieuwe power-ups: muur ervoor of erachter, punaises geven lek, schild helpt', () => {
   const { race } = simulate({ track: 'polder', laps: 1, bots: 1, maxTime: 20, useItems: false });
   const me = race.me, bot = race.riders[1];

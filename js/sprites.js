@@ -115,7 +115,11 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     c.fillStyle = 'rgba(255,209,102,.5)'; c.beginPath(); c.ellipse(0, -0.1 * u, 0.4 * u, 0.14 * u, 0, 0, 7); c.fill();
   }
   // achterwiel
-  c.fillStyle = '#0c0c14'; c.fillRect(-0.045 * u, -0.7 * u, 0.09 * u, 0.7 * u);
+  if (m & 4096) { // antilekband (Gouden Kassei): band in de voegkleur van de kasseien, met een zachte gloed
+    c.fillStyle = (opts.tire || '#ffd166') + '55'; c.fillRect(-0.075 * u, -0.73 * u, 0.15 * u, 0.76 * u);
+    c.fillStyle = opts.tire || '#ffd166';
+  } else c.fillStyle = '#0c0c14';
+  c.fillRect(-0.045 * u, -0.7 * u, 0.09 * u, 0.7 * u);
   c.fillStyle = '#c9c9d9'; c.fillRect(-0.012 * u, -0.66 * u, 0.024 * u, 0.62 * u);
   if (m & 2) { c.fillStyle = '#b44dff'; c.beginPath(); c.ellipse(0, -0.05 * u, 0.3 * u, 0.1 * u, 0, 0, 7); c.fill(); }
   if (m & 128) { // lekke band: witte straaltjes lucht die aan één kant uit het achterwiel spuiten
@@ -204,6 +208,12 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     c.textAlign = 'center';
     c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.7)';
     c.strokeText(opts.label, X, Y - 2.25 * u); c.fillStyle = opts.ghost ? 'rgba(255,255,255,.6)' : r.color; c.fillText(opts.label, X, Y - 2.25 * u);
+    if (opts.cass) { // Gouden Kassei: een gouden keitje voor de naam
+      const fs = Math.max(10, Math.min(18, u * 0.3)), s = fs * 0.75, x = X - c.measureText(opts.label).width / 2 - s - 4, y = Y - 2.25 * u - fs * 0.78;
+      c.fillStyle = '#7a5a10'; c.fillRect(x - 1, y - 1, s + 2, s + 2);
+      c.fillStyle = '#ffc93c'; c.fillRect(x, y, s, s);
+      c.fillStyle = '#fff2b0'; c.fillRect(x + s * 0.15, y + s * 0.15, s * 0.35, s * 0.25);
+    }
   }
 }
 
