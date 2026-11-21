@@ -711,3 +711,18 @@ test('Rubber banding: achterblijvers sneller, koploper niet, tijden tellen dan n
   race._time('kosmo|seg|lanceerbaan', 1, 'Test');
   assert.equal(getTime('real', 'kosmo|seg|lanceerbaan'), before);
 });
+
+test('Berm: korte klap op de trainer, ook bij een tikje', () => {
+  const { race } = simulate({ track: 'polder', laps: 1, bots: 0, maxTime: 10, useItems: false });
+  const me = race.me;
+  me.x = 0; race.update(0.04);
+  const g0 = race.trainerGrade;
+  me.x = 1.2; race.update(0.04);
+  assert.ok(race.trainerGrade > g0 + 11.5, `klap: ${race.trainerGrade - g0}`);
+  me.x = 0; race.update(0.04); // meteen weer de weg op
+  assert.ok(race.trainerGrade > g0 + 7.5, 'klap duurt nog even na een tikje');
+  for (let i = 0; i < 30; i++) race.update(0.04);
+  assert.ok(Math.abs(race.trainerGrade - g0) < 1, 'daarna weer normaal');
+  for (let i = 0; i < 30; i++) { me.x = 1.2; race.update(0.04); }
+  assert.ok(race.trainerGrade > g0 + 3.5 && race.trainerGrade < g0 + 4.5, 'lang in de berm: +4%');
+});

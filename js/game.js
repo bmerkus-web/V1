@@ -22,6 +22,7 @@ export const BOT_NAMES = ['Turbo Tess', 'Watt Wout', 'Sprint Sanne', 'Klim Kees'
 const LINE_K = (ROAD_W / (SEG * SEG)) * 1.3;
 // Na een kwak kunnen gever en ontvanger elkaar zo lang niet kwakken (een botsing kan wel).
 const KWAK_CALM = 2;
+const BERM_KICK = 8, BERM_KICK_SECS = 1; // klap op de trainer bij het raken van de berm: 1 s lang 8% extra (bovenop de 4%)
 const BERM_COST = 0.4; // in de berm kom je meteen 40% minder snel vooruit
 const SPRINT_BONUS = 0.05, SPRINT_SECS = 30; // groene trui: 5% sneller, 30 seconden
 const ROCKET_ARM = 1.0; // een vuurpijl hangt eerst even stil: tijd om je schild te pakken
@@ -207,7 +208,7 @@ export class Race {
     this._ghosts();
 
     const seg = this.track.segAt(me.dist);
-    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
+    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) + (me.bermKick > 0 ? BERM_KICK : 0) + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
     this._net(dt);
   }
 
@@ -251,6 +252,8 @@ export class Race {
       r.bermWear = Math.max(0, r.bermWear - 0.02 * dt);
     }
     if (r === this.me) {
+      if (r.bermKick > 0) r.bermKick -= dt;
+      if (r.berm && !wasBerm && !r.finished) r.bermKick = BERM_KICK_SECS; // ook een kort tikje voel je zo
       if (r.berm && !wasBerm && !r.finished && this.clock - (this._bermAt || -9) > 4) {
         this._bermAt = this.clock;
         this.emit('banner', { text: '⚠️ BERM!', sub: 'stuur terug naar de weg', color: '#ff6b6b' });
