@@ -28,6 +28,7 @@ export const TRACK_DEFS = [
       rumble: ['#ff3fa4', '#f5f5ff'],
       lane: '#7df9ff',
       fog: '#ff7a90',
+      cobble: { joint: '#22f0ff', stones: ['#3a3552', '#332e49', '#423c5c'] }, // neonraster
       scenery: ['windmill', 'poplar', 'poplar', 'lamp', 'tulips', 'tulips', 'billboard'],
     },
     cut: [2950, 150],
@@ -53,6 +54,7 @@ export const TRACK_DEFS = [
       rumble: ['#ff7b1c', '#2a1a1f'],
       lane: '#ffd166',
       fog: '#ff6a2a',
+      cobble: { joint: '#ff3a1c', stones: ['#3a3236', '#322b2f', '#43393d'] }, // lava tussen basalt
       scenery: ['rock', 'rock', 'deadtree', 'crystal', 'lavavent', 'billboard'],
     },
     cut: [2500, 140],
