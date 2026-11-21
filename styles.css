@@ -89,6 +89,7 @@ tr.me td { color: var(--gold); font-weight: 800; }
 .diag { font: 13px/1.5 ui-monospace, Menlo, monospace; max-height: 50vh; overflow: auto; background: #0d0626; border-radius: 8px; padding: 8px; white-space: pre-wrap; user-select: text; }
 svg.jersey { height: 1.05em; width: auto; vertical-align: -0.15em; margin-right: .3em; filter: drop-shadow(0 1px 0 rgba(0,0,0,.5)); }
 #h-kom { color: #ff8a8a; font-size: clamp(15px, 3vh, 22px); font-style: normal; font-weight: 800; }
+#h-rubber { color: #ffd166; font-size: clamp(14px, 2.6vh, 18px); font-style: normal; font-weight: 800; }
 #h-green { color: #39ffb0; font-size: clamp(15px, 3vh, 22px); font-style: normal; font-weight: 800; }
 #h-warn { background: rgba(120, 0, 20, .85); border: 2px solid #ff3b3b; border-radius: 10px; padding: 4px 12px; font-size: clamp(14px, 2.8vh, 20px); font-style: normal; animation: warnblink .4s infinite alternate; }
 @keyframes warnblink { to { background: rgba(200, 0, 40, .95); } }

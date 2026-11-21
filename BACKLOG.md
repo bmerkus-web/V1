@@ -25,7 +25,6 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-11 | Bluetooth-presentatieklikker als power-up-knop (PageUp/PageDown en pijltjes koppelen). | idee | S |
 | WB-12 | Apparaten onthouden, zodat ze na verversen vanzelf terugkomen zonder keuzelijst (eerst nakijken of Chrome dat toestaat). | idee | M |
 | WB-13 | Eigen verbindingsdienst plus hulpserver (TURN) voor multiplayer, zodat het niet afhangt van de gratis PeerJS-dienst en ook op strenge netwerken werkt. | idee | M |
-| WB-18 | Rubber banding: gratis extra snelheid naarmate je verder achter de koploper ligt, zodat races spannend blijven. Aan/uit per race; in een race met rubber banding tellen tijden niet voor records. *Open vraag: tot hoeveel procent, vanaf hoeveel meter?* | Sebas | S |
 | WB-19 | Chat in de lobby (en misschien snelle emoji's tijdens de race). | Sebas | M |
 
 ## Publieke beta
@@ -65,6 +64,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- WB-18 Rubber banding, aan te vinken bij de start (tijden tellen dan niet voor records)
 - WB-32/34 Nieuwe power-ups: scooter, plakbidon (met jury), muur en punaises; lekrijden met sealant en wielwissel; jury met tijdstraffen (ook voor kwakken)
 - WB-17 Bolletjestrui voor de snelste klimtijd in de race, 5% sneller voor 30 seconden
 - WB-14 Berm kost meteen 40%; short cut telt alleen via de oprit
