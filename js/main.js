@@ -24,7 +24,7 @@ const renderer = new Renderer($('game'));
 let race = null, room = null, paused = false, lastCfg = null, resultsTimer = null;
 const WARM_SECS = +new URLSearchParams(location.search).get('warm') || 420; // 7 minuten in- en uitrijden
 const T = (store.training ||= { plan: [{ track: 'polder', laps: 1 }, { track: 'vulkaan', laps: 1 }, { track: 'kosmo', laps: 1 }], warm: true, cool: true });
-const sel = { track: 'polder', laps: 2, botsOn: true, bots: 5, diff: 'normaal', fair: P.fair, mode: 'race', plan: T.plan, warm: T.warm, cool: T.cool };
+const sel = { track: 'polder', laps: 2, botsOn: true, bots: 5, diff: 'normaal', fair: P.fair, rubber: false, mode: 'race', plan: T.plan, warm: T.warm, cool: T.cool };
 let training = null; // lopende training: { stages, idx, courseLen, gone }
 
 // ---------- hulpjes ----------
@@ -214,7 +214,8 @@ function renderSetup() {
   $('o-fair-note').textContent = sel.fair ? 'Iedereen die op zijn eigen FTP rijdt is even snel.' : 'Uit: snelheid volgt je watt per kilo (vul je gewicht in bij Renner).';
   $('o-laps').value = sel.laps; $('o-bots').value = Math.max(1, Math.min(sel.bots, maxBots || 1)); $('o-diff').value = sel.diff; $('o-fair').checked = sel.fair;
   $('o-ghost').checked = P.ghostRace; $('o-ghost-lap').checked = P.ghostLap; $('o-ghost-seg').checked = P.ghostSeg;
-  for (const id of ['o-laps', 'o-bots', 'o-diff', 'o-fair']) $(id).disabled = !canEdit;
+  $('o-rubber').checked = !!sel.rubber;
+  for (const id of ['o-laps', 'o-bots', 'o-diff', 'o-fair', 'o-rubber']) $(id).disabled = !canEdit;
   $('o-ghost-l').classList.toggle('hidden', tr_); // een training heeft geen race-PR
   $('b-start').classList.toggle('hidden', !canEdit);
   $('b-back').textContent = lobby ? '← Kamer verlaten' : '← Terug';
@@ -263,6 +264,7 @@ $('o-laps').onchange = (e) => { sel.laps = +e.target.value; pushSettings(); };
 $('o-bots').onchange = (e) => { sel.bots = +e.target.value; pushSettings(); };
 $('o-botson').onchange = (e) => { sel.botsOn = e.target.checked; pushSettings(); };
 $('o-diff').onchange = (e) => { sel.diff = e.target.value; pushSettings(); };
+$('o-rubber').onchange = (e) => { sel.rubber = e.target.checked; pushSettings(); };
 $('o-fair').onchange = (e) => { sel.fair = e.target.checked; if (!room) { P.fair = sel.fair; save(); } pushSettings(); };
 for (const [id, k] of [['o-ghost', 'ghostRace'], ['o-ghost-lap', 'ghostLap'], ['o-ghost-seg', 'ghostSeg']]) $(id).onchange = (e) => { P[k] = e.target.checked; save(); };
 $('b-solo').onclick = () => { audio.unlock(); show('setup'); renderSetup(); };
@@ -278,7 +280,7 @@ $('b-start').onclick = () => {
     id: 'b' + i, name: BOT_NAMES[(off + i) % BOT_NAMES.length], color: free[i % Math.max(1, free.length)] || COLORS[i],
     skill: nb > 1 ? i / (nb - 1) : 0.6,
   }));
-  const cfg = { track: sel.track, laps: sel.laps, diff: sel.diff, fair: sel.fair, seed: (Math.random() * 1e9) | 0, roster, bots };
+  const cfg = { track: sel.track, laps: sel.laps, diff: sel.diff, fair: sel.fair, rubber: !!sel.rubber, seed: (Math.random() * 1e9) | 0, roster, bots };
   if (sel.mode === 'training') Object.assign(cfg, { plan: sel.plan.map((s) => ({ track: s.track, laps: s.laps })), warm: sel.warm, cool: sel.cool });
   room?.start(cfg);
   startRace(cfg);
@@ -473,7 +475,7 @@ function launch(cfg, carry) {
   }
   race = new Race({
     track, laps: st.laps, seed: cfg.seed + (training ? training.idx : 0), riders, room, isHost: iRunBots, ns: n,
-    profile: { ...P, fair: cfg.fair }, difficulty: cfg.diff, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
+    profile: { ...P, fair: cfg.fair }, difficulty: cfg.diff, rubber: !!cfg.rubber, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
   });
   drawProfile($('h-prof'), track, profDots);
   $('h-dots').innerHTML = '';
@@ -592,6 +594,7 @@ function showResults() {
         <div><b>${(st.maxV * 3.6).toFixed(0)}</b>km/u top</div><div><b>${(st.km || 0).toFixed(1)}</b>km totaal</div><div><b>${Math.round(st.hm || 0)}</b>hoogtemeters</div>${st.nHr ? `<div><b>${Math.round(st.sumHr / st.nHr)}</b>❤ gemiddeld</div><div><b>${st.maxHr}</b>❤ max</div>` : ''}<div><b>${Math.round(st.secs.reduce((a, w) => a + w, 0) / 1000)} kJ</b>arbeid</div>
       </div>
       ${r.ns === 'demo' ? '<p class="small">Demo-modus: tijden tellen apart van je trainer-records.</p>' : ''}
+      ${r.rubber ? '<p class="small">Rubber banding stond aan: tijden uit deze race tellen niet voor records.</p>' : ''}
       <div class="menu">${canSave(r) ? (r.saved ? '<p class="small">Rit opgeslagen. Upload het bestand op <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a>.</p>' : SAVE_BTN)  : ''}${SHOT_BTN}</div>
       <div class="menu">${room ? (room.isHost ? '<button class="big" id="ov-lobby">Terug naar kamer</button>' : '<p class="small">Wacht op de host voor de volgende race…</p><button class="ghost" id="ov-quit">Verlaten</button>')
         : '<button class="big" id="ov-again">Nog een keer</button><button class="ghost" id="ov-quit">Menu</button>'}</div>`);
@@ -656,6 +659,8 @@ function hud(dt) {
   const green = r.greenId === me.id;
   $('h-green').classList.toggle('hidden', !green);
   if (green) $('h-green').innerHTML = JERSEY_SVG + (me.fx.sprint > 0 ? `Groene trui · +5% nog ${Math.ceil(me.fx.sprint)} s` : 'Groene trui');
+  $('h-rubber').classList.toggle('hidden', !(me.rubber > 0.005));
+  if (me.rubber > 0.005) $('h-rubber').textContent = `🪢 Rubber band +${Math.round(me.rubber * 100)}%`;
   $('h-gear').classList.toggle('hidden', !P.vshift);
   $('h-gear').textContent = `⚙ ${getGear()}/${GEARS}`;
   $('h-bolts').title = `${me.bolts * 2}% minder luchtweerstand`;

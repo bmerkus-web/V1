@@ -32,6 +32,8 @@ export const JURY = { bottle: [0.2, 7], dirty: [0.2, 5], kwak: [1 / 15, 1] };
 const TOW_BONUS = 0.35; // plakbidon: 35% sneller vooruit zolang je de bidon vasthoudt
 const WALL_W = 0.5, TACKS_W = 0.5; // halve breedte in halve wegbreedtes: samen de halve weg
 const FLAT = 0.3, FLAT_SECS = 6, WHEEL_SECS = 3; // lek: 30% trager tot de sealant dicht; soms een wielwissel
+// Rubber banding: wie achter de koploper ligt, krijgt gratis extra voortgang (vanaf 20 m tot max 10% bij 150 m).
+export const RUBBER = { from: 20, full: 150, max: 0.1 };
 const CUT_BONUS = 0.12; // extra voortgang op het short-cut-pad
 
 export const DIFFICULTY = { makkelijk: 0.7, normaal: 0.82, zwaar: 0.93, beul: 1.05 };
@@ -293,7 +295,10 @@ export class Race {
     r.line = 1 / (1 - (viaCut ? r.x : clamp(r.x, -1, 1)) * seg.curve * LINE_K) - 1;
     if (viaCut && Math.abs(r.x) > 1) r.line += CUT_BONUS;
     if (r.berm) r.line = -BERM_COST;
-    const prog = (1 + r.line) * (e.sprint > 0 ? 1 + SPRINT_BONUS : 1) * (e.kom > 0 ? 1 + SPRINT_BONUS : 1) *
+    r.rubber = 0;
+    if (this.rubber && !this.free && !r.finished && this.order?.[0] && this.order[0] !== r && !this.order[0].finished)
+      r.rubber = clamp((this.order[0].dist - r.dist - RUBBER.from) / (RUBBER.full - RUBBER.from), 0, 1) * RUBBER.max;
+    const prog = (1 + r.rubber) * (1 + r.line) * (e.sprint > 0 ? 1 + SPRINT_BONUS : 1) * (e.kom > 0 ? 1 + SPRINT_BONUS : 1) *
       (r.towing ? 1 + TOW_BONUS : 1) * (e.flat > 0 ? 1 - FLAT : 1) * (e.wheel > 0 ? 0.05 : 1);
     r.prog = prog;
     r.dist += r.v * dt * prog;
@@ -431,7 +436,7 @@ export class Race {
         this._time(key, t, 'Ronde');
         if (lap < this.laps) this.emit('sfx', 'lap');
         if (lap === this.laps - 1 && this.laps > 1) this.emit('banner', { text: 'LAATSTE RONDE!', color: '#ff3fa4' });
-      } else if (submitTime(this.ns, key, t).isPR) this.prs.push({ label: 'Ronde', t, prev: null });
+      } else if (!this.rubber && submitTime(this.ns, key, t).isPR) this.prs.push({ label: 'Ronde', t, prev: null });
       this._saveGhost(`${id}|lapghost`, t, this.lapStart, (lap - 1) * L, this.lapD0);
       this.lapStart = this.time;
       this.lastLap = t;
@@ -486,6 +491,10 @@ export class Race {
   }
 
   _time(key, t, label) {
+    if (this.rubber) { // met rubber banding tellen tijden niet voor records
+      this.emit('banner', { text: `${label}: ${fmtTime(t)}`, sub: 'telt niet voor records (rubber banding)', color: '#f5f5ff' });
+      return { isPR: false, prev: null };
+    }
     const res = submitTime(this.ns, key, t);
     if (res.isPR) {
       this.prs.push({ label, t, prev: res.prev });
@@ -528,6 +537,7 @@ export class Race {
 
   // Bewaart deze poging als spook als hij sneller is dan het spook dat er al was.
   _saveGhost(key, t, tStart, base, d0) {
+    if (this.rubber) return;
     const old = getGhost(this.ns, key);
     if (old && old.t <= t) return;
     const tr = this.trace, r1 = (v) => Math.round(v * 10) / 10, s = [0, r1(d0), 0];

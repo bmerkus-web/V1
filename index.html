@@ -78,6 +78,7 @@
       <label id="o-diff-l">Niveau bots <select id="o-diff"><option>makkelijk</option><option selected>normaal</option><option>zwaar</option><option>beul</option></select></label>
       <label class="check"><input id="o-fair" type="checkbox"> Eerlijk (vermogen t.o.v. FTP)</label>
       <p class="small" id="o-fair-note"></p>
+      <label class="check"><input id="o-rubber" type="checkbox"> Rubber banding (achterblijvers tot 10% sneller; tijden tellen niet voor records)</label>
       <div class="row ghosts"><span>👻 Spook van mijn PR</span>
         <label class="check" id="o-ghost-l"><input id="o-ghost" type="checkbox"> Race</label>
         <label class="check"><input id="o-ghost-lap" type="checkbox"> Ronde</label>
@@ -147,6 +148,7 @@
       <p><b>Waarschuwing:</b> komt er een vuurpijl of tegenwind op je af, dan zie je dat boven je power-upvak. Een vuurpijl richt eerst even en tegenwind komt na anderhalve seconde: tijd genoeg om je schild te gebruiken.</p>
       <p><b>Lek:</b> rijd je door punaises of vaak of lang door de berm, dan rijd je lek: 30% trager tot de tubeless sealant hem na 6 seconden dicht. Soms is het gat te groot en brengt de ploegwagen een nieuw wiel (3 seconden stilstand).</p>
       <p><b>Jury:</b> een plakbidon of een kwak kan je een tijdstraf opleveren die bij je eindtijd komt. Een kwak waarmee je iemand de berm in duwt wordt zwaarder bestraft dan een gewone.</p>
+      <p><b>Rubber banding</b> (aan te vinken bij de start): wie meer dan 20 meter achter de koploper ligt, komt gratis sneller vooruit, oplopend tot 10% bij 150 meter achterstand. Zo blijft het spannend tot de finish. Tijden uit zo'n race tellen niet voor records.</p>
       <p><b>Kwak:</b> rijd vlak naast iemand en stuur naar hem toe. Hij schiet opzij, verliest een blitzje en is een paar tellen trager. Een schild houdt een kwak tegen. Na een kwak kunnen jullie elkaar 2 seconden niet kwakken; terugsturen naar je lijn is dus geen terugkwak. Pas wel op: wordt de ander trager en rijd jij erachter, dan botst je alsnog.</p>
       <p><b>Slipstream:</b> rijd vlak achter iemand voor minder luchtweerstand. <b>Raketstart:</b> trap boven 120% FTP als het aftellen eindigt.</p>
       <p><b>Records en spoken:</b> jaag op PR's voor sprints, klimmen, rondes en hele races. Je beste race, ronde en segment kunnen als spook met je meerijden; bij de start kies je welke je wilt zien.</p>
@@ -165,6 +167,7 @@
     <div class="h-sub"><span id="h-spd">0</span> km/u · <span id="h-cad">0</span> rpm · <span id="h-grade">0</span>%</div>
     <div id="h-hr" class="hidden">❤ <span id="h-hr-v">0</span></div>
     <div id="h-gear" class="hidden"></div>
+    <div id="h-rubber" class="hidden"></div>
     <div id="h-green" class="hidden"></div>
     <div id="h-kom" class="hidden"></div>
     <div id="h-draft" class="hidden">💨 SLIPSTREAM</div>

@@ -693,3 +693,21 @@ test('Plakbidon: de ploegwagen houdt je uit de berm aan zijn kant', () => {
   for (let i = 0; i < 25; i++) race.update(0.04);
   assert.ok(me.x <= 0.96 && !me.berm && me.towing, `x=${me.x}`);
 });
+
+test('Rubber banding: achterblijvers sneller, koploper niet, tijden tellen dan niet', async () => {
+  const { getTime } = await import('../js/storage.js');
+  const { race } = simulate({ track: 'kosmo', laps: 1, bots: 1, maxTime: 10, useItems: false, extra: { rubber: true, ns: 'real' } });
+  const me = race.me, bot = race.riders[1];
+  bot.dist = me.dist + 200; race.rank();
+  race.update(0.04);
+  assert.ok(Math.abs(me.rubber - 0.1) < 1e-9, `ver achter: ${me.rubber}`);
+  assert.equal(bot.rubber, 0, 'koploper krijgt niets');
+  bot.dist = me.dist + 85; race.rank(); race.update(0.04);
+  assert.ok(me.rubber > 0.04 && me.rubber < 0.06, `halverwege: ${me.rubber}`);
+  bot.dist = me.dist + 10; race.rank(); race.update(0.04);
+  assert.equal(me.rubber, 0, 'dichtbij geen bonus');
+  // tijden tellen niet
+  const before = getTime('real', 'kosmo|seg|lanceerbaan');
+  race._time('kosmo|seg|lanceerbaan', 1, 'Test');
+  assert.equal(getTime('real', 'kosmo|seg|lanceerbaan'), before);
+});
