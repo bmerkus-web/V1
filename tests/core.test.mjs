@@ -683,3 +683,13 @@ test('Jury: tijdstraf bij plakbidon en kwak, telt mee in de eindtijd', () => {
   assert.ok(me.finished && me.finishTime > race.time + 12.5, `eindtijd ${me.finishTime} bij tijd ${race.time}`);
   assert.equal(race.results().find((x) => x.me).penalty, 13);
 });
+
+test('Plakbidon: de ploegwagen houdt je uit de berm aan zijn kant', () => {
+  const { race } = simulate({ track: 'polder', laps: 1, bots: 0, maxTime: 10, useItems: false });
+  const me = race.me;
+  race.rng = () => 0.99;
+  me.x = 0.8; me.item = 'bottle'; race.useItem(me);
+  race.getSteer = () => 1; // hard naar de berm sturen
+  for (let i = 0; i < 25; i++) race.update(0.04);
+  assert.ok(me.x <= 0.96 && !me.berm && me.towing, `x=${me.x}`);
+});
