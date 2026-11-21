@@ -66,8 +66,10 @@ export class Race {
     this.total = this.L * this.laps;
     // Training: een rit bestaat uit etappes. mode = 'race' (losse race), 'warm', 'stage' of 'cool'.
     this.mode = cfg.mode || 'race';
-    this.free = this.mode === 'warm' || this.mode === 'cool'; // vrij rijden: geen items, geen strijd
-    this.finishAt = this.mode === 'cool' ? 0 : this.free || this.open ? Infinity : this.total; // waar de eindstreep ligt
+    // Workout: rondjes rijden tot de workout klaar is; zonder spelmodus ook geen items of strijd.
+    this.free = this.mode === 'warm' || this.mode === 'cool' || (this.mode === 'workout' && !cfg.wgame); // vrij rijden: geen items, geen strijd
+    this.finishAt = this.mode === 'cool' ? 0 : this.free || this.open || this.mode === 'workout' ? Infinity : this.total; // waar de eindstreep ligt
+    this.wkOffset = 0; // overgeslagen workouttijd
     this.distOffset = cfg.distOffset || 0; // afstand van eerdere etappes (voor multiplayer)
     this.logDist = cfg.logDist || 0;
     this.logT = cfg.carry?.logT || 0;
@@ -186,7 +188,7 @@ export class Race {
       return;
     }
     this.time += dt;
-    if (this.timed && !this.ended && this.time - this.t0 >= this.timed) { this.ended = true; this.emit('stage'); return; }
+    if (this.timed && !this.ended && this.time - this.t0 + this.wkOffset >= this.timed) { this.ended = true; this.emit('stage'); return; }
     this.portal = this.open && me.dist >= this.total - this.L ? this.portalArch : null;
 
     // Ik
@@ -506,6 +508,7 @@ export class Race {
   }
 
   _time(key, t, label) {
+    if (this.mode === 'workout') return { isPR: false, prev: null }; // een workout gaat niet om tijden
     if (this.rubber) { // met rubber banding tellen tijden niet voor records
       this.emit('banner', { text: `${label}: ${fmtTime(t)}`, sub: 'telt niet voor records (rubber banding)', color: '#f5f5ff' });
       return { isPR: false, prev: null };
@@ -544,7 +547,7 @@ export class Race {
   // Start een ronde- of segmentspook: mijn beste opgenomen poging, die nu naast me begint.
   _startGhost(gk, key, name, base) {
     this.ghostRiders = this.ghostRiders.filter((g) => g.gk !== gk);
-    if (this.free || !(gk === 'lap' ? this.ghostLap : this.ghostSeg)) return;
+    if (this.free || this.mode === 'workout' || !(gk === 'lap' ? this.ghostLap : this.ghostSeg)) return;
     const s = getGhost(this.ns, key)?.s;
     if (!s || s.length < 6) return;
     this.ghostRiders.push({ id: 'ghost-' + gk, gk, name, color: '#ffffff', kind: 'ghost', dist: base + s[1], x: s[2] / 100, v: 0, mask: 0, bolts: 0, cadence: 85, s, t0: this.time, base, i: 0, j: 0, delta: null });
@@ -552,7 +555,7 @@ export class Race {
 
   // Bewaart deze poging als spook als hij sneller is dan het spook dat er al was.
   _saveGhost(key, t, tStart, base, d0) {
-    if (this.rubber) return;
+    if (this.rubber || this.mode === 'workout') return;
     const old = getGhost(this.ns, key);
     if (old && old.t <= t) return;
     const tr = this.trace, r1 = (v) => Math.round(v * 10) / 10, s = [0, r1(d0), 0];

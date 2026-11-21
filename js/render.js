@@ -213,7 +213,7 @@ export class Renderer {
           if (h < 3 || p.X + w < 0 || p.X - w > W || p.Y - h > s.clip) continue;
           c.drawImage(def.cv, p.X - w / 2, p.Y - h, w, h);
         }
-        for (const o of seg.objs) {
+        if (!(race.mode === 'workout' && race.free)) for (const o of seg.objs) { // rustige workout: geen boxen en blitzjes
           if (race.objCool[o.id] > race.time) continue;
           const p = this._pt(seg, (o.d % SEG) / SEG, o.x);
           if (p.u < 2) continue;
