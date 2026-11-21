@@ -6,6 +6,7 @@ import { SCENERY, drawRider, drawBox, drawBolt, drawGlue, drawRocket, drawWall, 
 const ZS = 1.6, YS = 2.3, CURVE_VIS = 1.8; // visuele rek: diepte, hoogte, bochten
 const DRAW = 150, NEAR = 1.2, CAM_H = 3.4;
 const DEPTH = 1 / Math.tan((80 * Math.PI) / 360);
+const COBBLE_LOOK = { joint: '#4e4858', stones: ['#8b8496', '#7e778a', '#98919f'] }; // kasseien zonder eigen thema
 
 export class Renderer {
   constructor(canvas) {
@@ -149,9 +150,9 @@ export class Renderer {
           this._quad(k1.X + sd * k1.u * ROAD_W * c1, k1.Y, k1.u * ROAD_W * kh, k2.X + sd * k2.u * ROAD_W * c2, k2.Y, k2.u * ROAD_W * kh);
         }
       }
-      c.fillStyle = seg.i < 2 ? (alt ? '#f5f5ff' : '#15152a') : seg.cobble ? '#4e4858' : th.road[alt];
+      c.fillStyle = seg.i < 2 ? (alt ? '#f5f5ff' : '#15152a') : seg.cobble ? (th.cobble || COBBLE_LOOK).joint : th.road[alt];
       this._quad(a.X, a.Y, w1, b.X, b.Y, w2);
-      if (seg.cobble) this._cobbles(seg, a, b, w1, w2, n, th.road[alt]);
+      if (seg.cobble) this._cobbles(seg, a, b, w1, w2, n, th.road[alt], th.cobble || COBBLE_LOOK);
       else if (alt && n < 90) {
         c.fillStyle = th.lane; c.globalAlpha = 0.55;
         for (const l of [-1 / 3, 1 / 3]) this._quad(a.X + w1 * l, a.Y, w1 * 0.014, b.X + w2 * l, b.Y, w2 * 0.014);
@@ -251,7 +252,7 @@ export class Renderer {
   }
 
   // Kasseien: rijen stenen in een verband, met langs beide randen een glad gootje.
-  _cobbles(seg, a, b, w1, w2, n, smooth) {
+  _cobbles(seg, a, b, w1, w2, n, smooth, look) {
     const c = this.c, g1 = w1 * GUTTER / seg.wA, g2 = w2 * GUTTER / seg.wB;
     c.fillStyle = smooth; // gootjes
     for (const sd of [-1, 1]) this._quad(a.X + sd * (w1 - g1 / 2), a.Y, g1 / 2, b.X + sd * (w2 - g2 / 2), b.Y, g2 / 2);
@@ -264,7 +265,7 @@ export class Renderer {
     const inner = (seg.wA + seg.wB) / 2 - GUTTER;
     // stenen minstens ~6 px breed: in de verte dus minder (en grotere) stenen per rij
     const across = Math.max(4, Math.min(Math.round((inner * ROAD_W * 2) / S), Math.floor((inner * ROAD_W * 2 * b.u) / 6)));
-    const shades = ['#8b8496', '#7e778a', '#98919f'];
+    const shades = look.stones;
     const stones = [[], [], []];
     const halfAt = (t) => seg.wA + (seg.wB - seg.wA) * t - GUTTER; // in wegbreedtes
     for (let r = 0; r < rows; r++) {
@@ -274,8 +275,8 @@ export class Renderer {
       if (rowH < 3 || p2.Y > this.H) continue; // te klein, of helemaal onder in beeld (niet zichtbaar)
       const k1 = p1.u * ROAD_W, k2 = p2.u * ROAD_W, h1 = halfAt(t1), h2 = halfAt(t2);
       const sw1 = (2 * h1) / across, sw2 = (2 * h2) / across;
-      const gx = Math.max(0.12, 0.7 / (sw2 * k2)); // voeg als deel van een steen, minstens ~0,7 px
-      const gy = Math.max(0.6, rowH * 0.1), off = ((seg.i * rows + r) % 2) * 0.5;
+      const gx = Math.max(0.09, 0.7 / (sw2 * k2)); // dunne voeg als deel van een steen, minstens ~0,7 px
+      const gy = Math.max(0.6, rowH * 0.08), off = ((seg.i * rows + r) % 2) * 0.5;
       const yb = p1.Y - gy * 0.5, yt = p2.Y + gy * 0.5;
       for (let k = -1; k < across; k++) {
         const f0 = (k + off) / across, f1 = (k + off + 1 - gx) / across; // positie over de weg, 0..1

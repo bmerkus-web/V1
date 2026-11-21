@@ -673,7 +673,7 @@ function hud(dt) {
   const cut = me.onCut && me.cutValid && Math.abs(me.x) > 1;
   ln.classList.toggle('hidden', !me.berm && !me.onCobble && !me.inGutter && Math.abs(gain) < 0.012);
   ln.classList.toggle('bad', me.berm || me.onCobble || (!me.inGutter && gain < 0));
-  ln.textContent = me.berm ? `⚠️ BERM −${Math.round(-me.line * 100)}%` : me.onCobble ? '🪨 KASSEIEN −15% · zoek het gootje' : me.inGutter ? '🪨 GOOTJE'
+  ln.textContent = me.berm ? `⚠️ BERM −${Math.round(-me.line * 100)}%` : me.onCobble ? '🪨 KASSEIEN −15%' : me.inGutter ? '🪨 GOOTJE'
     : cut ? `🔀 SHORT CUT +${(gain * 100).toFixed(0)}%`
     : gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`;
   $('h-tot').textContent = `${(r.stats.km || 0).toFixed(2)} km · ${Math.round(r.stats.hm || 0)} hm`;
