@@ -11,17 +11,17 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
-| WB-01 | Strava toont geen hoogtemeters. Drie testvarianten (TCX met GPS, FIT virtueel met en zonder GPS) uploaden en kijken welke werkt. Wacht op het .tcx-bestand. | Bo | S |
-| WB-02 | Click v2 blijft verbonden (elke 50 s opnieuw verbinden). Controleren of Y de hele rit blijft werken; anders het diagnosescherm sturen. | Bo | S |
+| WB-01 | Strava toont geen hoogtemeters. Drie testvarianten (TCX met GPS, FIT virtueel met en zonder GPS) uploaden en kijken welke werkt. Wacht op het .tcx-bestand. | zelf | S |
+| WB-02 | Click v2 blijft verbonden (elke 50 s opnieuw verbinden). Controleren of Y de hele rit blijft werken; anders het diagnosescherm sturen. | zelf | S |
 | WB-03 | Virtueel schakelen op een Zwift Ride. Werkt het, reageert het snel genoeg, en voelt 0,5% per versnelling goed? | maat met Zwift Ride | S |
-| WB-04 | Afstellen op gevoel: breedte van de short cut (vooral in de afdaling van de Vulkaanpas), stuurdrempel van de kwak, hoe hard een bocht je naar buiten duwt, extra weerstand in de berm. | Bo | S |
-| WB-05 | Multiplayer met 5–6 spelers en via mobiel internet. Werkt het vinden van elkaar en blijft het soepel? | Bo | S |
+| WB-04 | Afstellen op gevoel: breedte van de short cut (vooral in de afdaling van de Vulkaanpas), stuurdrempel van de kwak, hoe hard een bocht je naar buiten duwt, extra weerstand in de berm. | zelf | S |
+| WB-05 | Multiplayer met 5–6 spelers en via mobiel internet. Werkt het vinden van elkaar en blijft het soepel? | zelf | S |
 
 ## Volgende
 
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
-| WB-10 | Lichte weergave voor oude tablets: minder decor en minder ver vooruit tekenen. | Bo (zorg over oude tablet) | S |
+| WB-10 | Lichte weergave voor oude tablets: minder decor en minder ver vooruit tekenen. | zelf (zorg over oude tablet) | S |
 | WB-11 | Bluetooth-presentatieklikker als power-up-knop (PageUp/PageDown en pijltjes koppelen). | idee | S |
 | WB-12 | Apparaten onthouden, zodat ze na verversen vanzelf terugkomen zonder keuzelijst (eerst nakijken of Chrome dat toestaat). | idee | M |
 | WB-13 | Eigen verbindingsdienst plus hulpserver (TURN) voor multiplayer, zodat het niet afhangt van de gratis PeerJS-dienst en ook op strenge netwerken werkt. | idee | M |
@@ -50,7 +50,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
 | WB-40 | iPad en iPhone: Bluefy-browser testen; later eventueel een eigen app. | idee | L |
-| WB-41 | Promofilmpje in staand formaat voor telefoons, met echte namen. | Bo | S |
+| WB-41 | Promofilmpje in staand formaat voor telefoons, met echte namen. | zelf | S |
 | WB-42 | Nieuwe banen. | idee | M |
 | WB-43 | Trainingsschema's (blokken op vermogen, ERG-modus). | idee | M |
 | WB-44 | Uiterlijk aanpassen: outfits, fietsen, kleuren (zonder snelheidsvoordeel). | idee | M |
