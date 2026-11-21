@@ -1,5 +1,5 @@
 // Race-logica: renners, items, bots, zones/PR's, spook en netwerk-synchronisatie.
-import { SEG, ROAD_W } from './track.js';
+import { SEG, ROAD_W, GUTTER } from './track.js';
 import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
 import { submitTime, getTime, setGhost, getGhost, submitPower, store, save } from './storage.js';
@@ -22,6 +22,8 @@ export const BOT_NAMES = ['Turbo Tess', 'Watt Wout', 'Sprint Sanne', 'Klim Kees'
 const LINE_K = (ROAD_W / (SEG * SEG)) * 1.3;
 // Na een kwak kunnen gever en ontvanger elkaar zo lang niet kwakken (een botsing kan wel).
 const KWAK_CALM = 2;
+const COBBLE_COST = 0.15; // midden op de kasseien 15% trager; in het gootje niet
+const COBBLE_FLAT = 0.006, GUTTER_FLAT = 0.0015; // kans op lek per seconde op de kasseien / in het gootje
 const BERM_KICK = 8, BERM_KICK_SECS = 1; // klap op de trainer bij het raken van de berm: 1 s lang 8% extra (bovenop de 4%)
 const BERM_COST = 0.4; // in de berm kom je meteen 40% minder snel vooruit
 const SPRINT_BONUS = 0.05, SPRINT_SECS = 30; // groene trui: 5% sneller, 30 seconden
@@ -208,7 +210,7 @@ export class Race {
     this._ghosts();
 
     const seg = this.track.segAt(me.dist);
-    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) + (me.bermKick > 0 ? BERM_KICK : 0) + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
+    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) + (me.bermKick > 0 ? BERM_KICK : 0) + (me.onCobble ? 3 + (Math.floor(this.clock * 2) % 2 ? 2 : -2) : 0) /* hobbelen op de kasseien */ + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
     this._net(dt);
   }
 
@@ -228,7 +230,7 @@ export class Race {
     if (!auto) {
       // Zonder stuurhulp duwt de bocht je naar buiten; mét stuurhulp blijf je vanzelf op de weg.
       if (!this.profile.assist) r.x -= seg.curve * r.v * r.v * 0.0055 * dt;
-      else if (Math.abs(r.x) > 0.92 && Math.abs(steer) < 0.15 && !r.onCut) r.x -= Math.sign(r.x) * 0.5 * dt;
+      else if (Math.abs(r.x) > this.track.wAt(r.dist) - 0.02 && Math.abs(steer) < 0.15 && !r.onCut) r.x -= Math.sign(r.x) * 0.5 * dt;
     }
     // Bij een short cut is er meer berm (ook aan de buitenkant van het pad).
     const lim = seg.cut ? 1.7 : 1.45;
@@ -240,8 +242,13 @@ export class Race {
     // De short cut telt alleen als je via de oprit (het gat in de kerbstones) op het pad komt.
     if (r.onCut && !wasCut) r.cutValid = !!seg.cut.ramp;
     if (!r.onCut) r.cutValid = false;
+    const w = this.track.wAt(r.dist); // halve wegbreedte hier (smaller op de kasseien)
     const wasBerm = r.berm;
-    r.berm = Math.abs(r.x) > 1 && !r.onCut;
+    r.berm = Math.abs(r.x) > w && !r.onCut;
+    r.onCobble = seg.cobble && !r.berm && Math.abs(r.x) < w - GUTTER;
+    r.inGutter = seg.cobble && !r.berm && !r.onCobble;
+    if (r.onCobble) r.x += (Math.sin(this.clock * 9.1 + r.dist * 0.7) * 0.18 + Math.sin(this.clock * 15.7 + r.dist) * 0.1) * dt; // stuur wiebelt op de stenen
+    if ((r.onCobble || r.inGutter) && !this.free && !r.finished && this.rng() < (r.onCobble ? COBBLE_FLAT : GUTTER_FLAT) * dt) this._flat(r, 'kasseien');
     // Lek uit de berm: de kans groeit met elke keer in de berm én met de tijd erin.
     if (!this.free && !r.finished) {
       if (r.berm && !wasBerm) r.bermWear += 1;
@@ -295,13 +302,13 @@ export class Race {
     r.v = stepSpeed(r, power, seg.grade, dt, pull);
     // Voortgang t.o.v. je snelheid: lijn in de bocht, short cut, berm en groene trui.
     const viaCut = r.onCut && r.cutValid;
-    r.line = 1 / (1 - (viaCut ? r.x : clamp(r.x, -1, 1)) * seg.curve * LINE_K) - 1;
+    r.line = 1 / (1 - (viaCut ? r.x : clamp(r.x, -w, w)) * seg.curve * LINE_K) - 1;
     if (viaCut && Math.abs(r.x) > 1) r.line += CUT_BONUS;
     if (r.berm) r.line = -BERM_COST;
     r.rubber = 0;
     if (this.rubber && !this.free && !r.finished && this.order?.[0] && this.order[0] !== r && !this.order[0].finished)
       r.rubber = clamp((this.order[0].dist - r.dist - RUBBER.from) / (RUBBER.full - RUBBER.from), 0, 1) * RUBBER.max;
-    const prog = (1 + r.rubber) * (1 + r.line) * (e.sprint > 0 ? 1 + SPRINT_BONUS : 1) * (e.kom > 0 ? 1 + SPRINT_BONUS : 1) *
+    const prog = (1 + r.rubber) * (1 + r.line) * (r.onCobble ? 1 - COBBLE_COST : 1) * (e.sprint > 0 ? 1 + SPRINT_BONUS : 1) * (e.kom > 0 ? 1 + SPRINT_BONUS : 1) *
       (r.towing ? 1 + TOW_BONUS : 1) * (e.flat > 0 ? 1 - FLAT : 1) * (e.wheel > 0 ? 0.05 : 1);
     r.prog = prog;
     r.dist += r.v * dt * prog;
@@ -417,7 +424,7 @@ export class Race {
         this._startGhost('seg', `${id}|segghost|${z.id}`, 'PR ' + z.name, this.zoneGhost[z.id].base);
         this.activeZone = { zone: z, t0: this.time, pr: getTime(this.ns, `${id}|seg|${z.id}`) };
         this.emit('sfx', 'zone');
-        this.emit('banner', { text: (z.type === 'sprint' ? '⚡ SPRINT: ' : '⛰️ KLIM: ') + z.name, sub: this.activeZone.pr ? 'PR ' + fmtTime(this.activeZone.pr) : 'Zet een eerste tijd!', color: z.type === 'sprint' ? '#39ffb0' : '#ff7b1c' });
+        this.emit('banner', { text: ({ sprint: '⚡ SPRINT: ', climb: '⛰️ KLIM: ', cobble: '🪨 KASSEIEN: ' }[z.type]) + z.name, sub: this.activeZone.pr ? 'PR ' + fmtTime(this.activeZone.pr) : 'Zet een eerste tijd!', color: { sprint: '#39ffb0', climb: '#ff7b1c', cobble: '#d9d2e6' }[z.type] });
       }
       if (m0 < z.end && m1 >= z.end && this.zoneStart[z.id] != null) {
         const t = this.time - this.zoneStart[z.id];
@@ -723,8 +730,8 @@ export class Race {
     if (r === this.me) {
       this.emit('sfx', 'psst'); this.emit('shake', 4);
       this.emit('banner', wheel ? { text: '🔧 LEK – te groot voor de sealant', sub: 'de ploegwagen brengt een nieuw wiel', color: '#ff6b6b' }
-        : { text: '💥 LEK!', sub: `${why === 'berm' ? 'te vaak door de berm' : 'punaises'} · de sealant dicht hem in ${FLAT_SECS} s`, color: '#ff6b6b' });
-    } else if (why === 'berm') this.say(`💥 ${r.name} rijdt lek`);
+        : { text: '💥 LEK!', sub: `${{ berm: 'te vaak door de berm', kasseien: 'de kasseien', punaises: 'punaises' }[why] || why} · de sealant dicht hem in ${FLAT_SECS} s`, color: '#ff6b6b' });
+    } else if (why !== 'punaises') this.say(`💥 ${r.name} rijdt lek`);
   }
 
   // Jury: tijdstraf die bij de eindtijd opgeteld wordt. why: 'bottle' | 'dirty' | 'kwak'
@@ -882,7 +889,9 @@ export class Race {
       // Niet achterop een tragere renner rijden: eromheen sturen.
       const blk = this.riders.find((q) => q !== r && q.dist - r.dist > 0 && q.dist - r.dist < 8 && Math.abs(q.x - tx) < 0.2 && q.v < r.v + 0.3);
       if (blk && !(ai.kwakT > 0)) tx = blk.x + (r.x >= blk.x ? 0.34 : -0.34);
-      ai.tx = clamp(tx, -0.85, 0.85);
+      const wAhead = this.track.wAt(r.dist + 12);
+      if (this.track.segAt(r.dist + 12).cobble) tx = ai.skill > 0.35 ? (Math.sign(r.x) || (ai.ph > 5 ? 1 : -1)) * (wAhead - GUTTER / 2) : clamp(tx, -(wAhead - 0.2), wAhead - 0.2); // goede bots zoeken het gootje
+      ai.tx = clamp(tx, -Math.min(0.85, wAhead - 0.05), Math.min(0.85, wAhead - 0.05));
       // Short cut: betere bots nemen hem vaker en strakker.
       const cut = this.track.cut;
       if (cut) {

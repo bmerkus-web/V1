@@ -11,7 +11,7 @@ export function boardKeys() {
   const out = [];
   for (const d of TRACK_DEFS) {
     out.push({ key: `${d.id}|lap`, track: d.id, label: 'Ronde' });
-    for (const z of getTrack(d.id).zones) out.push({ key: `${d.id}|seg|${z.id}`, track: d.id, label: (z.type === 'sprint' ? '⚡ ' : '⛰️ ') + z.name });
+    for (const z of getTrack(d.id).zones) out.push({ key: `${d.id}|seg|${z.id}`, track: d.id, label: ({ sprint: '⚡ ', climb: '⛰️ ', cobble: '🪨 ' }[z.type] || '') + z.name });
   }
   return out;
 }

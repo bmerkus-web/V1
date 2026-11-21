@@ -1,5 +1,5 @@
 // Pseudo-3D wegweergave op canvas (licht genoeg voor een oude Mac of tablet).
-import { SEG, ROAD_W, KERB } from './track.js';
+import { SEG, ROAD_W, KERB, GUTTER } from './track.js';
 import { mod, clamp, mulberry } from './util.js';
 import { SCENERY, drawRider, drawBox, drawBolt, drawGlue, drawRocket, drawWall, drawTacks, drawScooter, drawCar, drawBottleArm } from './sprites.js';
 
@@ -129,12 +129,12 @@ export class Renderer {
       const a = this._pt(seg, 0, 0), b = this._pt(seg, 1, 0);
       if (b.Y >= maxy || a.Y <= b.Y) continue;
       const alt = seg.i % 2;
-      const w1 = a.u * ROAD_W, w2 = b.u * ROAD_W;
+      const w1 = a.u * ROAD_W * seg.wA, w2 = b.u * ROAD_W * seg.wB;
       c.fillStyle = th.grass[alt]; c.fillRect(0, b.Y - 0.5, W, a.Y - b.Y + 1);
       // Kerbstones: korte blokjes in de lijnkleur, afgewisseld met niets. Wie erop rijdt, zit in de berm.
       // Bij de op- en afrit van de short cut ontbreken ze: dat is de enige aanwijzing.
       c.fillStyle = seg.zone === 'sprint' ? '#39ffb0' : seg.zone === 'climb' ? '#ff7b1c' : th.rumble[0];
-      const kc = (1 + KERB) / 2, kh = (KERB - 1) / 2;
+      const kh = (KERB - 1) / 2;
       for (let q = 0; q < 2; q++) { // twee blokjes per wegsegment, met evenveel ruimte ertussen
         const t1 = q ? 0.5 : 0, t2 = t1 + 0.25;
         const k1 = q ? this._pt(seg, 0.5, 0) : a, k2 = this._pt(seg, t2, 0);
@@ -145,12 +145,14 @@ export class Renderer {
             this._quad(k1.X + k1.u * ROAD_W * o1, k1.Y, k1.u * ROAD_W * kh, k2.X + k2.u * ROAD_W * o2, k2.Y, k2.u * ROAD_W * kh);
             if (cu.ramp) continue; // het gat: hier steek je over
           }
-          this._quad(k1.X + sd * k1.u * ROAD_W * kc, k1.Y, k1.u * ROAD_W * kh, k2.X + sd * k2.u * ROAD_W * kc, k2.Y, k2.u * ROAD_W * kh);
+          const c1 = seg.wA + (seg.wB - seg.wA) * t1 + kh, c2 = seg.wA + (seg.wB - seg.wA) * t2 + kh; // kerbstones schuiven mee met de wegbreedte
+          this._quad(k1.X + sd * k1.u * ROAD_W * c1, k1.Y, k1.u * ROAD_W * kh, k2.X + sd * k2.u * ROAD_W * c2, k2.Y, k2.u * ROAD_W * kh);
         }
       }
-      c.fillStyle = seg.i < 2 ? (alt ? '#f5f5ff' : '#15152a') : th.road[alt];
+      c.fillStyle = seg.i < 2 ? (alt ? '#f5f5ff' : '#15152a') : seg.cobble ? (alt ? '#6a6374' : '#5f5869') : th.road[alt];
       this._quad(a.X, a.Y, w1, b.X, b.Y, w2);
-      if (alt && n < 90) {
+      if (seg.cobble) this._cobbles(seg, a, b, w1, w2, n, th.road[alt]);
+      else if (alt && n < 90) {
         c.fillStyle = th.lane; c.globalAlpha = 0.55;
         for (const l of [-1 / 3, 1 / 3]) this._quad(a.X + w1 * l, a.Y, w1 * 0.014, b.X + w2 * l, b.Y, w2 * 0.014);
         c.globalAlpha = 1;
@@ -246,6 +248,26 @@ export class Renderer {
 
     this._overlay(race, dt);
     c.restore();
+  }
+
+  // Kasseien: rijen stenen in een verband, met langs beide randen een glad gootje.
+  _cobbles(seg, a, b, w1, w2, n, smooth) {
+    const c = this.c, g1 = w1 * GUTTER / seg.wA, g2 = w2 * GUTTER / seg.wB;
+    c.fillStyle = smooth; // gootjes
+    for (const sd of [-1, 1]) this._quad(a.X + sd * (w1 - g1 / 2), a.Y, g1 / 2, b.X + sd * (w2 - g2 / 2), b.Y, g2 / 2);
+    if (n > 55) return;
+    c.fillStyle = '#857e90';
+    for (let row = 0; row < 3; row++) {
+      const t1 = row / 3 + 0.04, t2 = row / 3 + 0.29;
+      const p1 = this._pt(seg, t1, 0), p2 = this._pt(seg, t2, 0);
+      const ww1 = p1.u * ROAD_W * (seg.wA + (seg.wB - seg.wA) * t1), ww2 = p2.u * ROAD_W * (seg.wA + (seg.wB - seg.wA) * t2);
+      const in1 = ww1 * (1 - GUTTER / seg.wA), in2 = ww2 * (1 - GUTTER / seg.wB), cnt = 8, off = ((seg.i * 3 + row) % 2) * 0.5;
+      for (let k = 0; k < cnt; k++) {
+        const f = (k + off + 0.5) / cnt * 2 - 1;
+        if (Math.abs(f) > 0.95) continue;
+        this._quad(p1.X + f * in1, p1.Y, in1 / cnt * 0.78, p2.X + f * in2, p2.Y, in2 / cnt * 0.78);
+      }
+    }
   }
 
   _quad(x1, y1, w1, x2, y2, w2) {

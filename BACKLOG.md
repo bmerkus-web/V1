@@ -64,6 +64,8 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- Kasseienstroken: De Hel van de Polder en de Basaltmuur (smallere weg, gootje, hobbelende trainer, meer lek)
+- Korte klap op de trainer bij het raken van de berm
 - WB-18 Rubber banding, aan te vinken bij de start (tijden tellen dan niet voor records)
 - WB-32/34 Nieuwe power-ups: scooter, plakbidon (met jury), muur en punaises; lekrijden met sealant en wielwissel; jury met tijdstraffen (ook voor kwakken)
 - WB-17 Bolletjestrui voor de snelste klimtijd in de race, 5% sneller voor 30 seconden
