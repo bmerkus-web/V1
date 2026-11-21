@@ -27,8 +27,6 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-13 | Eigen verbindingsdienst plus hulpserver (TURN) voor multiplayer, zodat het niet afhangt van de gratis PeerJS-dienst en ook op strenge netwerken werkt. | idee | M |
 | WB-18 | Rubber banding: gratis extra snelheid naarmate je verder achter de koploper ligt, zodat races spannend blijven. Aan/uit per race; in een race met rubber banding tellen tijden niet voor records. *Open vraag: tot hoeveel procent, vanaf hoeveel meter?* | Sebas | S |
 | WB-19 | Chat in de lobby (en misschien snelle emoji's tijdens de race). | Sebas | M |
-| WB-32 | Gekkere power-ups, standaard in het spel (geen aparte stand): bijv. een muur op de weg, en een ploegwagen die je even meetrekt met een "plakbidon". *Ontwerp ploegwagen: rijdt door de berm aan jouw kant, zodat hij niemand ramt.* | Sebas | M |
-| WB-34 | Power-up "scooter": er rijdt opeens een scooter voor je uit waar je flink in de slipstream zit (zoals een derny). | zelf | S |
 
 ## Publieke beta
 
@@ -67,6 +65,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- WB-32/34 Nieuwe power-ups: scooter, plakbidon (met jury), muur en punaises; lekrijden met sealant en wielwissel; jury met tijdstraffen (ook voor kwakken)
 - WB-17 Bolletjestrui voor de snelste klimtijd in de race, 5% sneller voor 30 seconden
 - WB-14 Berm kost meteen 40%; short cut telt alleen via de oprit
 - WB-15 Waarschuwing voor vuurpijl, lijm en tegenwind (met tijd om je schild te pakken)

@@ -11,6 +11,10 @@ export const ITEMS = {
   glue: { name: 'Lijmklodder', icon: '🟣', hint: 'Plakt achter je op de weg' },
   magnet: { name: 'Magneet', icon: '🧲', hint: 'Trekt je naar de renner vóór je' },
   storm: { name: 'Tegenwind', icon: '🌪️', hint: 'Storm voor iedereen vóór je' },
+  scooter: { name: 'Scooter', icon: '🛵', hint: 'Rij in zijn slipstream: blijf recht achter hem' },
+  bottle: { name: 'Plakbidon', icon: '🚗', hint: 'Ploegwagen trekt je mee; blijf tegen de rand. Pas op voor de jury!' },
+  wall: { name: 'Muur', icon: '🧱', hint: 'Duikt op voor de renner vóór je (op kop: achter je)' },
+  tacks: { name: 'Punaises', icon: '📌', hint: 'Strooi ze achter je: wie erdoor rijdt, rijdt lek' },
 };
 
 export const BOT_NAMES = ['Turbo Tess', 'Watt Wout', 'Sprint Sanne', 'Klim Kees', 'Demarrage Daan', 'Bidon Bram', 'Kopman Koen'];
@@ -22,6 +26,12 @@ const BERM_COST = 0.4; // in de berm kom je meteen 40% minder snel vooruit
 const SPRINT_BONUS = 0.05, SPRINT_SECS = 30; // groene trui: 5% sneller, 30 seconden
 const ROCKET_ARM = 1.0; // een vuurpijl hangt eerst even stil: tijd om je schild te pakken
 const STORM_DELAY = 1.5; // tegenwind komt na een korte waarschuwing
+// Jury: [kans, tijdstraf in s]. Afgestemd zodat het gemiddeld ongeveer quitte speelt met wat het oplevert:
+// plakbidon ≈ 1,4 s winst, vuile kwak (de berm in) ≈ 0,9 s, gewone kwak ≈ 0,05 s plus een blitzje.
+export const JURY = { bottle: [0.2, 7], dirty: [0.2, 5], kwak: [1 / 15, 1] };
+const TOW_BONUS = 0.35; // plakbidon: 35% sneller vooruit zolang je de bidon vasthoudt
+const WALL_W = 0.5, TACKS_W = 0.5; // halve breedte in halve wegbreedtes: samen de halve weg
+const FLAT = 0.3, FLAT_SECS = 6, WHEEL_SECS = 3; // lek: 30% trager tot de sealant dicht; soms een wielwissel
 const CUT_BONUS = 0.12; // extra voortgang op het short-cut-pad
 
 export const DIFFICULTY = { makkelijk: 0.7, normaal: 0.82, zwaar: 0.93, beul: 1.05 };
@@ -31,8 +41,9 @@ function pickItem(rng, rank, total) {
   const f = (rank - 1) / (total - 1);
   const first = rank === 1;
   const w = {
-    turbo: 2 + 2 * f, shield: 3 - 1.5 * f, glue: 3 - 2.5 * f,
+    turbo: 2 + 2 * f, shield: 3 - 1.5 * f, glue: 2 - 1.5 * f, tacks: 2 - 1.5 * f, wall: 1.5 - 0.5 * f,
     rocket: first ? 0 : 1 + 3 * f, magnet: first ? 0 : 0.5 + 2.5 * f, storm: f > 0.45 ? 2.2 * f : 0,
+    scooter: 0.5 + 2 * f, bottle: 0.5 + 1.5 * f,
   };
   let sum = 0;
   for (const k in w) sum += w[k];
@@ -89,7 +100,7 @@ export class Race {
       for (const r of this.riders) {
         const o = c.riders[r.id];
         if (!o) continue;
-        r.bolts = o.bolts; r.item = this.free ? null : o.item; r.finished = o.finished; r.finishTime = o.finishTime;
+        r.bolts = o.bolts; r.item = this.free ? null : o.item; r.finished = o.finished; r.finishTime = o.finishTime; r.penalty = o.penalty || 0;
         if (cfg.rolling) { r.dist = o.gap; r.x = o.x; r.v = o.v; }
       }
     }
@@ -107,7 +118,8 @@ export class Race {
       id: r.id, name: r.name, color: r.color, kind: r.kind,
       dist: -3 - row * 4, x: [-0.5, 0, 0.5][col], v: 0, power: 0, cadence: 0, steer: 0,
       item: null, roulette: 0, bolts: 0, draft: false, mask: 0,
-      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0, kom: 0 },
+      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0, kom: 0, scooter: 0, tow: 0, flat: 0, wheel: 0 },
+      bermWear: 0, penalty: 0,
       kwakCd: 0, kwakSafe: 0, bumpCd: 0,
       finished: false, finishTime: null, rank: i + 1, bell: 0, net: null,
     };
@@ -187,13 +199,13 @@ export class Race {
     this._storms();
     this._warnings();
     for (const h of this.hazards) h.age += dt;
-    this.hazards = this.hazards.filter((h) => h.age < 45);
+    this.hazards = this.hazards.filter((h) => h.age < (h.life || 45));
     this.rank();
     this._ghost(dt);
     this._ghosts();
 
     const seg = this.track.segAt(me.dist);
-    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
+    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
     this._net(dt);
   }
 
@@ -226,6 +238,15 @@ export class Race {
     if (!r.onCut) r.cutValid = false;
     const wasBerm = r.berm;
     r.berm = Math.abs(r.x) > 1 && !r.onCut;
+    // Lek uit de berm: de kans groeit met elke keer in de berm én met de tijd erin.
+    if (!this.free && !r.finished) {
+      if (r.berm && !wasBerm) r.bermWear += 1;
+      if (r.berm) {
+        r.bermWear += 1.5 * dt;
+        if (this.rng() < Math.min(0.5, 0.02 * r.bermWear) * dt) this._flat(r, 'berm');
+      }
+      r.bermWear = Math.max(0, r.bermWear - 0.02 * dt);
+    }
     if (r === this.me) {
       if (r.berm && !wasBerm && !r.finished && this.clock - (this._bermAt || -9) > 4) {
         this._bermAt = this.clock;
@@ -253,6 +274,17 @@ export class Race {
         if (!this.free && r.bumpCd <= 0 && r.v > o.v + 0.4 && !r.finished && !o.finished && this.time > 3) this._bump(r, o);
       }
     }
+    // Scooter: alleen voordeel recht achter hem. Plakbidon: alleen zolang je tegen de rand blijft.
+    r.inScooter = e.scooter > 0 && Math.abs(r.x - r.scooterX) < 0.18;
+    if (r.inScooter) r.draft = false;
+    r.towing = false;
+    if (e.tow > 0) {
+      if (r.towSide * r.x > 0.55) { r.towing = true; r.towLost = 0; }
+      else if ((r.towLost = (r.towLost || 0) + dt) > 0.35) {
+        e.tow = 0;
+        if (r === this.me) this.emit('banner', { text: '🚗 Bidon losgelaten', sub: 'je stuurde te ver van de rand', color: '#f5f5ff' });
+      }
+    }
     const prev = r.dist;
     r.v = stepSpeed(r, power, seg.grade, dt, pull);
     // Voortgang t.o.v. je snelheid: lijn in de bocht, short cut, berm en groene trui.
@@ -260,7 +292,9 @@ export class Race {
     r.line = 1 / (1 - (viaCut ? r.x : clamp(r.x, -1, 1)) * seg.curve * LINE_K) - 1;
     if (viaCut && Math.abs(r.x) > 1) r.line += CUT_BONUS;
     if (r.berm) r.line = -BERM_COST;
-    const prog = (1 + r.line) * (e.sprint > 0 ? 1 + SPRINT_BONUS : 1) * (e.kom > 0 ? 1 + SPRINT_BONUS : 1);
+    const prog = (1 + r.line) * (e.sprint > 0 ? 1 + SPRINT_BONUS : 1) * (e.kom > 0 ? 1 + SPRINT_BONUS : 1) *
+      (r.towing ? 1 + TOW_BONUS : 1) * (e.flat > 0 ? 1 - FLAT : 1) * (e.wheel > 0 ? 0.05 : 1);
+    r.prog = prog;
     r.dist += r.v * dt * prog;
     if (r.dist > prev && !r.finished && !this.free) { this._sprintLine(r, prev); this._climbLine(r, prev); }
 
@@ -274,7 +308,7 @@ export class Race {
     }
     if (!r.finished && r.dist >= this.finishAt) {
       r.finished = true;
-      r.finishTime = this.time - (r.dist - this.finishAt) / Math.max(r.v, 1);
+      r.finishTime = this.time - (r.dist - this.finishAt) / Math.max(r.v, 1) + (r.penalty || 0); // incl. tijdstraf van de jury
       this.room?.send({ t: 'fin', id: r.id, time: r.finishTime });
       if (r !== this.me) this.say(`🏁 ${r.name}`);
     }
@@ -316,13 +350,22 @@ export class Race {
     }
     // Lijmklodders
     for (const h of this.hazards) {
-      if (h.gone || (h.owner === r.id && h.age < 1.2)) continue;
+      const type = h.type || 'glue';
+      if (h.gone || (h.owner === r.id && h.age < 1.2 && !h.front)) continue; // eigen muur ervoor raakt je wel
       const dd = mod(r.dist - h.d + this.L / 2, this.L) - this.L / 2;
-      if (Math.abs(dd) < 1.8 && Math.abs(h.x - r.x) < 0.2) {
+      const hw = type === 'glue' ? 0.2 : (type === 'wall' ? WALL_W : TACKS_W) + 0.05;
+      if (Math.abs(dd) >= 1.8 || Math.abs(h.x - r.x) >= hw) continue;
+      if (type === 'glue') {
         h.gone = true;
         this.room?.send({ t: 'hazgone', hid: h.id });
         this.hit(r, 'glue', h.owner);
+        continue;
       }
+      if ((h.hitBy ||= []).includes(r.id)) continue; // ieder één keer per muur of strook punaises
+      h.hitBy.push(r.id);
+      const shielded = r.fx.shield > 0;
+      this.hit(r, type, h.owner);
+      if (type === 'wall' && shielded) { h.gone = true; this.room?.send({ t: 'hazgone', hid: h.id }); } // schild breekt de muur
     }
     this.hazards = this.hazards.filter((h) => !h.gone);
   }
@@ -415,7 +458,7 @@ export class Race {
   // Toestand die mee moet naar de volgende etappe. Afstanden t.o.v. de streep.
   carryOut() {
     const warm = this.mode === 'warm', riders = {};
-    for (const r of this.riders) riders[r.id] = { gap: warm ? 0 : r.dist - this.total, x: r.x, v: r.v, bolts: warm ? 0 : r.bolts, item: this.free ? null : r.item, finished: r.finished, finishTime: r.finishTime };
+    for (const r of this.riders) riders[r.id] = { gap: warm ? 0 : r.dist - this.total, x: r.x, v: r.v, bolts: warm ? 0 : r.bolts, item: this.free ? null : r.item, finished: r.finished, finishTime: r.finishTime, penalty: r.penalty || 0 };
     return {
       time: warm ? 0 : this.time, logT: warm ? this.logT + this.time : this.logT, logDist: this.logDist + Math.max(0, this.me.dist),
       stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders, greenId: this.greenId, komId: this.komId, komBest: this.komBest,
@@ -544,6 +587,31 @@ export class Race {
         break;
       }
       case 'storm': this._storm(r); break;
+      case 'scooter':
+        r.fx.scooter = 8; r.scooterX = clamp(r.x, -0.8, 0.8); msg.sx = r.scooterX;
+        if (isMe) this.emit('sfx', 'scooter');
+        break;
+      case 'bottle':
+        r.towSide = r.x >= 0 ? 1 : -1; r.fx.tow = 4; r.towLost = 0; msg.side = r.towSide;
+        if (isMe) { this.emit('sfx', 'boost'); this.emit('banner', { text: '🚗 PLAKBIDON!', sub: `blijf ${r.towSide > 0 ? 'rechts' : 'links'} tegen de rand`, color: '#7df9ff' }); }
+        this._jury(r, 'bottle');
+        break;
+      case 'wall': {
+        const target = r.rank > 1 ? this.order[r.rank - 2] : null;
+        const front = !!target && !target.finished;
+        msg.h = front
+          ? { type: 'wall', front: true, life: 10, d: mod(target.dist + 30, this.L), x: clamp(target.x, -0.5, 0.5) }
+          : { type: 'wall', front: false, life: 20, d: mod(r.dist - 3, this.L), x: clamp(r.x, -0.5, 0.5) };
+        Object.assign(msg.h, { id: r.id + '-' + this._hid++, owner: r.id, st: this.stageIdx | 0 });
+        this.hazards.push({ ...msg.h, age: 0, hitBy: [] });
+        if (isMe) this.emit('sfx', 'drop');
+        break;
+      }
+      case 'tacks':
+        msg.h = { type: 'tacks', life: 20, id: r.id + '-' + this._hid++, d: mod(r.dist - 3, this.L), x: clamp(r.x, -0.5, 0.5), owner: r.id, st: this.stageIdx | 0 };
+        this.hazards.push({ ...msg.h, age: 0, hitBy: [] });
+        if (isMe) this.emit('sfx', 'drop');
+        break;
     }
     this.room?.send(msg);
   }
@@ -632,6 +700,34 @@ export class Race {
     return true;
   }
 
+  // Lekke band: meestal dicht de tubeless sealant hem na een paar seconden, soms moet er een nieuw wiel in.
+  _flat(r, why) {
+    if (r.fx.flat > 0 || r.fx.wheel > 0) return;
+    r.bermWear = 0;
+    const wheel = this.rng() < 0.25;
+    if (wheel) r.fx.wheel = WHEEL_SECS; else r.fx.flat = FLAT_SECS;
+    if (r === this.me) {
+      this.emit('sfx', 'psst'); this.emit('shake', 4);
+      this.emit('banner', wheel ? { text: '🔧 LEK – te groot voor de sealant', sub: 'de ploegwagen brengt een nieuw wiel', color: '#ff6b6b' }
+        : { text: '💥 LEK!', sub: `${why === 'berm' ? 'te vaak door de berm' : 'punaises'} · de sealant dicht hem in ${FLAT_SECS} s`, color: '#ff6b6b' });
+    } else if (why === 'berm') this.say(`💥 ${r.name} rijdt lek`);
+  }
+
+  // Jury: tijdstraf die bij de eindtijd opgeteld wordt. why: 'bottle' | 'dirty' | 'kwak'
+  _jury(r, why) {
+    const [chance, secs] = JURY[why];
+    if (this.rng() >= chance) return;
+    r.penalty = (r.penalty || 0) + secs;
+    this.room?.send({ t: 'jury', id: r.id, secs, why });
+    this._juryFx(r, secs, why);
+  }
+
+  _juryFx(r, secs, why) {
+    const what = { bottle: 'plakbidon gezien', dirty: 'vuile kwak', kwak: 'kwak' }[why] || 'overtreding';
+    if (r === this.me) { this.emit('sfx', 'whistle'); this.emit('banner', { text: `⚖️ JURY: +${secs} s`, sub: what, color: '#ffd166' }); }
+    else this.say(`⚖️ ${r.name} +${secs} s (${what})`);
+  }
+
   // r rijdt achterop o: r valt terug tot onder de snelheid van o en moet even herstellen.
   _bump(r, o) {
     r.bumpCd = 2.5;
@@ -646,6 +742,7 @@ export class Race {
 
   // r geeft o een zet opzij (dir = richting van de zet: -1 links, +1 rechts).
   _kwak(r, o, dir) {
+    if (!(o.fx.shield > 0 || (o.mask & 4))) this._jury(r, Math.abs(o.x + dir * 0.22) > 1 ? 'dirty' : 'kwak'); // de berm in = vuile kwak
     r.kwakCd = r.kind === 'bot' ? 10 : 2.5; // bots houden zich wat in
     o.kwakSafe = 3;
     r.x -= dir * 0.05;
@@ -659,6 +756,8 @@ export class Race {
     else if (kind === 'rocket') { r.v *= 0.45; r.fx.spin = 1.2; r.bolts = Math.max(0, r.bolts - 3); }
     else if (kind === 'glue') { r.fx.slow = 2.5; r.bolts = Math.max(0, r.bolts - 1); }
     else if (kind === 'storm') r.fx.storm = 6;
+    else if (kind === 'wall') { r.v *= 0.3; r.fx.spin = 1.0; r.bolts = Math.max(0, r.bolts - 1); }
+    else if (kind === 'tacks') this._flat(r, 'punaises');
     if (kind === 'kwak') {
       r.kwakSafe = 3;
       r.kwakCd = Math.max(r.kwakCd || 0, KWAK_CALM); // terugsturen naar je lijn is geen terugkwak
@@ -696,7 +795,7 @@ export class Race {
       this.emit('banner', { text: blocked ? `${r.name} blokte je aanval` : `RAAK! ${r.name}`, color: blocked ? '#7df9ff' : '#39ffb0' });
       if (!blocked) this.emit('sfx', 'block');
     }
-    if (kind !== 'storm' && src && src !== r) this.say(`${src.name} ${blocked ? '🛡️' : kind === 'rocket' ? '🚀' : '🟣'} ${r.name}`);
+    if (kind !== 'storm' && src && src !== r) this.say(`${src.name} ${blocked ? '🛡️' : { rocket: '🚀', glue: '🟣', wall: '🧱', tacks: '📌' }[kind] || '💥'} ${r.name}`);
     r.hitAt = this.clock;
   }
 
@@ -758,7 +857,8 @@ export class Race {
       }
       for (const h of this.hazards) {
         const dd = mod(h.d - m, this.L);
-        if (dd < 35 && Math.abs(h.x - tx) < 0.26) tx = h.x + (tx >= h.x ? 0.42 : -0.42);
+        const hw = (h.type || 'glue') === 'glue' ? 0.2 : (h.type === 'wall' ? WALL_W : TACKS_W) + 0.05;
+        if (dd < 35 && Math.abs(h.x - tx) < hw + 0.06) tx = clamp(h.x + (tx >= h.x ? hw + 0.22 : -hw - 0.22), -0.9, 0.9);
       }
       // Af en toe bewust een kwak uitdelen aan wie vlak naast hem rijdt.
       if (r.kwakCd <= 0 && this.rng() < 0.05) {
@@ -781,6 +881,8 @@ export class Race {
         }
       }
     }
+    if (r.fx.scooter > 0) ai.tx = r.scooterX; // in de slipstream van de scooter blijven
+    if (r.fx.tow > 0) ai.tx = r.towSide * 0.8; // bidon vasthouden
     const steer = clamp((ai.tx - r.x) * (ai.takeCut ? 7 : 4), -0.8, 0.8);
     this._stepLocal(r, p, steer, dt, true);
 
@@ -789,8 +891,10 @@ export class Race {
       const ahead = this.order[r.rank - 2];
       const gap = ahead ? ahead.dist - r.dist : 1e9;
       const ready = ai.itemT > 1.5 + (ai.ph % 3);
+      const behind = this.riders.some((o) => o !== r && r.dist - o.dist > 2 && r.dist - o.dist < 40);
       const ok = r.item === 'rocket' || r.item === 'magnet' ? gap < 150 || ai.itemT > 12 :
-        r.item === 'glue' ? this.riders.some((o) => o !== r && r.dist - o.dist > 2 && r.dist - o.dist < 40) || ai.itemT > 10 : true;
+        r.item === 'glue' || r.item === 'tacks' ? behind || ai.itemT > 10 :
+        r.item === 'wall' ? (r.rank === 1 ? behind : gap < 120) || ai.itemT > 10 : true;
       if (ready && ok) { ai.itemT = 0; this.useItem(r); }
     }
   }
@@ -799,6 +903,7 @@ export class Race {
   _remote(r, dt) {
     if (r.bell > 0) r.bell -= dt;
     if (r.kwakSafe > 0) r.kwakSafe -= dt;
+    for (const k of ['scooter', 'tow']) if (r.fx[k] > 0) r.fx[k] = Math.max(0, r.fx[k] - dt);
     const n = r.net;
     if (!n) return;
     n.age += dt;
@@ -836,7 +941,13 @@ export class Race {
       case 'use': {
         const r = this.byId(msg.id);
         if (!r) break;
-        if (msg.item === 'glue') { if ((msg.h.st | 0) === (this.stageIdx | 0)) this.hazards.push({ ...msg.h, age: 0 }); }
+        if (msg.h) {
+          const h = msg.h;
+          const okType = h.type == null || h.type === 'glue' || h.type === 'wall' || h.type === 'tacks';
+          if (okType && typeof h.d === 'number' && typeof h.x === 'number' && (h.st | 0) === (this.stageIdx | 0))
+            this.hazards.push({ ...h, life: Math.min(45, +h.life || 45), age: 0, hitBy: [] });
+        } else if (msg.item === 'scooter') { r.fx.scooter = 8; r.scooterX = clamp(+msg.sx || 0, -0.8, 0.8); }
+        else if (msg.item === 'bottle') { r.fx.tow = 4; r.towSide = msg.side > 0 ? 1 : -1; }
         else if (msg.item === 'rocket' && msg.to) {
           this.rockets.push({ from: r.id, to: msg.to, d: r.dist + 1, x: r.x, age: 0 });
           if (msg.to === this.me.id) this.emit('banner', { text: '🚀 VUURPIJL OP KOMST!', color: '#ff3b3b' });
@@ -852,6 +963,13 @@ export class Race {
       case 'kom': {
         if (typeof msg.key !== 'string' || msg.key.length > 60 || typeof msg.time !== 'number' || !(msg.time > 1) || !this.byId(msg.id)) break;
         this._claimKom(msg.key, msg.id, msg.time, String(msg.zone || 'klim').slice(0, 30));
+        break;
+      }
+      case 'jury': {
+        const r = this.byId(msg.id);
+        if (!r || this.local(r) || typeof msg.secs !== 'number' || !(msg.secs > 0 && msg.secs <= 10)) break;
+        r.penalty = (r.penalty || 0) + msg.secs;
+        this._juryFx(r, msg.secs, msg.why);
         break;
       }
       case 'sprint': {
@@ -878,7 +996,7 @@ export class Race {
 
   results() {
     this.rank();
-    return this.order.map((r) => ({ id: r.id, name: r.name, color: r.color, rank: r.rank, time: r.finishTime, me: r === this.me, kind: r.kind }));
+    return this.order.map((r) => ({ id: r.id, name: r.name, color: r.color, rank: r.rank, time: r.finishTime, penalty: r.penalty || 0, me: r === this.me, kind: r.kind }));
   }
 }
 

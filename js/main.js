@@ -578,7 +578,7 @@ function showResults() {
     const res = r.results(), st = r.stats, me = r.me;
     const avgP = st.n ? st.sumP / st.n : 0;
     const win = me.rank === 1 && res.length > 1;
-    const rows = res.map((x) => `<tr class="${x.me ? 'me' : ''}"><td>${x.rank}</td><td><span style="color:${esc(x.color)}">●</span> ${esc(x.name)}</td><td>${x.time != null ? fmtTime(x.time, 2) : '…'}</td></tr>`).join('');
+    const rows = res.map((x) => `<tr class="${x.me ? 'me' : ''}"><td>${x.rank}</td><td><span style="color:${esc(x.color)}">●</span> ${esc(x.name)}</td><td>${x.time != null ? fmtTime(x.time, 2) : '…'}${x.penalty ? ` <small>⚖️ +${x.penalty} s</small>` : ''}</td></tr>`).join('');
     const prs = r.prs.map((p) => `<li>${esc(p.label)}: ${fmtTime(p.t, 2)}${p.prev ? ` (${fmtDelta(p.t - p.prev)})` : ''}</li>`);
     const pn = { 5: '5 s', 60: '1 min', 300: '5 min' };
     for (const w of r.powerPRs || []) prs.push(`<li>Vermogen ${pn[w]}: ${Math.round(st.best[w])} W</li>`);
@@ -611,7 +611,7 @@ const itemKeys = Object.keys(ITEMS);
 function hud(dt) {
   const r = race, me = r.me;
   $('h-watt').firstChild.nodeValue = Math.round(me.power);
-  $('h-spd').textContent = (me.v * 3.6 * (1 + (me.line || 0)) * (me.fx.sprint > 0 ? 1.05 : 1)).toFixed(0); // echte voortgang: berm, lijn en trui tellen mee
+  $('h-spd').textContent = (me.v * 3.6 * (me.prog ?? 1)).toFixed(0); // echte voortgang: berm, lijn, truien, lek en bidon tellen mee
   $('h-time').textContent = fmtTime(r.time);
   const it = $('h-item');
   if (me.roulette > 0) {
@@ -661,7 +661,8 @@ function hud(dt) {
   $('h-bolts').title = `${me.bolts * 2}% minder luchtweerstand`;
   $('h-hr').classList.toggle('hidden', !me.hr);
   $('h-hr-v').textContent = me.hr || '';
-  $('h-draft').classList.toggle('hidden', !me.draft);
+  $('h-draft').classList.toggle('hidden', !me.draft && !me.inScooter);
+  $('h-draft').textContent = me.inScooter ? '🛵 SLIPSTREAM SCOOTER' : '💨 SLIPSTREAM';
   // Eén regel voor je lijn: berm (kost), short cut (winst) of binnen-/buitenbocht.
   const ln = $('h-line'), gain = me.finished && !r.free ? 0 : me.line || 0;
   const cut = me.onCut && me.cutValid && Math.abs(me.x) > 1;
@@ -686,7 +687,7 @@ function hud(dt) {
   }
   $('h-rank').innerHTML = r.order.map((x) => {
     const gap = x === me ? '' : x.finished ? ' 🏁' : ` ${x.dist > me.dist ? '+' : '−'}${Math.abs(x.dist - me.dist).toFixed(0)}m`;
-    return `<div class="${x === me ? 'me' : ''}"><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${gap}</div>`;
+    return `<div class="${x === me ? 'me' : ''}"><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${x.penalty ? ` ⚖️+${x.penalty}s` : ''}${gap}</div>`;
   }).join('');
   $('h-feed').innerHTML = r.feed.filter((f) => r.clock - f.at < 6).map((f) => `<div>${f.icon ? ICONS[f.icon] || '' : ''}${esc(f.text)}</div>`).join('');
   // stippen op het profiel
