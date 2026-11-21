@@ -12,6 +12,7 @@ import { buildTcx, tcxFilename } from './export.js';
 import { grab, compose } from './shot.js';
 import { GEARS, getGear, shift, gearOffset } from './gears.js';
 import { boardKeys, boardRows, mergeEntry, entriesToShare } from './board.js';
+import { BUILTIN, parseWorkout, loadWorkouts, saveWorkouts, at as wkAt, targetW, blockName, blockFrac, zoneColor, cueAt, metrics, plannedTss } from './workout.js';
 
 const $ = (id) => document.getElementById(id);
 // Alleen naar de pagina schrijven als er echt iets verandert: elke schrijfactie kost de browser
@@ -30,6 +31,12 @@ const WARM_SECS = +new URLSearchParams(location.search).get('warm') || 420; // 7
 const T = (store.training ||= { plan: [{ track: 'polder', laps: 1 }, { track: 'vulkaan', laps: 1 }, { track: 'kosmo', laps: 1 }], warm: true, cool: true });
 const sel = { track: 'polder', laps: 2, botsOn: true, bots: 5, diff: 'normaal', fair: P.fair, rubber: false, mode: 'race', plan: T.plan, warm: T.warm, cool: T.cool };
 let training = null; // lopende training: { stages, idx, courseLen, gone }
+// Workouts: ingebouwd + zelf geïmporteerd. wk = de lopende workout.
+let myWorkouts = loadWorkouts();
+const allWorkouts = () => [...BUILTIN, ...myWorkouts];
+Object.assign(sel, { wk: store.wkSel || 'b-kennis', erg: store.wkErg ?? true, wgame: false });
+let wk = null; // { w, bias, erg, log: [{t,p,tgt,hr,cad}], sec, bi, p3, chartAt }
+const clock = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = String(sec % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
 
 // ---------- hulpjes ----------
 // Kleine groene trui (strepen + bliksem) voor meldingen en het lijstje rechtsboven.
@@ -210,12 +217,16 @@ function drawProfile(cv, track, dots) {
 
 function renderSetup() {
   const lobby = !!room, canEdit = !room || room.isHost;
-  const tr_ = sel.mode === 'training';
-  $('setup-title').textContent = lobby ? 'Kamer' : tr_ ? 'Training' : 'Solo race';
-  $('m-race').classList.toggle('sel', !tr_); $('m-training').classList.toggle('sel', tr_);
+  if (lobby && sel.mode === 'workout') sel.mode = 'race'; // workouts zijn (nog) solo
+  const tr_ = sel.mode === 'training', wk_ = sel.mode === 'workout';
+  $('setup-title').textContent = lobby ? 'Kamer' : tr_ ? 'Training' : wk_ ? 'Workout' : 'Solo race';
+  $('m-race').classList.toggle('sel', !tr_ && !wk_); $('m-training').classList.toggle('sel', tr_); $('m-workout').classList.toggle('sel', wk_);
   $('m-race').disabled = $('m-training').disabled = !canEdit;
+  $('m-workout').classList.toggle('hidden', lobby);
   $('tracks').classList.toggle('hidden', tr_); $('plan-box').classList.toggle('hidden', !tr_);
-  $('o-laps-l').classList.toggle('hidden', tr_);
+  $('wk-box').classList.toggle('hidden', !wk_);
+  $('o-laps-l').classList.toggle('hidden', tr_ || wk_);
+  if (wk_) renderWorkouts();
   renderPlan(canEdit);
   $('lobby-box').classList.toggle('hidden', !lobby);
   if (lobby) {
@@ -239,8 +250,14 @@ function renderSetup() {
   $('o-botson').checked = sel.botsOn && maxBots > 0;
   $('o-botson').disabled = !canEdit || maxBots === 0;
   for (const o of $('o-bots').options) o.disabled = +o.value > maxBots;
-  $('o-bots-l').classList.toggle('hidden', !$('o-botson').checked);
-  $('o-diff-l').classList.toggle('hidden', !$('o-botson').checked);
+  const botsShown = wk_ ? sel.wgame : $('o-botson').checked; // bij een workout gaan de bots mee met de spelmodus
+  $('o-botson').parentElement.classList.toggle('hidden', wk_);
+  $('o-bots-l').classList.toggle('hidden', !botsShown);
+  $('o-diff-l').classList.toggle('hidden', !botsShown);
+  for (const id of ['o-fair', 'o-rubber']) $(id).parentElement.classList.toggle('hidden', wk_ && !sel.wgame);
+  $('o-fair-note').classList.toggle('hidden', wk_ && !sel.wgame);
+  document.querySelector('.ghosts').classList.toggle('hidden', wk_);
+  $('o-erg').checked = sel.erg; $('o-wgame').checked = sel.wgame;
   $('o-fair-note').textContent = sel.fair ? 'Iedereen die op zijn eigen FTP rijdt is even snel.' : 'Uit: snelheid volgt je watt per kilo (vul je gewicht in bij Renner).';
   $('o-laps').value = sel.laps; $('o-bots').value = Math.max(1, Math.min(sel.bots, maxBots || 1)); $('o-diff').value = sel.diff; $('o-fair').checked = sel.fair;
   $('o-ghost').checked = P.ghostRace; $('o-ghost-lap').checked = P.ghostLap; $('o-ghost-seg').checked = P.ghostSeg;
@@ -286,6 +303,75 @@ $('t-warm').onchange = (e) => { sel.warm = e.target.checked; planChanged(); };
 $('t-cool').onchange = (e) => { sel.cool = e.target.checked; planChanged(); };
 $('m-race').onclick = () => { sel.mode = 'race'; pushSettings(); };
 $('m-training').onclick = () => { sel.mode = 'training'; pushSettings(); };
+$('m-workout').onclick = () => { sel.mode = 'workout'; pushSettings(); };
+$('o-erg').onchange = (e) => { sel.erg = store.wkErg = e.target.checked; save(); };
+$('o-wgame').onchange = (e) => { sel.wgame = e.target.checked; renderSetup(); };
+
+// ---------- workouts kiezen en importeren ----------
+// Workout als staafjes in zonekleuren (kaartje, HUD-grafiek en nabespreking).
+function drawWorkout(cv, w, o = {}) {
+  const c = cv.getContext('2d'), W = cv.width, H = cv.height, pad = o.pad ?? 0, top = o.top ?? 2, base = H - (o.bottom ?? 0);
+  const ftp = P.ftp, maxF = Math.max(1.3, ...w.blocks.map((b) => (b.a == null ? 0 : Math.max(b.a, b.b) * (w.unit === 'w' ? 1 / ftp : 1)))) * 1.05;
+  const x = (t) => pad + (t / w.total) * (W - 2 * pad), y = (f) => base - (f / maxF) * (base - top);
+  c.clearRect(0, 0, W, H);
+  for (const b of w.blocks) {
+    const n = b.a === b.b || b.a == null ? 1 : Math.max(2, Math.round((x(b.t0 + b.dur) - x(b.t0)) / 4));
+    for (let i = 0; i < n; i++) {
+      const t0 = b.t0 + (b.dur * i) / n, t1 = b.t0 + (b.dur * (i + 1)) / n;
+      const f = b.a == null ? 0.5 : (b.a + ((b.b - b.a) * (i + 0.5)) / n) * (w.unit === 'w' ? 1 / ftp : 1);
+      c.fillStyle = b.a == null ? '#5b5675' : zoneColor(f);
+      c.globalAlpha = o.now != null && t1 <= o.now ? 0.32 : 0.92;
+      c.fillRect(x(t0), y(f), x(t1) - x(t0) + 0.6, base - y(f));
+    }
+  }
+  c.globalAlpha = 1;
+  if (o.ftpLine) { c.setLineDash([8, 8]); c.strokeStyle = 'rgba(255,255,255,.3)'; c.lineWidth = 2; c.beginPath(); c.moveTo(pad, y(1)); c.lineTo(W - pad, y(1)); c.stroke(); c.setLineDash([]); }
+  if (o.log?.length) { // gereden vermogen
+    c.strokeStyle = '#fff'; c.lineWidth = o.line || 2.5; c.beginPath();
+    let k = 0, acc = 0, n = 0;
+    o.log.forEach((e, i) => { acc += e.p; n++; if (n >= (o.avg || 5) || i === o.log.length - 1) { const px = x(e.t), py = y(acc / n / ftp); if (k++) c.lineTo(px, py); else c.moveTo(px, py); acc = 0; n = 0; } });
+    c.stroke();
+  }
+  if (o.now != null) { c.fillStyle = '#fff'; c.fillRect(x(o.now) - 2, top - 6, 4, base - top + 6); c.beginPath(); c.moveTo(x(o.now) - 9, top - 12); c.lineTo(x(o.now) + 9, top - 12); c.lineTo(x(o.now), top - 1); c.fill(); }
+}
+function renderWorkouts() {
+  const list = allWorkouts();
+  if (!list.some((w) => w.id === sel.wk)) sel.wk = list[0].id;
+  $('wk-list').innerHTML = list.map((w) => `<button class="wk-card${w.id === sel.wk ? ' sel' : ''}" data-id="${esc(w.id)}"><b>${esc(w.name)}</b><canvas width="420" height="80"></canvas>
+    <span>${clock(w.total)} · TSS ${Math.round(plannedTss(w, P.ftp))}${w.unit === 'w' ? ' · vaste watts' : ''}</span>${w.desc ? `<span>${esc(w.desc).slice(0, 90)}</span>` : ''}
+    ${w.id.startsWith('u-') ? `<span class="ghost del" data-del="${esc(w.id)}" role="button" aria-label="${esc(w.name)} verwijderen">✕</span>` : ''}</button>`).join('');
+  [...$('wk-list').querySelectorAll('canvas')].forEach((cv, i) => drawWorkout(cv, list[i]));
+}
+$('wk-list').onclick = (e) => {
+  const d = e.target.closest('[data-del]');
+  if (d) {
+    const w = myWorkouts.find((x) => x.id === d.dataset.del);
+    myWorkouts = myWorkouts.filter((x) => x.id !== d.dataset.del); saveWorkouts(myWorkouts);
+    toast(`${w?.name || 'Workout'} verwijderd`); renderWorkouts(); return;
+  }
+  const c = e.target.closest('.wk-card');
+  if (c) { sel.wk = store.wkSel = c.dataset.id; save(); renderWorkouts(); }
+};
+async function importFiles(files) {
+  const ok = [], bad = [];
+  for (const f of files) {
+    try {
+      if (f.size > 2e6) throw new Error('bestand is te groot');
+      const w = parseWorkout(await f.text(), f.name);
+      w.id = 'u-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); w.added = Date.now();
+      myWorkouts.push(w); ok.push(w);
+    } catch (err) { bad.push(`${f.name}: ${err.message}`); }
+  }
+  if (ok.length && !saveWorkouts(myWorkouts)) bad.push('Opslaan lukte niet (opslag vol?)');
+  if (ok.length) { sel.wk = store.wkSel = ok[ok.length - 1].id; save(); }
+  $('wk-msg').textContent = [ok.length ? `✓ ${ok.map((w) => `${w.name} (${clock(w.total)})`).join(', ')} toegevoegd` : '', ...bad].filter(Boolean).join(' · ');
+  renderWorkouts();
+}
+$('wk-import').onclick = () => $('wk-file').click();
+$('wk-file').onchange = (e) => { importFiles([...e.target.files]); e.target.value = ''; };
+for (const ev of ['dragenter', 'dragover']) $('wk-box').addEventListener(ev, (e) => { e.preventDefault(); $('wk-box').classList.add('drop'); });
+$('wk-box').addEventListener('dragleave', () => $('wk-box').classList.remove('drop'));
+$('wk-box').addEventListener('drop', (e) => { e.preventDefault(); $('wk-box').classList.remove('drop'); importFiles([...e.dataTransfer.files]); });
 function pushSettings() {
   if (room?.isHost) room.setSettings({ ...sel });
   renderSetup();
@@ -302,7 +388,7 @@ $('b-back').onclick = () => { leaveRoom(); show('home'); };
 $('b-start').onclick = () => {
   audio.unlock();
   const roster = room ? room.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : [{ id: 'p0', name: P.name, color: P.color }];
-  const nb = sel.botsOn ? Math.min(sel.bots, 6 - roster.length) : 0;
+  const nb = (sel.mode === 'workout' ? sel.wgame : sel.botsOn) ? Math.min(sel.bots, 6 - roster.length) : 0;
   const used = new Set(roster.map((p) => p.color));
   const free = COLORS.filter((c) => !used.has(c));
   const off = Math.floor(Math.random() * BOT_NAMES.length);
@@ -312,6 +398,7 @@ $('b-start').onclick = () => {
   }));
   const cfg = { track: sel.track, laps: sel.laps, diff: sel.diff, fair: sel.fair, rubber: !!sel.rubber, seed: (Math.random() * 1e9) | 0, roster, bots };
   if (sel.mode === 'training') Object.assign(cfg, { plan: sel.plan.map((s) => ({ track: s.track, laps: s.laps })), warm: sel.warm, cool: sel.cool });
+  if (sel.mode === 'workout' && !room) Object.assign(cfg, { workout: allWorkouts().find((w) => w.id === sel.wk) || BUILTIN[0], erg: sel.erg, wgame: sel.wgame, laps: 999, rubber: sel.wgame && !!sel.rubber });
   room?.start(cfg);
   startRace(cfg);
 };
@@ -433,7 +520,7 @@ function emit(type, data) {
     case 'sfx': audio.sfx(data); break;
     case 'shake': renderer.shake = Math.max(renderer.shake, data); break;
     case 'flash': renderer.flash = { color: data, a: 1 }; break;
-    case 'stage': nextStage(); break;
+    case 'stage': if (wk) finishWorkout(); else nextStage(); break;
     case 'finish': {
       audio.sfx('finish'); renderer.party();
       const r = race;
@@ -457,14 +544,73 @@ function getPower(dt) {
     const stale = performance.now() - trainer.lastData > 3000;
     return { power: stale ? 0 : trainer.power, cadence: stale ? 0 : trainer.cadence, hr: hrm.value };
   }
+  if (wk && race?.state === 'race') { // demo-workout: het vermogen volgt vanzelf het doel
+    const tg = wkTarget() ?? P.ftp * 0.6, s = performance.now() / 1000;
+    wk.demo = (wk.demo ?? tg) + (tg * (1 + 0.025 * Math.sin(s * 1.3) + 0.015 * Math.sin(s * 0.37)) - (wk.demo ?? tg)) * Math.min(1, dt * 1.5);
+    return { power: wk.demo, cadence: 88 + 4 * Math.sin(s / 3), hr: hrm.value };
+  }
   const p = input.demoPower(dt, P.ftp);
   return { power: p, cadence: p > 20 ? 60 + (p / P.ftp) * 28 : 0, hr: hrm.value };
+}
+// ---------- workout tijdens de rit ----------
+const wkTime = () => (race ? Math.max(0, race.time - race.t0 + race.wkOffset) : 0);
+function wkTarget() { if (!wk || !race) return null; const p = wkAt(wk.w, wkTime()); return p.done ? null : targetW(wk.w, p.b, p.tIn, P.ftp, wk.bias); }
+// Elke frame: piepjes bij de blokwissel, gemiddeld vermogen en een logregel per seconde.
+function wkTick(dt) {
+  if (!wk || race.state !== 'race' || paused) return;
+  const t = wkTime(), p = wkAt(wk.w, t), me = race.me;
+  wk.p3 += (me.power - wk.p3) * Math.min(1, dt / 1.5); // ~3 s gemiddeld
+  if (p.i !== wk.bi) { if (wk.bi >= 0) { audio.sfx('zone'); wk.flash = 1; } wk.bi = p.i; wk.beep = 4; }
+  const l = Math.ceil(p.left);
+  if (l <= 3 && l >= 1 && l < wk.beep && p.i < wk.w.blocks.length - 1) { wk.beep = l; audio.sfx('count'); }
+  const sec = Math.floor(t);
+  if (sec > wk.sec) { wk.sec = sec; wk.log.push({ t: sec, p: Math.round(me.power), tgt: targetW(wk.w, p.b, p.tIn, P.ftp, wk.bias), hr: me.hr || 0, cad: Math.round(me.cadence), bi: p.i }); }
+}
+function wkBias(d) {
+  wk.bias = clamp(Math.round((wk.bias + d) * 100) / 100, -0.3, 0.3);
+  audio.sfx('tick'); toast(wk.bias ? `Doel ${wk.bias > 0 ? '+' : ''}${Math.round(wk.bias * 100)}%` : 'Doel weer zoals gepland');
+}
+function wkSkip() {
+  if (!wk || !race || race.state !== 'race') return;
+  const p = wkAt(wk.w, wkTime());
+  if (p.done) return;
+  race.wkOffset += p.left + 0.01;
+  toast(`${blockName(p.b)} overgeslagen`);
+}
+function wkHud() {
+  const r = race, me = r.me, w = wk.w, t = Math.min(w.total, wkTime()), p = wkAt(w, t), b = p.b;
+  const tg = p.done ? null : targetW(w, b, p.tIn, P.ftp, wk.bias), f = blockFrac(w, b, P.ftp);
+  const bias = wk.bias ? ` (${wk.bias > 0 ? '+' : ''}${Math.round(wk.bias * 100)}%)` : '';
+  setText($('wk-blk'), `${blockName(b).toUpperCase()}${f != null ? ` · ${w.unit === 'w' ? Math.round((b.a + b.b) / 2) + ' W' : Math.round(f * 100) + '% FTP'}` : ''}${bias}${wk.erg && tg != null && trainer.connected ? '' : tg != null && trainer.connected ? ' · ERG uit' : ''}`);
+  const cue = cueAt(w, t);
+  setText($('wk-cue'), cue ? cue.text : b.a == null ? 'Vrij rijden: trap wat je wilt' : b.cad ? `Cadans rond de ${b.cad}` : '');
+  setText($('wk-cd'), clock(p.left));
+  $('wk-bar').style.width = `${(p.tIn / b.dur) * 100}%`;
+  const pw = Math.round(wk.p3), now = $('wk-now');
+  setHTML(now, `${pw}<small>W</small>`);
+  const dev = tg ? pw / tg - 1 : 0;
+  now.className = tg == null ? 'free' : Math.abs(dev) <= 0.05 ? '' : dev < 0 ? 'low' : 'high';
+  setHTML($('wk-tgt'), tg == null ? '–' : `${tg}<small>W</small>`);
+  setText($('wk-tgt-l'), `DOEL${bias}`);
+  $('wk-c').classList.toggle('free', tg == null);
+  $('wk-gauge').style.left = `${clamp(50 + (dev / 0.4) * 100, 0, 100)}%`;
+  const cad = Math.round(me.cadence);
+  setHTML($('wk-cad'), b.cad && Math.abs(cad - b.cad) > 8 ? `<span class="warn">${cad}</span>` : String(cad));
+  setText($('wk-hr'), me.hr ? me.hr : '–');
+  setText($('wk-tot1'), `WORKOUT · ${clock(t)} / ${clock(w.total)}`);
+  setText($('wk-tot2'), `nog ${clock(w.total - t)}`);
+  setHTML($('wk-next'), p.next.map((n, i) => { const nt = targetW(w, n, 0, P.ftp, wk.bias), nt2 = targetW(w, n, n.dur, P.ftp, wk.bias);
+    return `<div><i style="background:${zoneColor(blockFrac(w, n, P.ftp))}"></i>${i ? 'dan' : 'straks'} ${esc(blockName(n).toLowerCase())} · ${clock(n.dur)}${nt == null ? '' : ` · ${nt === nt2 ? nt : nt + '→' + nt2} W`}</div>`; }).join(''));
+  if (performance.now() - (wk.chartAt || 0) > 500) { wk.chartAt = performance.now(); drawWorkout($('wk-chart'), w, { pad: 14, top: 18, bottom: 6, now: t, log: wk.log, ftpLine: true, line: 3 }); }
 }
 const getSteer = (dt) => clamp(input.steer(dt) + sterzo.steer, -1, 1);
 
 let profDots = {};
 function startRace(cfg) {
   rideShot = null; lobbyReady = false; rerenderResults = null;
+  wk = cfg.workout ? { w: cfg.workout, bias: 0, erg: !!cfg.erg, log: [], sec: -1, bi: -1, p3: 0, beep: 4 } : null;
+  $('hud').classList.toggle('workout', !!wk); $('hud').classList.toggle('wkgame', !!wk && !!cfg.wgame);
+  $('wk').classList.toggle('hidden', !wk);
   lastCfg = cfg;
   hideOverlay();
   training = null;
@@ -502,6 +648,7 @@ function launch(cfg, carry) {
   const n = ns();
   const ghost = !training && P.ghostRace ? getGhost(n, `${track.id}|ghost|${cfg.laps}`) : null;
   let extra = {};
+  if (cfg.workout) extra = { mode: 'workout', timed: cfg.workout.total, wgame: !!cfg.wgame };
   if (training) {
     const all = training.stages, i = training.idx;
     const next = all.slice(i + 1).find((s) => s.kind === 'stage');
@@ -541,6 +688,7 @@ function nextStage() {
 
 function endRace() {
   boxClear();
+  wk = null; $('wk').classList.add('hidden'); $('hud').classList.remove('workout', 'wkgame');
   rerenderResults = null; lobbyReady = false;
   if (race) race.savePower();
   training = null;
@@ -580,7 +728,7 @@ function rideImage(r) {
   const st = r.stats, me = r.me, secs = st.secs.length;
   const avgP = secs ? st.secs.reduce((a, w) => a + w, 0) / secs : 0;
   const when = new Date(r.startedAt || Date.now()).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
-  const where = r.training ? `Training · ${training ? training.count : ''} etappes` : r.track.name;
+  const where = r.wkName ? `Workout · ${r.wkName}` : r.training ? `Training · ${training ? training.count : ''} etappes` : r.track.name;
   const stats = [[`${(st.km || 0).toFixed(1)} km`, 'afstand'], [fmtTime(secs, 0), 'tijd'], [`${Math.round(avgP)} W`, 'gemiddeld'], [`${Math.round(st.hm || 0)} m`, 'hoogtemeters']];
   if (me.finished && r.riders.length > 1) stats.push([`${me.rank}/${r.riders.length}`, 'plaats']);
   return compose(rideShot || grab($('game')), `${where} · ${when}`, stats); // te vroeg gestopt: het beeld van nu
@@ -595,7 +743,7 @@ function wireSave(r) {
   const b = $('ov-save');
   if (!b) return;
   b.onclick = () => {
-    const tcx = buildTcx({ startedAt: r.startedAt, log: r.stats.log, name: `Watt Blitz – ${r.track.name}` });
+    const tcx = buildTcx({ startedAt: r.startedAt, log: r.stats.log, name: `Watt Blitz – ${r.wkName || r.track.name}` });
     if (!tcx) return;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([tcx], { type: 'application/vnd.garmin.tcx+xml' }));
@@ -614,13 +762,64 @@ function togglePause() {
   overlay(`<h2>${room ? 'Race verlaten?' : 'Pauze'}</h2><div class="menu">
     <button class="big" id="ov-resume">Verder rijden</button>
     ${room ? '' : '<button class="ghost" id="ov-restart">Opnieuw</button>'}
-    ${race.timed && (race.mode === 'cool' || !room) ? `<button class="ghost" id="ov-skip">${race.mode === 'warm' ? 'Warming-up' : 'Cooling-down'} overslaan</button>` : ''}
+    ${race.timed && (race.mode === 'cool' || race.mode === 'warm') && (race.mode === 'cool' || !room) ? `<button class="ghost" id="ov-skip">${race.mode === 'warm' ? 'Warming-up' : 'Cooling-down'} overslaan</button>` : ''}
+    ${wk ? `<button class="ghost" id="ov-wkskip">⏭ Blok overslaan</button><button class="ghost" id="ov-erg">ERG ${wk.erg ? 'uitzetten' : 'aanzetten'}</button><button class="ghost" id="ov-easy">−5%</button><button class="ghost" id="ov-hard">+5%</button>` : ''}
     <button class="ghost" id="ov-quit">Stoppen</button></div><div class="menu">${canSave(race) ? SAVE_BTN : ''}${race.stats.secs.length > 5 ? SHOT_BTN : ''}</div>`);
   wireSave(race);
   $('ov-resume').onclick = () => { paused = false; hideOverlay(); };
   if (!room) $('ov-restart').onclick = () => startRace({ ...lastCfg, seed: (Math.random() * 1e9) | 0 });
   $('ov-quit').onclick = quitToMenu;
   if ($('ov-skip')) $('ov-skip').onclick = () => { const r = race; paused = false; hideOverlay(); r.timed = 0.001; };
+  if (wk) {
+    $('ov-wkskip').onclick = () => { paused = false; hideOverlay(); wkSkip(); };
+    $('ov-erg').onclick = () => { wk.erg = !wk.erg; paused = false; hideOverlay(); toast(wk.erg ? 'ERG aan: de trainer houdt het doel vast' : 'ERG uit: je voelt weer de helling'); };
+    $('ov-easy').onclick = () => wkBias(-0.05);
+    $('ov-hard').onclick = () => wkBias(0.05);
+    if (race.time - race.t0 > 60) $('ov-quit').onclick = () => finishWorkout(true); // gestopt: toch even nabespreken
+  }
+}
+
+// ---------- workout klaar: nabespreking ----------
+function finishWorkout(partial = false) {
+  if (!race || !wk || race.state === 'done') return;
+  const r = race, w = wk.w, log = wk.log;
+  r.state = 'done'; r.ended = true; r.wkName = w.name; paused = false;
+  hideOverlay();
+  audio.sfx('finish'); if (!partial) renderer.party();
+  const st = store.stats;
+  st.km += Math.max(0, r.stats.km || 0); st.xp += Math.round((log.length / 60) * 3);
+  r.savePower(); save();
+  const ftp = P.ftp, m = metrics(log.map((e) => e.p), ftp);
+  const hrs = log.filter((e) => e.hr > 0).map((e) => e.hr);
+  const work = (b) => !['warm', 'cool', 'free'].includes(b.kind) && b.label !== 'Herstel' && b.dur >= 30;
+  const rows = [];
+  let inAll = 0, nAll = 0;
+  w.blocks.forEach((b, i) => {
+    const es = log.filter((e) => e.bi === i);
+    if (!es.length) return;
+    const tg = es.filter((e) => e.tgt), avg = es.reduce((a, e) => a + e.p, 0) / es.length;
+    const inZ = tg.length ? tg.filter((e) => Math.abs(e.p / e.tgt - 1) <= 0.05).length / tg.length : null;
+    if (work(b) && inZ != null) { inAll += inZ * tg.length; nAll += tg.length; }
+    const medal = !work(b) || inZ == null ? '' : inZ >= 0.9 ? '🥇' : inZ >= 0.75 ? '🥈' : inZ >= 0.5 ? '🥉' : '';
+    const tAvg = tg.length ? Math.round(tg.reduce((a, e) => a + e.tgt, 0) / tg.length) : null;
+    rows.push(`<tr><td><i class="wk-sw" style="background:${zoneColor(blockFrac(w, b, ftp))}"></i>${esc(blockName(b))}</td><td>${clock(es.length)}</td><td>${tAvg ?? '–'}${tAvg ? ' W' : ''}</td><td><b>${Math.round(avg)} W</b></td><td>${inZ == null ? '–' : Math.round(inZ * 100) + '%'}</td><td class="wk-medal">${medal}</td></tr>`);
+  });
+  const zone = nAll ? Math.round((inAll / nAll) * 100) : null;
+  overlay(`<h2>${partial ? '⏹ Workout gestopt' : '✅ Workout klaar!'}</h2><p class="rv-sub">${esc(w.name)} · ${clock(log.length)}${partial ? ` van ${clock(w.total)}` : ''}${zone != null ? ` · ${zone}% in de zone` : ''}</p>
+    <canvas id="wk-sum-chart" width="1200" height="220" style="width:100%;height:auto;border-radius:12px;background:#0d0626"></canvas>
+    <div class="statgrid">
+      <div><b>${Math.round(m.avg)} W</b>gemiddeld</div><div><b>${Math.round(m.np)} W</b>NP</div><div><b>${m.if.toFixed(2)}</b>IF</div><div><b>${Math.round(m.tss)}</b>TSS</div>
+      <div><b>${Math.round(log.reduce((a, e) => a + e.p, 0) / 1000)} kJ</b>arbeid</div>${hrs.length ? `<div><b>${Math.round(hrs.reduce((a, h) => a + h, 0) / hrs.length)}</b>❤ gemiddeld</div><div><b>${Math.max(...hrs)}</b>❤ max</div>` : ''}<div><b>${(r.stats.km || 0).toFixed(1)}</b>km</div>
+    </div>
+    <p><b>Per blok</b></p><table class="wk-sum"><tr><th>Blok</th><th>Tijd</th><th>Doel</th><th>Gereden</th><th>In zone</th><th></th></tr>${rows.join('')}</table>
+    <p class="small">In de zone = binnen 5% van je doel. 🥇 90% of meer · 🥈 75% · 🥉 50%. NP, IF en TSS zeggen hoe zwaar de workout was (een uur op je FTP = 100 TSS).</p>
+    ${r.ns === 'demo' ? '<p class="small">Demo-modus: het vermogen volgde vanzelf het doel.</p>' : ''}
+    <div class="menu">${canSave(r) ? (r.saved ? '<p class="small">Rit opgeslagen.</p>' : SAVE_BTN) : ''}${SHOT_BTN}</div>
+    <div class="menu"><button class="big" id="ov-again">Nog een keer</button><button class="ghost" id="ov-quit">Menu</button></div>`);
+  drawWorkout($('wk-sum-chart'), w, { pad: 16, top: 14, bottom: 8, log, ftpLine: true, line: 3, avg: 10 });
+  $('ov-again').onclick = () => startRace({ ...lastCfg, seed: (Math.random() * 1e9) | 0 });
+  $('ov-quit').onclick = quitToMenu;
+  wireSave(r);
 }
 
 // Uitslag in stappen: eerst de voorlopige uitslag (zonder jury), dan de jurybeslissing per renner,
@@ -729,6 +928,7 @@ let hudSlow = 0, rouletteTick = 0;
 const itemKeys = Object.keys(ITEMS);
 function hud(dt) {
   const r = race, me = r.me;
+  if (wk) wkHud();
   $('h-watt').firstChild.nodeValue = Math.round(me.power);
   setText($('h-spd'), (me.v * 3.6 * (me.prog ?? 1)).toFixed(0)); // echte voortgang: berm, lijn, truien, lek en bidon tellen mee
   setText($('h-time'), fmtTime(r.time));
@@ -846,7 +1046,9 @@ function frame(now) {
   if (input.take('item')) race.useItem();
   if (input.take('bell')) race.bell();
   const gu = input.take('gearUp'), gd = input.take('gearDown');
-  if (P.vshift && (gu || gd) && shift(gu ? 1 : -1)) {
+  if (input.take('skip')) wkSkip();
+  if (wk && (gu || gd)) wkBias(gu ? 0.05 : -0.05); // workout: schakelknoppen maken het 5% zwaarder of lichter
+  else if (P.vshift && (gu || gd) && shift(gu ? 1 : -1)) {
     audio.sfx('tick');
     const el = $('h-gear'); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
   }
@@ -855,7 +1057,10 @@ function frame(now) {
     while (dt > 0.0001 && race) { const step = Math.min(dt, 0.04); race.update(step); dt -= step; }
     if (!race) return;
     audio.setIntensity(race.me.power / (P.ftp * 1.5));
-    trainer.setGrade((race.state === 'race' ? race.trainerGrade : 0) + (P.vshift ? gearOffset() : 0));
+    const ergW = wk?.erg && race.state === 'race' ? wkTarget() : null;
+    if (ergW != null) trainer.setTargetPower(ergW); // ERG: de trainer houdt het doel vast
+    else trainer.setGrade((race.state === 'race' ? race.trainerGrade : 0) + (P.vshift && !wk ? gearOffset() : 0));
+    wkTick(frameDt);
   }
   if (!paused && race.me.onCobble) { // schudden en geratel op de kasseien
     renderer.shake = Math.max(renderer.shake, 2.2);

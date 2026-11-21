@@ -196,7 +196,7 @@ export class Trainer extends Device {
         await this._write(new Uint8Array([0x00])); // request control
         await this._write(new Uint8Array([0x07])); // start
         this.canControl = true;
-        this._lastGrade = null;
+        this._lastGrade = null; this._lastTarget = null; // na (opnieuw) verbinden alles opnieuw sturen
       } catch (e) { this._cp = null; }
     } catch (e) { /* geen FTMS: val terug op Cycling Power */ }
     try {
@@ -228,8 +228,28 @@ export class Trainer extends Device {
     if (g === this._lastGrade || now - this._lastGradeAt < 250) return; // vaak genoeg om schakelen direct te voelen
     this._lastGrade = g;
     this._lastGradeAt = now;
+    this._lastTarget = null; // terug in hellingsmodus: een volgend ERG-doel moet opnieuw verstuurd worden
     this._write(simParamsCommand(g));
   }
+  // ERG: de trainer houdt zelf dit vermogen vast (FTMS 'Set Target Power').
+  // Bij verandering meteen (een nieuw blok), anders hooguit eens per 2 s (hellingen in een blok).
+  setTargetPower(watts) {
+    if (!this._cp || !this.connected) return;
+    const w = Math.max(0, Math.min(2000, Math.round(watts)));
+    const now = performance.now();
+    if (w === this._lastTarget) return;
+    if (this._lastTarget != null && Math.abs(w - this._lastTarget) < 10 && now - this._lastTargetAt < 2000) return;
+    this._lastTarget = w;
+    this._lastTargetAt = now;
+    this._lastGrade = null; // terug naar hellingsmodus stuurt dan meteen weer de helling
+    this._write(targetPowerCommand(w));
+  }
+}
+export function targetPowerCommand(watts) {
+  const b = new DataView(new ArrayBuffer(3));
+  b.setUint8(0, 0x05);
+  b.setInt16(1, Math.round(watts), true);
+  return new Uint8Array(b.buffer);
 }
 
 export class HeartRate extends Device {

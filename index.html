@@ -61,6 +61,17 @@
     <div class="menu" id="mode-row">
       <button id="m-race" class="ghost">🏁 Race</button>
       <button id="m-training" class="ghost">🏋️ Training</button>
+      <button id="m-workout" class="ghost">📈 Workout</button>
+    </div>
+    <div id="wk-box" class="card hidden">
+      <h2>Workout kiezen</h2>
+      <div id="wk-list" class="wk-list"></div>
+      <div class="row"><button id="wk-import" class="ghost">📂 Workout importeren</button><span class="small">.zwo (Zwift), .erg of .mrc – of sleep het bestand hierheen</span>
+        <input id="wk-file" type="file" accept=".zwo,.erg,.mrc,.xml,.txt" multiple hidden></div>
+      <p class="small" id="wk-msg"></p>
+      <label class="check"><input id="o-erg" type="checkbox"> ERG: de trainer houdt zelf het doelvermogen vast</label>
+      <label class="check"><input id="o-wgame" type="checkbox"> Spelmodus: bots en power-ups erbij</label>
+      <p class="small">Kies hieronder een baan als decor. De baan loopt rondjes tot je workout klaar is.</p>
     </div>
     <div id="tracks" class="tracks"></div>
     <div id="plan-box" class="card hidden">
@@ -142,6 +153,7 @@
       <p><b>Ideale lijn:</b> de binnenbocht is korter, de buitenbocht langer. Snijd bochten aan de binnenkant aan en je wint meters zonder harder te trappen – maar een bocht duwt je naar buiten, dus je moet ervoor sturen.</p>
       <p><b>Kerbstones:</b> de blokjes langs de weg zijn de rand. Daarbuiten rijd je in de berm en rem je af; je trainer geeft dan een korte klap en blijft zwaarder zolang je erin rijdt. Elke baan heeft ook één geheime short cut – let goed op de kerbstones.</p>
       <p><b>Training:</b> kies bij de start <i>Training</i> en stel je eigen parcours samen uit etappes (baan + aantal rondes), met 7 minuten warming-up en cooling-down. Aan het eind van een etappe rijd je door een teleportboog naar de volgende baan. Je hele rit komt als één bestand in je Strava-export.</p>
+      <p><b>Workout:</b> kies bij de start <i>Workout</i> en een workout uit de lijst, of importeer je eigen (.zwo van Zwift, .erg of .mrc). Met ERG aan houdt je trainer zelf het doelvermogen vast. In het midden zie je hoe lang het blok nog duurt, wat je trapt en wat je moet trappen (groen = binnen 5%), met cadans en hartslag. Voor elke blokwissel hoor je 3-2-1. Met de schakelknoppen (E/Q of je Zwift-knoppen) maak je het doel 5% zwaarder of lichter, met N sla je een blok over. In het pauzemenu zet je ERG uit of aan. Wil je het spel erbij, vink dan <i>Spelmodus</i> aan voor bots en power-ups. Na afloop zie je per blok hoe goed je in de zone bleef, plus NP, IF en TSS.</p>
       <p><b>Botsing:</b> rijd je achterop iemand, dan verlies je snelheid en moet je even herstellen. Stuur er dus omheen – of deel van opzij een kwak uit.</p>
       <p><b>Bolletjestrui:</b> wie in de race de snelste tijd op een klim zet, krijgt de bolletjestrui en is 30 seconden lang 5% sneller. Klimt iemand anders sneller, dan pakt die de trui over.</p>
       <p><b>Gouden Kassei:</b> wie in de race de snelste tijd over een kasseienstrook zet, pakt de Gouden Kassei en krijgt 30 seconden lang een antilekband: je rijdt niet lek (een lek van dat moment is meteen weg) en de berm hindert maar half zo veel. Is iemand anders sneller over de stenen, dan gaat de kassei naar die renner.</p>
@@ -182,6 +194,18 @@
     <button id="h-item"><span id="h-item-i"></span><small id="h-item-n">spatie</small></button>
   </div>
   <div class="h-bc"><canvas id="h-prof" width="600" height="46"></canvas><div id="h-dots"></div></div>
+  <!-- workout (indeling A): klok en wattages in het midden, blok linksboven, totaal rechtsboven, grafiek onderin -->
+  <div id="wk" class="hidden">
+    <div id="wk-l"><div id="wk-blk"></div><div id="wk-cue"></div></div>
+    <div id="wk-c">
+      <div id="wk-cd">0:00</div><div class="wk-bar"><i id="wk-bar"></i></div>
+      <div class="wk-pw"><div><div class="wk-tl">NU</div><div id="wk-now">0<small>W</small></div></div><div><div class="wk-tl" id="wk-tgt-l">DOEL</div><div id="wk-tgt">–</div></div></div>
+      <div class="wk-gauge"><i id="wk-gauge"></i></div>
+      <div id="wk-meta"><span id="wk-cad">0</span><small>rpm</small><span id="wk-hr-w"><b>❤</b> <span id="wk-hr">–</span><small>bpm</small></span></div>
+    </div>
+    <div id="wk-r"><div id="wk-tot1"></div><div id="wk-tot2"></div><div id="wk-next"></div></div>
+    <canvas id="wk-chart" width="1640" height="180"></canvas>
+  </div>
   <div id="h-banner"></div>
   <div id="h-count"></div>
   <button id="t-left" class="touch">◀</button>

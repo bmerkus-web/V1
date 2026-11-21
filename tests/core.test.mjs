@@ -822,3 +822,50 @@ test('Uitslag: straffen met reden, segmentwinnaars en eindtruien', async () => {
   race.onNet({ t: 'left', id: 'p0' });
   assert.ok(race.results().some((x) => x.id === 'p0'));
 });
+
+test('Workouts: .zwo, .erg en .mrc inlezen, tijdlijn en TSS', async () => {
+  const W = await import('../js/workout.js');
+  const zwo = `<workout_file><author>X</author><name>Test &amp; zo</name><description>Kort</description><sportType>bike</sportType><workout>
+    <Warmup Duration="300" PowerLow="0.40" PowerHigh="0.70"/>
+    <SteadyState Duration="600" Power="0.90" Cadence="90"><textevent timeoffset="10" message="Hou vol"/></SteadyState>
+    <IntervalsT Repeat="3" OnDuration="60" OffDuration="30" OnPower="1.2" OffPower="0.5"/>
+    <FreeRide Duration="120" FlatRoad="1"/>
+    <Cooldown Duration="300" PowerLow="0.30" PowerHigh="0.60"/>
+  </workout></workout_file>`;
+  const w = W.parseWorkout(zwo, 'test.zwo');
+  assert.equal(w.name, 'Test & zo');
+  assert.equal(w.blocks.length, 1 + 1 + 6 + 1 + 1);
+  assert.equal(w.total, 300 + 600 + 270 + 120 + 300);
+  assert.deepEqual([w.blocks.at(-1).a, w.blocks.at(-1).b], [0.6, 0.3], 'cooling-down loopt af');
+  assert.equal(w.cues[0].t, 310); assert.equal(w.cues[0].text, 'Hou vol');
+  assert.equal(W.blockName(w.blocks[2]), 'VO2max 1/3');
+  assert.equal(w.blocks[1].cad, 90);
+  // tijdlijn
+  const p = W.at(w, 300 + 600 + 70);
+  assert.equal(p.b.kind, 'off'); assert.equal(p.left, 20);
+  assert.equal(W.targetW(w, w.blocks[0], 150, 200), Math.round(0.55 * 200));
+  assert.equal(W.targetW(w, w.blocks[1], 0, 200, 0.05), Math.round(180 * 1.05));
+  assert.equal(W.targetW(w, w.blocks[8], 10, 200), null, 'vrij rijden');
+  assert.ok(W.at(w, 99999).done);
+  // .erg in watt en .mrc in procent
+  const erg = `[COURSE HEADER]\nVERSION = 2\nUNITS = ENGLISH\nDESCRIPTION = Mijn ERG\nMINUTES WATTS\n[END COURSE HEADER]\n[COURSE DATA]\n0.00\t100\n5.00\t150\n5.00\t250\n10.00\t250\n[END COURSE DATA]\n[COURSE TEXT]\n300\tGas erop\t5\n[END COURSE TEXT]`;
+  const e = W.parseWorkout(erg, 'x.erg');
+  assert.equal(e.unit, 'w'); assert.equal(e.name, 'Mijn ERG'); assert.equal(e.total, 600);
+  assert.equal(W.targetW(e, e.blocks[1], 0, 300), 250, 'watt blijft watt');
+  assert.equal(e.cues[0].text, 'Gas erop');
+  const mrc = `[COURSE HEADER]\nMINUTES PERCENT\n[END COURSE HEADER]\n[COURSE DATA]\n0 50\n10 50\n10 100\n20 100\n[END COURSE DATA]`;
+  const m = W.parseWorkout(mrc, 'y.mrc');
+  assert.equal(m.unit, 'ftp'); assert.equal(W.targetW(m, m.blocks[1], 0, 240), 240);
+  assert.throws(() => W.parseWorkout('hallo', 'z.txt'), /Onbekend/);
+  assert.throws(() => W.parseWorkout('', 'z.fit'), /fit/);
+  // NP/IF/TSS: een uur op FTP = 100 TSS
+  const r = W.metrics(new Array(3600).fill(250), 250);
+  assert.ok(Math.abs(r.tss - 100) < 0.01 && Math.abs(r.if - 1) < 1e-9);
+  for (const b of W.BUILTIN) assert.ok(b.total > 0 && b.blocks.every((x) => x.label));
+});
+
+test('ERG: FTMS Set Target Power-opdracht', async () => {
+  const { targetPowerCommand } = await import('../js/ble.js');
+  assert.deepEqual([...targetPowerCommand(250)], [0x05, 250, 0]);
+  assert.deepEqual([...targetPowerCommand(300)], [0x05, 0x2c, 0x01]);
+});
