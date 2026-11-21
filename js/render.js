@@ -255,13 +255,15 @@ export class Renderer {
     const c = this.c, g1 = w1 * GUTTER / seg.wA, g2 = w2 * GUTTER / seg.wB;
     c.fillStyle = smooth; // gootjes
     for (const sd of [-1, 1]) this._quad(a.X + sd * (w1 - g1 / 2), a.Y, g1 / 2, b.X + sd * (w2 - g2 / 2), b.Y, g2 / 2);
-    if (n > 40) return; // ver weg: alleen de grondkleur (de voegen)
+    if (n > 24) return; // ver weg: alleen de grondkleur (de voegen); zo blijft het licht
     // Kleine, ongeveer vierkante keitjes (~32 cm) in halfsteensverband. Elke steen is een trapezium
     // langs de perspectieflijnen, zodat de voegen naar de horizon lopen; elke hoek wijkt een beetje
     // af (alleen naar binnen, dus de stenen overlappen nooit) voor de hobbelige look.
     const S = 0.32, uMid = (a.u + b.u) / 2, pxH = a.Y - b.Y;
-    const rows = Math.max(1, Math.min(16, Math.round(pxH / Math.max(2.5, S * uMid))));
-    const inner = (seg.wA + seg.wB) / 2 - GUTTER, across = Math.max(4, Math.round((inner * ROAD_W * 2) / S));
+    const rows = Math.max(1, Math.min(14, Math.round(pxH / Math.max(4, S * uMid)))); // rijen minstens 4 px hoog
+    const inner = (seg.wA + seg.wB) / 2 - GUTTER;
+    // stenen minstens ~6 px breed: in de verte dus minder (en grotere) stenen per rij
+    const across = Math.max(4, Math.min(Math.round((inner * ROAD_W * 2) / S), Math.floor((inner * ROAD_W * 2 * b.u) / 6)));
     const shades = ['#8b8496', '#7e778a', '#98919f'];
     const stones = [[], [], []];
     const halfAt = (t) => seg.wA + (seg.wB - seg.wA) * t - GUTTER; // in wegbreedtes
@@ -269,7 +271,7 @@ export class Renderer {
       const t1 = r / rows, t2 = (r + 1) / rows;
       const p1 = this._pt(seg, t1, 0), p2 = this._pt(seg, t2, 0); // p1 dichtbij (onder), p2 verder (boven)
       const rowH = p1.Y - p2.Y;
-      if (rowH < 2) continue;
+      if (rowH < 3 || p2.Y > this.H) continue; // te klein, of helemaal onder in beeld (niet zichtbaar)
       const k1 = p1.u * ROAD_W, k2 = p2.u * ROAD_W, h1 = halfAt(t1), h2 = halfAt(t2);
       const sw1 = (2 * h1) / across, sw2 = (2 * h2) / across;
       const gx = Math.max(0.12, 0.7 / (sw2 * k2)); // voeg als deel van een steen, minstens ~0,7 px
