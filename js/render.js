@@ -23,8 +23,12 @@ export class Renderer {
   resize() {
     const r = this.cv.getBoundingClientRect();
     const scale = Math.min(window.devicePixelRatio || 1, 1280 / Math.max(1, r.width));
-    this.W = this.cv.width = Math.max(320, Math.round(r.width * scale));
-    this.H = this.cv.height = Math.max(200, Math.round(r.height * scale));
+    const W = Math.max(320, Math.round(r.width * scale)), H = Math.max(200, Math.round(r.height * scale));
+    // Alleen opnieuw opbouwen als het formaat echt verandert: Android (vooral in fullscreen) meldt vaak
+    // een 'resize' zonder verschil, en elke keer nieuwe achtergrondcanvassen maken liep vol en haperde.
+    if (W === this.W && H === this.H) return;
+    this.W = this.cv.width = W;
+    this.H = this.cv.height = H;
     this.bg = null;
   }
 
