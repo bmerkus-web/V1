@@ -149,7 +149,7 @@ export class Renderer {
           this._quad(k1.X + sd * k1.u * ROAD_W * c1, k1.Y, k1.u * ROAD_W * kh, k2.X + sd * k2.u * ROAD_W * c2, k2.Y, k2.u * ROAD_W * kh);
         }
       }
-      c.fillStyle = seg.i < 2 ? (alt ? '#f5f5ff' : '#15152a') : seg.cobble ? (alt ? '#6a6374' : '#5f5869') : th.road[alt];
+      c.fillStyle = seg.i < 2 ? (alt ? '#f5f5ff' : '#15152a') : seg.cobble ? '#4e4858' : th.road[alt];
       this._quad(a.X, a.Y, w1, b.X, b.Y, w2);
       if (seg.cobble) this._cobbles(seg, a, b, w1, w2, n, th.road[alt]);
       else if (alt && n < 90) {
@@ -255,18 +255,31 @@ export class Renderer {
     const c = this.c, g1 = w1 * GUTTER / seg.wA, g2 = w2 * GUTTER / seg.wB;
     c.fillStyle = smooth; // gootjes
     for (const sd of [-1, 1]) this._quad(a.X + sd * (w1 - g1 / 2), a.Y, g1 / 2, b.X + sd * (w2 - g2 / 2), b.Y, g2 / 2);
-    if (n > 55) return;
-    c.fillStyle = '#857e90';
-    for (let row = 0; row < 3; row++) {
-      const t1 = row / 3 + 0.04, t2 = row / 3 + 0.29;
+    if (n > 40) return; // ver weg: alleen de grondkleur (de voegen)
+    // Kleine, ongeveer vierkante keitjes (~32 cm) in halfsteensverband, met wat kleurverschil.
+    const S = 0.32, uMid = (a.u + b.u) / 2, pxH = a.Y - b.Y;
+    const rows = Math.max(1, Math.min(16, Math.round(pxH / Math.max(2.5, S * uMid))));
+    const inner = (seg.wA + seg.wB) / 2 - GUTTER, across = Math.max(4, Math.round((inner * ROAD_W * 2) / S));
+    const shades = ['#8b8496', '#7e778a', '#98919f'];
+    const rects = [[], [], []];
+    for (let r = 0; r < rows; r++) {
+      const t1 = r / rows, t2 = (r + 1) / rows;
       const p1 = this._pt(seg, t1, 0), p2 = this._pt(seg, t2, 0);
-      const ww1 = p1.u * ROAD_W * (seg.wA + (seg.wB - seg.wA) * t1), ww2 = p2.u * ROAD_W * (seg.wA + (seg.wB - seg.wA) * t2);
-      const in1 = ww1 * (1 - GUTTER / seg.wA), in2 = ww2 * (1 - GUTTER / seg.wB), cnt = 8, off = ((seg.i * 3 + row) % 2) * 0.5;
-      for (let k = 0; k < cnt; k++) {
-        const f = (k + off + 0.5) / cnt * 2 - 1;
-        if (Math.abs(f) > 0.95) continue;
-        this._quad(p1.X + f * in1, p1.Y, in1 / cnt * 0.78, p2.X + f * in2, p2.Y, in2 / cnt * 0.78);
+      const rowH = p1.Y - p2.Y;
+      if (rowH < 2) continue;
+      const pm = (p1.u + p2.u) / 2, half = pm * ROAD_W * (seg.wA + (seg.wB - seg.wA) * (t1 + t2) / 2 - GUTTER);
+      const cx = (p1.X + p2.X) / 2, sw = (half * 2) / across, gap = Math.max(0.6, sw * 0.12), off = ((seg.i * rows + r) % 2) * 0.5;
+      for (let k = -1; k < across; k++) {
+        let x0 = cx - half + (k + off) * sw, x1 = x0 + sw - gap;
+        if (x1 <= cx - half || x0 >= cx + half) continue;
+        x0 = Math.max(x0, cx - half); x1 = Math.min(x1, cx + half);
+        rects[(seg.i * 7 + r * 13 + k * 5 + 99) % 3].push(x0, p2.Y + gap * 0.5, x1 - x0, rowH - gap);
       }
+    }
+    for (let sh = 0; sh < 3; sh++) {
+      c.fillStyle = shades[sh];
+      const q = rects[sh];
+      for (let i = 0; i < q.length; i += 4) c.fillRect(q[i], q[i + 1], q[i + 2], q[i + 3]);
     }
   }
 
