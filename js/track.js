@@ -4,6 +4,8 @@ import { mulberry, hashStr, mod } from './util.js';
 export const SEG = 5; // meter per wegsegment
 export const ROAD_W = 4.5;
 export const CUT_X = 1.28, CUT_HW = 0.115;
+// Kasseien: de weg wordt smaller (60%), met langs beide randen een glad gootje.
+export const COBBLE_W = 0.6, GUTTER = 0.14, COBBLE_TAPER = 20;
 export const KERB = CUT_X - CUT_HW; // buitenrand van de kerbstones = binnenrand van het short-cut-pad // short cut: midden en halve breedte (in halve wegbreedtes) // halve wegbreedte in meter
 
 const T = (len, curve = 0, grade = 0, zone = null) => ({ len, curve, grade, zone });
@@ -29,6 +31,7 @@ export const TRACK_DEFS = [
       scenery: ['windmill', 'poplar', 'poplar', 'lamp', 'tulips', 'tulips', 'billboard'],
     },
     cut: [2950, 150],
+    cobbles: [{ name: 'De Hel van de Polder', start: 1680, len: 500, stars: 4 }],
     sections: [
       T(300), T(400, 2), T(300, 0, 0, sprint('Dijksprint')), T(350, -3), T(150, 0, 4), T(150, 0, -4),
       T(500, 2.5), T(300, -1.5, 0.5), T(400, 0, 0, sprint('Molenstraat')), T(450, -3.5, -0.5),
@@ -53,6 +56,7 @@ export const TRACK_DEFS = [
       scenery: ['rock', 'rock', 'deadtree', 'crystal', 'lavavent', 'billboard'],
     },
     cut: [2500, 140],
+    cobbles: [{ name: 'Basaltmuur', start: 1580, len: 300, stars: 5 }],
     sections: [
       T(400), T(300, 2, 1), T(350, -4, 6, climb('Lavamuur')), T(250, 5, 8, climb('Lavamuur')),
       T(300, -5, 7, climb('Lavamuur')), T(300, 4, 6, climb('Lavamuur')), T(200, 0, 2),
@@ -135,7 +139,7 @@ function build(def) {
   for (let k = 0; k < n; k++) {
     const g = grade[k] - corr;
     const y2 = y + (g / 100) * SEG;
-    segs.push({ i: k, curve: curve[k], grade: g, y1: y, y2, sprites: [], objs: [], zone: null, pad: null, arch: null, scr: {} });
+    segs.push({ i: k, curve: curve[k], grade: g, y1: y, y2, sprites: [], objs: [], zone: null, pad: null, arch: null, scr: {}, wA: 1, wB: 1, cobble: false });
     y = y2;
   }
   for (const z of zones) {
@@ -143,11 +147,22 @@ function build(def) {
     segs[z.start / SEG].arch = { text: z.name.toUpperCase(), color: z.type === 'sprint' ? '#39ffb0' : '#ff7b1c' };
     segs[z.end / SEG - 1].arch = { text: 'EINDE ' + (z.type === 'sprint' ? 'SPRINT' : 'KLIM'), color: '#f5f5ff' };
   }
+  // Kasseienstroken: smallere weg (met een overgang van COBBLE_TAPER m), eigen segment en bogen.
+  const cobbles = (def.cobbles || []).map((c) => ({ ...c, end: c.start + c.len }));
+  const inCobble = (d, margin = 0) => cobbles.some((c) => d > c.start - margin && d < c.end + margin);
+  for (const c of cobbles) {
+    const widthAt = (d) => { const k = Math.max(0, Math.min(1, (d - c.start) / COBBLE_TAPER, (c.end - d) / COBBLE_TAPER)); return 1 - (1 - COBBLE_W) * k * k * (3 - 2 * k); };
+    for (let k = c.start / SEG; k < c.end / SEG; k++) { const s = segs[k]; s.cobble = true; s.wA = widthAt(k * SEG); s.wB = widthAt((k + 1) * SEG); }
+    zones.push({ id: c.name.toLowerCase(), type: 'cobble', name: c.name, start: c.start, end: c.end, stars: c.stars });
+    segs[c.start / SEG].arch = { text: `KASSEIEN · ${c.name.toUpperCase()} ${'★'.repeat(c.stars)}`, color: '#d9d2e6' };
+    segs[c.end / SEG - 1].arch = { text: 'EINDE KASSEIEN', color: '#f5f5ff' };
+  }
   segs[0].arch = { text: 'START · FINISH', color: '#ff3fa4' };
 
   // Objecten: itemboxen, blitzjes (bliksemschichtjes) en turbostroken. Deterministisch per baan.
   const objects = [];
   const add = (type, d, x) => {
+    if (inCobble(d, 10)) return; // niets op de kasseien: daar draait het om het gootje
     const o = { id: objects.length, type, d, x };
     objects.push(o);
     segs[Math.floor(d / SEG) % n].objs.push(o);
@@ -162,6 +177,7 @@ function build(def) {
     for (let b = 0; b < 5; b++) add('bolt', d0 + b * 16, mid + side * (b % 2 ? -1 : 1) * amp + Math.sin(ph + b) * 0.06);
   }
   const padAt = (d, x) => {
+    if (inCobble(d, 25)) return;
     const s = Math.floor(d / SEG);
     for (let k = 0; k < 3; k++) segs[(s + k) % n].pad = { x, w: 0.15 };
     objects.push({ id: objects.length, type: 'pad', d, x, len: 3 * SEG, w: 0.15 });
@@ -198,7 +214,8 @@ function build(def) {
 
   const track = {
     id: def.id, name: def.name, desc: def.desc, theme: def.theme,
-    segs, n, length: total, zones, objects, cut,
+    segs, n, length: total, zones, objects, cut, cobbles,
+    wAt(d) { const m = mod(d, total), s = segs[Math.floor(m / SEG) % n]; return s.wA + (s.wB - s.wA) * ((m % SEG) / SEG); },
     segAt(d) { return segs[Math.floor(mod(d, total) / SEG) % n]; },
     yAt(d) {
       const m = mod(d, total);

@@ -101,7 +101,7 @@ const GREEN_DARK = '#15a34a', GREEN_LIGHT = '#7cf0a6';
 export function drawRider(c, X, Y, u, r, t, opts = {}) {
   const m = r.mask || 0;
   c.save();
-  c.translate(X, Y);
+  c.translate(X, Y - (m & 2048 ? Math.abs(Math.sin(t * 38 + X)) * 0.04 * u : 0)); // stuiteren op de kasseien
   c.fillStyle = 'rgba(0,0,0,.35)';
   c.beginPath(); c.ellipse(0, 0, 0.5 * u, 0.1 * u, 0, 0, 7); c.fill();
   if (opts.ghost || opts.fade) c.globalAlpha = 0.38;

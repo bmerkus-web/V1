@@ -172,7 +172,7 @@ function drawProfile(cv, track, dots) {
   const Y = (y) => h - 5 - ((y - lo) / span) * (h - 14);
   for (let i = 0; i < track.n; i++) {
     const s = track.segs[i], x = (i / track.n) * w;
-    c.fillStyle = s.zone === 'sprint' ? '#39ffb0' : s.zone === 'climb' ? '#ff7b1c' : '#7a5cff';
+    c.fillStyle = s.zone === 'sprint' ? '#39ffb0' : s.zone === 'climb' ? (s.cobble ? '#c9631a' : '#ff7b1c') : s.cobble ? '#b8b0c8' : '#7a5cff';
     c.fillRect(x, Y(s.y1), w / track.n + 1, h);
   }
   if (dots) dots.Y = Y;
@@ -363,7 +363,7 @@ function renderRecords() {
     const rows = [];
     for (const l of [1, 2, 3, 5]) { const t = book[`${d.id}|race|${l}`]?.t; if (t) rows.push([`Race · ${l} ronde${l > 1 ? 's' : ''}`, t]); }
     const lap = book[`${d.id}|lap`]?.t; if (lap) rows.push(['Snelste ronde', lap]);
-    for (const z of tr.zones) { const t = book[`${d.id}|seg|${z.id}`]?.t; if (t) rows.push([(z.type === 'sprint' ? '⚡ ' : '⛰️ ') + z.name, t]); }
+    for (const z of tr.zones) { const t = book[`${d.id}|seg|${z.id}`]?.t; if (t) rows.push([({ sprint: '⚡ ', climb: '⛰️ ', cobble: '🪨 ' }[z.type] || '') + z.name, t]); }
     html += `<div class="card"><h2>${d.name}</h2>${rows.length ? '<table>' + rows.map(([a, t]) => `<tr><td>${a}</td><td>${fmtTime(t, 2)}</td></tr>`).join('') + '</table>' : '<p class="small">Nog geen tijden.</p>'}</div>`;
   }
   const pw = store.power, names = { 5: '5 seconden', 60: '1 minuut', 300: '5 minuten' };
@@ -671,9 +671,9 @@ function hud(dt) {
   // Eén regel voor je lijn: berm (kost), short cut (winst) of binnen-/buitenbocht.
   const ln = $('h-line'), gain = me.finished && !r.free ? 0 : me.line || 0;
   const cut = me.onCut && me.cutValid && Math.abs(me.x) > 1;
-  ln.classList.toggle('hidden', !me.berm && Math.abs(gain) < 0.012);
-  ln.classList.toggle('bad', me.berm || gain < 0);
-  ln.textContent = me.berm ? `⚠️ BERM −${Math.round(-me.line * 100)}%`
+  ln.classList.toggle('hidden', !me.berm && !me.onCobble && !me.inGutter && Math.abs(gain) < 0.012);
+  ln.classList.toggle('bad', me.berm || me.onCobble || (!me.inGutter && gain < 0));
+  ln.textContent = me.berm ? `⚠️ BERM −${Math.round(-me.line * 100)}%` : me.onCobble ? '🪨 KASSEIEN −15% · zoek het gootje' : me.inGutter ? '🪨 GOOTJE'
     : cut ? `🔀 SHORT CUT +${(gain * 100).toFixed(0)}%`
     : gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`;
   $('h-tot').textContent = `${(r.stats.km || 0).toFixed(2)} km · ${Math.round(r.stats.hm || 0)} hm`;
@@ -711,7 +711,7 @@ function hud(dt) {
 }
 
 // ---------- hoofdlus ----------
-let last = performance.now();
+let last = performance.now(), rattleT = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = Math.min(0.25, (now - last) / 1000);
@@ -734,6 +734,10 @@ function frame(now) {
     if (!race) return;
     audio.setIntensity(race.me.power / (P.ftp * 1.5));
     trainer.setGrade((race.state === 'race' ? race.trainerGrade : 0) + (P.vshift ? gearOffset() : 0));
+  }
+  if (!paused && race.me.onCobble) { // schudden en geratel op de kasseien
+    renderer.shake = Math.max(renderer.shake, 2.2);
+    if ((rattleT -= frameDt) <= 0) { rattleT = 0.13; audio.sfx('rattle'); }
   }
   renderer.draw(race, paused ? 0 : frameDt);
   // Ritfoto: kort na de start (bij een training: na de start van de eerste etappe), op een moment

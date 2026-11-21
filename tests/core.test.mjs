@@ -726,3 +726,27 @@ test('Berm: korte klap op de trainer, ook bij een tikje', () => {
   for (let i = 0; i < 30; i++) { me.x = 1.2; race.update(0.04); }
   assert.ok(race.trainerGrade > g0 + 3.5 && race.trainerGrade < g0 + 4.5, 'lang in de berm: +4%');
 });
+
+test('Kasseien: smallere weg, gootje op volle snelheid, midden 15% trager, meer lek en hobbelende trainer', () => {
+  const t = getTrack('polder'), c = t.cobbles[0];
+  assert.equal(c.name, 'De Hel van de Polder');
+  assert.ok(Math.abs(t.wAt(c.start + 200) - 0.6) < 1e-9 && t.wAt(c.start - 30) === 1, 'smaller op de kasseien');
+  assert.ok(t.zones.some((z) => z.type === 'cobble' && z.start === c.start), 'eigen segment');
+  assert.equal(t.objects.filter((o) => o.d > c.start && o.d < c.end).length, 0, 'geen boxen of blitzjes op de kasseien');
+  assert.equal(getTrack('vulkaan').cobbles[0].name, 'Basaltmuur');
+
+  const { race } = simulate({ track: 'polder', laps: 1, bots: 0, maxTime: 10, useItems: false });
+  const me = race.me; race.rng = () => 0.99;
+  const step = (x) => { me.dist = c.start + 200; me.v = 10; me.x = x; const d0 = me.dist; race.update(0.04); return (me.dist - d0) / (me.v * 0.04); };
+  const mid = step(0), gut = step(0.53), berm = step(0.75);
+  assert.ok(me.berm === true, 'op 0,75 zit je al in de berm (weg is smaller)');
+  assert.ok(Math.abs(mid - 0.85) < 0.03, `midden ${mid}`);
+  assert.ok(gut > 0.97, `gootje ${gut}`);
+  assert.ok(berm < 0.65, `berm ${berm}`);
+  // hobbelende trainer midden op de stenen
+  const grades = []; for (let i = 0; i < 30; i++) { me.dist = c.start + 200; me.x = 0; race.update(0.04); grades.push(race.trainerGrade); }
+  assert.ok(Math.max(...grades) - Math.min(...grades) > 3.5, 'trainer hobbelt');
+  // meer kans op lek: midden op de stenen
+  race.rng = () => 0.0001; me.fx.flat = me.fx.wheel = 0; me.dist = c.start + 200; me.x = 0; race.update(0.04);
+  assert.ok(me.fx.flat > 0 || me.fx.wheel > 0, 'lek op de kasseien');
+});

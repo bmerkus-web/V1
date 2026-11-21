@@ -51,6 +51,7 @@ const SFX = {
   psst: (t) => { noise(t, 1.1, 0.35, sfxGain, 3000); tone(220, t, 0.25, 'square', 0.2, sfxGain, 90); },
   whistle: (t) => { tone(2600, t, 0.18, 'sine', 0.35); tone(2600, t + 0.24, 0.45, 'sine', 0.35); },
   scooter: (t) => { tone(70, t, 0.7, 'sawtooth', 0.3, sfxGain, 140); tone(140, t, 0.7, 'square', 0.12, sfxGain, 260); },
+  rattle: (t) => { noise(t, 0.06, 0.09, sfxGain, 1200); },
   hit: (t) => { tone(300, t, 0.4, 'sawtooth', 0.4, sfxGain, 50); noise(t, 0.3, 0.3, sfxGain, 200); },
   shield: (t) => tone(500, t, 0.3, 'sine', 0.3, sfxGain, 1000),
   block: (t) => { tone(1500, t, 0.12, 'triangle', 0.3); tone(1000, t + 0.08, 0.15, 'triangle', 0.25); },
