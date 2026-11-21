@@ -216,7 +216,7 @@ export class Renderer {
           else {
             const r = o.rider, p = this._pt(seg, o.t, r.x);
             if (s.z1 + (s.z2 - s.z1) * o.t < NEAR) continue;
-            drawRider(c, p.X, p.Y, p.u * 1.2, r, t, { ghost: o.ghost, green: !o.ghost && r.id === race.greenId, label: r === me ? null : r.name });
+            drawRider(c, p.X, p.Y, p.u * 1.2, r, t, { ghost: o.ghost, green: !o.ghost && r.id === race.greenId, polka: !o.ghost && r.id === race.komId && r.id !== race.greenId, label: r === me ? null : r.name });
             if (r === me) this.meScr = p;
           }
         }

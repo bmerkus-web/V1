@@ -30,7 +30,8 @@ let training = null; // lopende training: { stages, idx, courseLen, gone }
 // ---------- hulpjes ----------
 // Kleine groene trui (strepen + bliksem) voor meldingen en het lijstje rechtsboven.
 const JERSEY_SVG = '<svg class="jersey" viewBox="0 0 32 28" aria-hidden="true"><defs><clipPath id="jc"><path d="M10 1l-9 6 4 7 4-3v16h14V11l4 3 4-7-9-6c-1 3-3 4-6 4s-5-1-6-4z"/></clipPath></defs><g clip-path="url(#jc)"><rect width="32" height="28" fill="#15a34a"/><rect x="6" width="3.5" height="28" fill="#7cf0a6"/><rect x="13" width="3.5" height="28" fill="#7cf0a6"/><rect x="20" width="3.5" height="28" fill="#7cf0a6"/><path d="M18 8l-6 9h4l-2 8 7-10h-4l2-7z" fill="#ffe26b" stroke="#0b3d1f" stroke-width=".8"/></g><path d="M10 1l-9 6 4 7 4-3v16h14V11l4 3 4-7-9-6c-1 3-3 4-6 4s-5-1-6-4z" fill="none" stroke="#0b3d1f" stroke-width="1"/></svg>';
-const ICONS = { jersey: JERSEY_SVG };
+const POLKA_SVG = '<svg class="jersey" viewBox="0 0 32 28" aria-hidden="true"><defs><clipPath id="pc"><path d="M10 1l-9 6 4 7 4-3v16h14V11l4 3 4-7-9-6c-1 3-3 4-6 4s-5-1-6-4z"/></clipPath></defs><g clip-path="url(#pc)"><rect width="32" height="28" fill="#fbfbff"/><g fill="#e8262c"><circle cx="5" cy="9" r="1.8"/><circle cx="11" cy="6" r="1.8"/><circle cx="21" cy="6" r="1.8"/><circle cx="27" cy="9" r="1.8"/><circle cx="11" cy="14" r="1.8"/><circle cx="22" cy="13" r="1.8"/><circle cx="11" cy="22" r="1.8"/><circle cx="21" cy="21" r="1.8"/></g><path d="M18 8l-6 9h4l-2 8 7-10h-4l2-7z" fill="#ffd166" stroke="#7a0f12" stroke-width=".8"/></g><path d="M10 1l-9 6 4 7 4-3v16h14V11l4 3 4-7-9-6c-1 3-3 4-6 4s-5-1-6-4z" fill="none" stroke="#7a0f12" stroke-width="1"/></svg>';
+const ICONS = { jersey: JERSEY_SVG, polka: POLKA_SVG };
 
 function show(name) {
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('hidden', s.id !== 's-' + name);
@@ -649,6 +650,9 @@ function hud(dt) {
   const w = r.warn;
   $('h-warn').classList.toggle('hidden', !w);
   if (w) $('h-warn').textContent = w.text;
+  const kom = r.komId === me.id;
+  $('h-kom').classList.toggle('hidden', !kom);
+  if (kom) $('h-kom').innerHTML = POLKA_SVG + (me.fx.kom > 0 ? `Bolletjestrui · +5% nog ${Math.ceil(me.fx.kom)} s` : 'Bolletjestrui');
   const green = r.greenId === me.id;
   $('h-green').classList.toggle('hidden', !green);
   if (green) $('h-green').innerHTML = JERSEY_SVG + (me.fx.sprint > 0 ? `Groene trui · +5% nog ${Math.ceil(me.fx.sprint)} s` : 'Groene trui');

@@ -95,6 +95,7 @@ export class Race {
     }
     this.t0 = this.lapStart = this.time;
     if (c?.greenId) this.greenId = c.greenId;
+    if (c?.komId) { this.komId = c.komId; this.komBest = c.komBest; }
     this.lapD0 = this.me.dist; // waar ik was toen deze ronde begon (t.o.v. de streep)
     if (cfg.rolling) { this.state = 'race'; this.countdown = 0; this.startedAt ||= Date.now(); this._startGhost('lap', `${this.track.id}|lapghost`, 'PR ronde', 0); }
     this.rank();
@@ -106,7 +107,7 @@ export class Race {
       id: r.id, name: r.name, color: r.color, kind: r.kind,
       dist: -3 - row * 4, x: [-0.5, 0, 0.5][col], v: 0, power: 0, cadence: 0, steer: 0,
       item: null, roulette: 0, bolts: 0, draft: false, mask: 0,
-      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0 },
+      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0, kom: 0 },
       kwakCd: 0, kwakSafe: 0, bumpCd: 0,
       finished: false, finishTime: null, rank: i + 1, bell: 0, net: null,
     };
@@ -259,9 +260,9 @@ export class Race {
     r.line = 1 / (1 - (viaCut ? r.x : clamp(r.x, -1, 1)) * seg.curve * LINE_K) - 1;
     if (viaCut && Math.abs(r.x) > 1) r.line += CUT_BONUS;
     if (r.berm) r.line = -BERM_COST;
-    const prog = (1 + r.line) * (e.sprint > 0 ? 1 + SPRINT_BONUS : 1);
+    const prog = (1 + r.line) * (e.sprint > 0 ? 1 + SPRINT_BONUS : 1) * (e.kom > 0 ? 1 + SPRINT_BONUS : 1);
     r.dist += r.v * dt * prog;
-    if (r.dist > prev && !r.finished && !this.free) this._sprintLine(r, prev);
+    if (r.dist > prev && !r.finished && !this.free) { this._sprintLine(r, prev); this._climbLine(r, prev); }
 
     if (r.dist >= 0 && !this.free) this._pickups(r, prev);
     if (r.roulette > 0) {
@@ -417,7 +418,7 @@ export class Race {
     for (const r of this.riders) riders[r.id] = { gap: warm ? 0 : r.dist - this.total, x: r.x, v: r.v, bolts: warm ? 0 : r.bolts, item: this.free ? null : r.item, finished: r.finished, finishTime: r.finishTime };
     return {
       time: warm ? 0 : this.time, logT: warm ? this.logT + this.time : this.logT, logDist: this.logDist + Math.max(0, this.me.dist),
-      stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders, greenId: this.greenId,
+      stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders, greenId: this.greenId, komId: this.komId, komBest: this.komBest,
     };
   }
 
@@ -566,6 +567,39 @@ export class Race {
       for (const o of this.riders) if (this.local(o) && o.id !== s.src && o.dist > (src ? src.dist : s.d) && !o.finished) this.hit(o, 'storm', s.src);
     }
     this.storms = this.storms.filter((s) => !s.done);
+  }
+
+  // Bolletjestrui: wie in deze race een klim het snelst oprijdt. Een nieuwe snelste tijd pakt de trui over.
+  _climbLine(r, prev) {
+    if (this.riders.length < 2) return;
+    for (const z of this.track.zones) {
+      if (z.type !== 'climb') continue;
+      const cross = (at) => { const lap = Math.floor((r.dist - at) / this.L), line = lap * this.L + at; return lap >= 0 && prev < line && r.dist >= line ? this.time - (r.dist - line) / Math.max(r.v, 1) : null; };
+      const t0 = cross(z.start);
+      if (t0 != null) (r.climbT ||= {})[z.id] = t0;
+      const t1 = cross(z.end);
+      if (t1 == null || r.climbT?.[z.id] == null) continue;
+      const t = t1 - r.climbT[z.id];
+      delete r.climbT[z.id];
+      const key = `${this.stageIdx | 0}|${z.id}`;
+      if (this.local(r) && this._claimKom(key, r.id, t, z.name)) this.room?.send({ t: 'kom', key, id: r.id, time: t, zone: z.name });
+    }
+  }
+
+  _claimKom(key, id, t, zone) {
+    const best = (this.komBest ||= {});
+    if (best[key] && best[key].t <= t) return false;
+    best[key] = { id, t };
+    const prevId = this.komId, r = this.byId(id), me = this.me;
+    this.komId = id;
+    if (!r) return true;
+    if (this.local(r)) r.fx.kom = SPRINT_SECS;
+    if (r === me) { this.emit('banner', { icon: 'polka', text: 'BOLLETJESTRUI!', sub: `${zone} in ${fmtTime(t)} · ${SPRINT_SECS} s lang 5% sneller`, color: '#ff5b5b' }); this.emit('sfx', 'pr'); }
+    else {
+      this.say(`${r.name} pakt de bolletjestrui (${zone} ${fmtTime(t)})`, 'polka');
+      if (prevId === me.id) this.emit('banner', { icon: 'polka', text: 'Bolletjestrui kwijt', sub: `${r.name} klom sneller: ${fmtTime(t)}`, color: '#f5f5ff' });
+    }
+    return true;
   }
 
   // Groene trui: wie per ronde als eerste onder de eindboog van een sprint door rijdt.
@@ -813,6 +847,11 @@ export class Race {
         const id = msg.o;
         if ((msg.st | 0) !== (this.stageIdx | 0) || !Number.isInteger(id) || id < 0 || id >= this.objCool.length) break;
         this.objCool[id] = Math.max(this.objCool[id], this.time + Math.min(20, Math.max(0, +msg.c || 0)));
+        break;
+      }
+      case 'kom': {
+        if (typeof msg.key !== 'string' || msg.key.length > 60 || typeof msg.time !== 'number' || !(msg.time > 1) || !this.byId(msg.id)) break;
+        this._claimKom(msg.key, msg.id, msg.time, String(msg.zone || 'klim').slice(0, 30));
         break;
       }
       case 'sprint': {
