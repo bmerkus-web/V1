@@ -1,6 +1,6 @@
 // Race-logica: renners, items, bots, zones/PR's, spook en netwerk-synchronisatie.
 import { SEG, ROAD_W } from './track.js';
-import { stepSpeed, fxMask, bermCost, REF_FTP, REF_KG, FX } from './physics.js';
+import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
 import { submitTime, getTime, setGhost, getGhost, submitPower, store, save } from './storage.js';
 
@@ -18,6 +18,10 @@ export const BOT_NAMES = ['Turbo Tess', 'Watt Wout', 'Sprint Sanne', 'Klim Kees'
 const LINE_K = (ROAD_W / (SEG * SEG)) * 1.3;
 // Na een kwak kunnen gever en ontvanger elkaar zo lang niet kwakken (een botsing kan wel).
 const KWAK_CALM = 2;
+const BERM_COST = 0.4; // in de berm kom je meteen 40% minder snel vooruit
+const SPRINT_BONUS = 0.05, SPRINT_SECS = 30; // groene trui: 5% sneller, 30 seconden
+const ROCKET_ARM = 1.0; // een vuurpijl hangt eerst even stil: tijd om je schild te pakken
+const STORM_DELAY = 1.5; // tegenwind komt na een korte waarschuwing
 const CUT_BONUS = 0.12; // extra voortgang op het short-cut-pad
 
 export const DIFFICULTY = { makkelijk: 0.7, normaal: 0.82, zwaar: 0.93, beul: 1.05 };
@@ -90,6 +94,7 @@ export class Race {
       }
     }
     this.t0 = this.lapStart = this.time;
+    if (c?.greenId) this.greenId = c.greenId;
     this.lapD0 = this.me.dist; // waar ik was toen deze ronde begon (t.o.v. de streep)
     if (cfg.rolling) { this.state = 'race'; this.countdown = 0; this.startedAt ||= Date.now(); this._startGhost('lap', `${this.track.id}|lapghost`, 'PR ronde', 0); }
     this.rank();
@@ -101,7 +106,7 @@ export class Race {
       id: r.id, name: r.name, color: r.color, kind: r.kind,
       dist: -3 - row * 4, x: [-0.5, 0, 0.5][col], v: 0, power: 0, cadence: 0, steer: 0,
       item: null, roulette: 0, bolts: 0, draft: false, mask: 0,
-      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0 },
+      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0 },
       kwakCd: 0, kwakSafe: 0, bumpCd: 0,
       finished: false, finishTime: null, rank: i + 1, bell: 0, net: null,
     };
@@ -178,6 +183,8 @@ export class Race {
       else if (r.kind === 'remote') this._remote(r, dt);
     }
     this._rockets(dt);
+    this._storms();
+    this._warnings();
     for (const h of this.hazards) h.age += dt;
     this.hazards = this.hazards.filter((h) => h.age < 45);
     this.rank();
@@ -211,11 +218,14 @@ export class Race {
     const lim = seg.cut ? 1.7 : 1.45;
     if (Math.abs(r.x) > lim) r.x -= Math.sign(r.x) * Math.min(Math.abs(r.x) - lim, 1.5 * dt);
     const cc = seg.cut ? seg.cut.a + (seg.cut.b - seg.cut.a) * (mod(r.dist, SEG) / SEG) : 0;
+    const wasCut = r.onCut;
     r.onCut = !!seg.cut && Math.abs(r.x - cc) < seg.cut.hw;
+    // De short cut telt alleen als je via de oprit (het gat in de kerbstones) op het pad komt.
+    if (r.onCut && !wasCut) r.cutValid = !!seg.cut.ramp;
+    if (!r.onCut) r.cutValid = false;
     const wasBerm = r.berm;
     r.berm = Math.abs(r.x) > 1 && !r.onCut;
     if (r === this.me) {
-      r.bermCost = r.berm ? bermCost(power, seg.grade) : null;
       if (r.berm && !wasBerm && !r.finished && this.clock - (this._bermAt || -9) > 4) {
         this._bermAt = this.clock;
         this.emit('banner', { text: '⚠️ BERM!', sub: 'stuur terug naar de weg', color: '#ff6b6b' });
@@ -244,10 +254,14 @@ export class Race {
     }
     const prev = r.dist;
     r.v = stepSpeed(r, power, seg.grade, dt, pull);
-    r.line = 1 / (1 - (r.onCut ? r.x : clamp(r.x, -1, 1)) * seg.curve * LINE_K) - 1; // winst (+) of verlies (-) door je lijn
-    const offRoadCut = r.onCut && Math.abs(r.x) > 1;
-    if (offRoadCut) r.line += CUT_BONUS;
-    r.dist += r.v * dt * (1 + r.line);
+    // Voortgang t.o.v. je snelheid: lijn in de bocht, short cut, berm en groene trui.
+    const viaCut = r.onCut && r.cutValid;
+    r.line = 1 / (1 - (viaCut ? r.x : clamp(r.x, -1, 1)) * seg.curve * LINE_K) - 1;
+    if (viaCut && Math.abs(r.x) > 1) r.line += CUT_BONUS;
+    if (r.berm) r.line = -BERM_COST;
+    const prog = (1 + r.line) * (e.sprint > 0 ? 1 + SPRINT_BONUS : 1);
+    r.dist += r.v * dt * prog;
+    if (r.dist > prev && !r.finished && !this.free) this._sprintLine(r, prev);
 
     if (r.dist >= 0 && !this.free) this._pickups(r, prev);
     if (r.roulette > 0) {
@@ -403,8 +417,23 @@ export class Race {
     for (const r of this.riders) riders[r.id] = { gap: warm ? 0 : r.dist - this.total, x: r.x, v: r.v, bolts: warm ? 0 : r.bolts, item: this.free ? null : r.item, finished: r.finished, finishTime: r.finishTime };
     return {
       time: warm ? 0 : this.time, logT: warm ? this.logT + this.time : this.logT, logDist: this.logDist + Math.max(0, this.me.dist),
-      stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders,
+      stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders, greenId: this.greenId,
     };
+  }
+
+  // Wat er nu op je afkomt (voor de waarschuwing boven je power-upvak).
+  _warnings() {
+    const me = this.me;
+    const rk = this.rockets.find((p) => p.to === me.id);
+    if (rk) {
+      if (!rk.warned) { rk.warned = true; this.emit('sfx', 'alarm'); }
+      this.warn = { text: '🚀 VUURPIJL OP KOMST', until: this.time + 0.1 };
+      return;
+    }
+    const L = this.L;
+    const glue = this.hazards.find((h) => { const dd = mod(h.d - me.dist, L); return dd > 2 && dd < 30 && Math.abs(h.x - me.x) < 0.3; });
+    if (glue) { this.warn = { text: '🟣 LIJM VOOR JE', until: this.time + 0.1 }; return; }
+    if (this.warn && this.time > this.warn.until) this.warn = null;
   }
 
   savePower() {
@@ -521,11 +550,55 @@ export class Race {
     this.room?.send(msg);
   }
 
+  // Tegenwind: eerst een waarschuwing voor iedereen die voor de veroorzaker rijdt, na STORM_DELAY de klap.
   _storm(src) {
-    this.emit('sfx', 'storm');
-    this.stormFlash = 1;
+    const me = this.me;
     this.say(`🌪️ ${src.name} ontketent tegenwind`);
-    for (const o of this.riders) if (this.local(o) && o !== src && o.dist > src.dist && !o.finished) this.hit(o, 'storm', src.id);
+    (this.storms ||= []).push({ src: src.id, d: src.dist, at: this.time + STORM_DELAY });
+    if (me !== src && me.dist > src.dist && !me.finished) { this.warn = { text: '🌪️ TEGENWIND OP KOMST', until: this.time + STORM_DELAY }; this.emit('sfx', 'alarm'); }
+  }
+
+  _storms() {
+    if (!this.storms?.length) return;
+    for (const s of this.storms) {
+      if (this.time < s.at) continue;
+      s.done = true;
+      const src = this.byId(s.src);
+      this.emit('sfx', 'storm');
+      this.stormFlash = 1;
+      for (const o of this.riders) if (this.local(o) && o.id !== s.src && o.dist > (src ? src.dist : s.d) && !o.finished) this.hit(o, 'storm', s.src);
+    }
+    this.storms = this.storms.filter((s) => !s.done);
+  }
+
+  // Groene trui: wie per ronde als eerste onder de eindboog van een sprint door rijdt.
+  _sprintLine(r, prev) {
+    if (this.riders.length < 2) return;
+    for (const z of this.track.zones) {
+      if (z.type !== 'sprint') continue;
+      const lap = Math.floor((r.dist - z.end) / this.L);
+      const line = lap * this.L + z.end;
+      if (lap < 0 || prev >= line || r.dist < line) continue;
+      const key = `${this.stageIdx | 0}|${z.id}|${lap}`;
+      const at = this.time - (r.dist - line) / Math.max(r.v, 1);
+      if (this.local(r) && this._claimSprint(key, r.id, at, z.name)) this.room?.send({ t: 'sprint', key, id: r.id, at, zone: z.name });
+    }
+  }
+
+  _claimSprint(key, id, at, zone) {
+    const wins = (this.sprintWins ||= {});
+    const cur = wins[key];
+    if (cur && cur.at <= at) return false;
+    const prevId = cur?.id;
+    wins[key] = { id, at };
+    const r = this.byId(id), me = this.me;
+    if (prevId && prevId !== id) { const p = this.byId(prevId); if (p && this.local(p)) p.fx.sprint = 0; } // een ander was toch eerder
+    this.greenId = id;
+    if (!r) return true;
+    if (this.local(r)) r.fx.sprint = SPRINT_SECS;
+    if (r === me) { this.emit('banner', { text: '🟢 GROENE TRUI!', sub: `${zone} gewonnen · ${SPRINT_SECS} s lang 5% sneller`, color: '#39ffb0' }); this.emit('sfx', 'pr'); }
+    else this.say(`🟢 ${r.name} wint de ${zone}`);
+    return true;
   }
 
   // r rijdt achterop o: r valt terug tot onder de snelheid van o en moet even herstellen.
@@ -601,6 +674,7 @@ export class Race {
       const t = this.byId(p.to);
       p.age += dt;
       if (!t || p.age > 15) { p.done = true; continue; }
+      if (p.age < ROCKET_ARM) continue; // nog aan het richten
       p.d += (Math.max(t.v, 4) + 30) * dt;
       p.x = lerp(p.x, t.x, Math.min(1, dt * 4));
       if (p.d >= t.dist - 0.5) {
@@ -742,6 +816,11 @@ export class Race {
         const id = msg.o;
         if ((msg.st | 0) !== (this.stageIdx | 0) || !Number.isInteger(id) || id < 0 || id >= this.objCool.length) break;
         this.objCool[id] = Math.max(this.objCool[id], this.time + Math.min(20, Math.max(0, +msg.c || 0)));
+        break;
+      }
+      case 'sprint': {
+        if (typeof msg.key !== 'string' || msg.key.length > 60 || typeof msg.at !== 'number' || !this.byId(msg.id)) break;
+        this._claimSprint(msg.key, msg.id, msg.at, String(msg.zone || 'sprint').slice(0, 30));
         break;
       }
       case 'hazgone': this.hazards = this.hazards.filter((h) => h.id !== msg.hid); break;

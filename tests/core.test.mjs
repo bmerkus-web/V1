@@ -210,20 +210,28 @@ test('Short cut: oprit sluit aan op de weg, pad loont, ernaast is berm', () => {
     // aaneengesloten: einde van elk stukje = begin van het volgende
     for (let i = 1; i < cs.length; i++) assert.ok(Math.abs(cs[i].cut.a - cs[i - 1].cut.b) < 1e-9);
   }
-  const run = (x) => {
+  // gemeten als tijd over hetzelfde stuk: minder tijd = sneller
+  const timeOver = (follow, hopAt) => {
     const { race } = simulate({ track: 'kosmo', laps: 1, bots: 0, maxTime: 10, useItems: false });
-    const cut = race.track.cut, me = race.me;
-    me.dist = cut.start + 50; me.v = 10;
-    const d0 = me.dist;
-    for (let i = 0; i < 40; i++) { me.x = x; race.update(0.04); }
-    return { d: me.dist - d0, me };
+    const cut = race.track.cut, me = race.me, side = cut.side;
+    me.dist = cut.start - 4; me.v = 10; me.x = side * 0.8;
+    const t0 = race.time; let berm = 0, valid = null;
+    while (me.dist < cut.start + 110) {
+      const s = race.track.segAt(me.dist + 0.5).cut;
+      if (follow === 'path' && s && (hopAt == null || me.dist > cut.start + hopAt)) me.x = (s.a + s.b) / 2;
+      else me.x = side * (follow === 'path' ? 0.95 : follow);
+      me.v = 10; race.update(0.04);
+      if (me.berm) berm++;
+      if (me.onCut && valid == null && me.dist > cut.start + 15) valid = me.cutValid;
+    }
+    return { t: race.time - t0, berm, valid };
   };
-  const side = getTrack('kosmo').cut.side;
-  const path = run(side * 1.28), edge = run(side * 0.95), berm = run(side * 1.08);
-  assert.equal(path.me.onCut, true); assert.equal(path.me.berm, false);
-  assert.equal(berm.me.onCut, false); assert.equal(berm.me.berm, true);
-  assert.ok(path.d > edge.d * 1.08, `pad ${path.d} vs binnenkant weg ${edge.d}`);
-  assert.ok(berm.d < edge.d, 'in de berm verlies je');
+  const viaRamp = timeOver('path'), edge = timeOver(0.95), hop = timeOver('path', 40), berm = timeOver(1.08);
+  assert.equal(viaRamp.valid, true, 'via de oprit telt');
+  assert.equal(hop.valid, false, 'dwars door de berm het pad op telt niet');
+  assert.ok(viaRamp.t < edge.t * 0.93, `pad ${viaRamp.t} vs binnenkant weg ${edge.t}`);
+  assert.ok(hop.t > edge.t * 0.99 && hop.t > viaRamp.t * 1.05, `inspringen ${hop.t} levert niets op (rand ${edge.t}, oprit ${viaRamp.t})`);
+  assert.ok(berm.t > edge.t * 1.4, 'in de berm verlies je 40%');
 });
 
 test('Training: etappes sluiten op elkaar aan via de teleportboog', async () => {
@@ -325,16 +333,16 @@ test('Botsing: achterop iemand rijden kost snelheid, ernaast rijden niet', () =>
   assert.ok(me.v > v * 0.9, 'niet twee keer achter elkaar gestraft');
 });
 
-test('Berm: kost flink snelheid, trainer wordt zwaarder en je krijgt een melding', async () => {
-  const { bermCost } = await import('../js/physics.js');
-  const c = bermCost(200, 0);
-  assert.ok(c > 0.25 && c < 0.7, `kost ${c}`);
-  assert.equal(bermCost(0, 0), null);
+test('Berm: meteen 40% minder voortgang, trainer wordt zwaarder en je krijgt een melding', () => {
   const { race, events } = simulate({ track: 'polder', laps: 1, bots: 0, maxTime: 10, useItems: false });
-  const g0 = race.trainerGrade;
-  race.me.x = 1.3; race.update(0.04); race.update(0.04);
-  assert.equal(race.me.berm, true);
-  assert.ok(race.me.bermCost > 0.25);
+  const g0 = race.trainerGrade, me = race.me;
+  me.x = 1.3; me.v = 10;
+  const d0 = me.dist;
+  race.update(0.04);
+  assert.equal(me.berm, true);
+  assert.ok(Math.abs(me.line + 0.4) < 1e-9);
+  assert.ok(Math.abs((me.dist - d0) - me.v * 0.04 * 0.6) < 0.02, 'direct 40% minder vooruit');
+  race.update(0.04);
   assert.ok(race.trainerGrade > g0 + 3.5, 'trainer voelt de berm');
   assert.ok(events.some(([t, d]) => t === 'banner' && d.text.includes('BERM')));
 });
@@ -501,4 +509,58 @@ test('Multiplayer: wat een ander pakt, verdwijnt ook bij mij', async () => {
   // onzin wordt genegeerd
   b.onNet({ t: 'pick', o: 99999, c: 15 }); b.onNet({ t: 'pick', o: 'x', c: 15 }); b.onNet({ t: 'pick', o: 1, c: 15, st: 3 });
   assert.equal(b.objCool[1], 0);
+});
+
+test('Groene trui: eerste onder de sprintboog wint, 5% sneller voor 30 s, ook in multiplayer', async () => {
+  const { Race } = await import('../js/game.js');
+  const sent = [];
+  const room = { send: (m) => sent.push(m) };
+  const mk = (meId) => new Race({ track: getTrack('polder'), laps: 2, seed: 1, room, isHost: meId === 'p0', ns: 'demo',
+    riders: [{ id: 'p0', name: 'A', color: '#fff', kind: meId === 'p0' ? 'me' : 'remote' }, { id: 'p1', name: 'B', color: '#000', kind: meId === 'p1' ? 'me' : 'remote' }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  const a = mk('p0'), b = mk('p1');
+  for (const r of [a, b]) { r.countdown = 0; r.update(0.04); }
+  const z = a.track.zones.find((q) => q.type === 'sprint');
+  // A komt als eerste onder de boog
+  a.me.dist = z.end - 1; a.me.v = 10; a.me.x = 0;
+  a.update(0.2);
+  assert.equal(a.greenId, 'p0'); assert.ok(a.me.fx.sprint > 29);
+  const msg = sent.find((m) => m.t === 'sprint');
+  assert.ok(msg && msg.id === 'p0');
+  // B komt later onder dezelfde boog, maar kreeg het bericht van A al: geen trui voor B
+  b.onNet(msg);
+  assert.equal(b.greenId, 'p0');
+  b.me.dist = z.end - 1; b.me.v = 10; b.update(0.2);
+  assert.equal(b.greenId, 'p0'); assert.equal(b.me.fx.sprint, 0);
+  // voordeel: 5% meer voortgang
+  const d0 = a.me.dist, v = a.me.v; a.update(0.04);
+  assert.ok((a.me.dist - d0) / (a.me.v * 0.04) > 1.04 && (a.me.dist - d0) / (a.me.v * 0.04) < 1.07);
+  // volgende ronde wint B: trui gaat over
+  b.me.dist = a.L + z.end - 1; b.update(0.2);
+  assert.equal(b.greenId, 'p1'); assert.ok(b.me.fx.sprint > 29);
+  // onzin wordt genegeerd
+  b.onNet({ t: 'sprint', key: 5, id: 'p0', at: 1 }); b.onNet({ t: 'sprint', key: 'x', id: 'nobody', at: 1 });
+  assert.equal(b.greenId, 'p1');
+});
+
+test('Waarschuwing: vuurpijl richt eerst, tegenwind komt na een korte waarschuwing; schild blokt dan nog', async () => {
+  const { race, events } = simulate({ laps: 1, bots: 1, maxTime: 20, useItems: false });
+  const me = race.me, bot = race.riders[1];
+  // vuurpijl van de bot op mij
+  bot.dist = me.dist - 20; bot.v = me.v = 9; race.rank();
+  bot.item = 'rocket'; race.useItem(bot);
+  race.update(0.04);
+  assert.match(race.warn?.text || '', /VUURPIJL/);
+  assert.ok(events.some(([t, d]) => t === 'sfx' && d === 'alarm'));
+  me.item = 'shield'; race.useItem(me); // op tijd het schild erin
+  for (let i = 0; i < 100 && race.rockets.length; i++) race.update(0.04);
+  assert.equal(me.fx.spin, 0, 'schild hield de vuurpijl tegen');
+  // tegenwind
+  bot.item = 'storm'; race.useItem(bot);
+  race.update(0.04);
+  assert.match(race.warn?.text || '', /TEGENWIND/);
+  assert.equal(me.fx.storm, 0, 'nog niet meteen');
+  for (let i = 0; i < 45; i++) race.update(0.04);
+  assert.ok(me.fx.storm > 0, 'na de waarschuwing komt hij');
 });

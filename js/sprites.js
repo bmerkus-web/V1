@@ -126,13 +126,14 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     c.fillStyle = '#f5f5ff'; c.fillRect(s * 0.12 * u - 0.05 * u, foot - 0.02 * u, 0.1 * u, 0.07 * u);
   }
   // romp
-  c.fillStyle = r.color;
+  const jersey = opts.green ? '#2fd36b' : r.color; // groene trui
+  c.fillStyle = jersey;
   c.beginPath(); c.moveTo(-0.19 * u, -0.92 * u); c.quadraticCurveTo(-0.3 * u, -1.25 * u, -0.22 * u, -1.45 * u);
   c.lineTo(0.22 * u, -1.45 * u); c.quadraticCurveTo(0.3 * u, -1.25 * u, 0.19 * u, -0.92 * u); c.fill();
   c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(-0.035 * u, -1.44 * u, 0.07 * u, 0.5 * u);
   c.fillStyle = '#15152a'; c.fillRect(-0.19 * u, -0.98 * u, 0.38 * u, 0.1 * u);
   // armen + stuur
-  c.strokeStyle = r.color; c.lineWidth = 0.09 * u;
+  c.strokeStyle = jersey; c.lineWidth = 0.09 * u;
   for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 0.22 * u, -1.4 * u); c.lineTo(s * 0.31 * u, -1.1 * u); c.stroke(); }
   c.strokeStyle = '#23233a'; c.lineWidth = 0.05 * u; c.beginPath(); c.moveTo(-0.34 * u, -1.08 * u); c.lineTo(0.34 * u, -1.08 * u); c.stroke();
   // helm

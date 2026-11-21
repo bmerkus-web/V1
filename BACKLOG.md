@@ -25,9 +25,6 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-11 | Bluetooth-presentatieklikker als power-up-knop (PageUp/PageDown en pijltjes koppelen). | idee | S |
 | WB-12 | Apparaten onthouden, zodat ze na verversen vanzelf terugkomen zonder keuzelijst (eerst nakijken of Chrome dat toestaat). | idee | M |
 | WB-13 | Eigen verbindingsdienst plus hulpserver (TURN) voor multiplayer, zodat het niet afhangt van de gratis PeerJS-dienst en ook op strenge netwerken werkt. | idee | M |
-| WB-14 | Strengere straf in de berm, vooral bij de short cut. Voorstel: in de berm meteen 33% minder voortgang (niet pas na het afremmen), en de short cut-winst telt alleen als je via de oprit op het pad komt, niet als je er dwars door de berm heen springt. | Sebas, zelf | S |
-| WB-15 | Waarschuwing als er een aanval op je afkomt (vuurpijl, lijm voor je, tegenwind), zodat je op tijd je schild kunt inzetten. Nu alleen bij een vuurpijl in multiplayer. | Sebas | S |
-| WB-16 | Groene sprinttrui: wie per ronde als eerste onder de eindboog van de sprint door rijdt, krijgt de trui en 5% snelheid. Voorstel: de trui blijft tot iemand een volgende sprint wint, het voordeel duurt 30 seconden. | Sebas, zelf | M |
 | WB-17 | Klimtrui: wie in de race de snelste tijd op de klim heeft, rijdt in een bolletjestrui met een voordeel. Rijdt iemand sneller, dan pakt die de trui over. *Open vraag: +10% snelheid is veel; liever iets kleiners?* | Sebas, zelf | M |
 | WB-18 | Rubber banding: gratis extra snelheid naarmate je verder achter de koploper ligt, zodat races spannend blijven. Aan/uit per race; in een race met rubber banding tellen tijden niet voor records. *Open vraag: tot hoeveel procent, vanaf hoeveel meter?* | Sebas | S |
 | WB-19 | Chat in de lobby (en misschien snelle emoji's tijdens de race). | Sebas | M |
@@ -71,6 +68,9 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- WB-14 Berm kost meteen 40%; short cut telt alleen via de oprit
+- WB-15 Waarschuwing voor vuurpijl, lijm en tegenwind (met tijd om je schild te pakken)
+- WB-16 Groene sprinttrui: 5% sneller voor 30 seconden
 - Ritfoto om bij je Strava-rit te zetten
 - Gepakte boxen en blitzjes verdwijnen ook bij andere spelers
 - Geen automatische terugkwak meer na een kwak

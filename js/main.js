@@ -606,7 +606,7 @@ const itemKeys = Object.keys(ITEMS);
 function hud(dt) {
   const r = race, me = r.me;
   $('h-watt').firstChild.nodeValue = Math.round(me.power);
-  $('h-spd').textContent = (me.v * 3.6).toFixed(0);
+  $('h-spd').textContent = (me.v * 3.6 * (1 + (me.line || 0)) * (me.fx.sprint > 0 ? 1.05 : 1)).toFixed(0); // echte voortgang: berm, lijn en trui tellen mee
   $('h-time').textContent = fmtTime(r.time);
   const it = $('h-item');
   if (me.roulette > 0) {
@@ -642,6 +642,13 @@ function hud(dt) {
   const lost = [trainer, sterzo, hrm, ...pads].filter((d) => d._wantConnected && !d.connected);
   $('h-dev').classList.toggle('hidden', !lost.length);
   $('h-dev').textContent = lost.length ? `⚠️ ${lost.map((d) => d.label).join(', ')} kwijt – opnieuw verbinden…` : '';
+  const w = r.warn;
+  $('h-warn').classList.toggle('hidden', !w);
+  if (w) $('h-warn').textContent = w.text + (me.item === 'shield' ? ' – SCHILD!' : '');
+  $('h-item').classList.toggle('shield-now', !!w && me.item === 'shield');
+  const green = r.greenId === me.id;
+  $('h-green').classList.toggle('hidden', !green);
+  if (green) $('h-green').textContent = me.fx.sprint > 0 ? `🟢 Groene trui · +5% nog ${Math.ceil(me.fx.sprint)} s` : '🟢 Groene trui';
   $('h-gear').classList.toggle('hidden', !P.vshift);
   $('h-gear').textContent = `⚙ ${getGear()}/${GEARS}`;
   $('h-bolts').title = `${me.bolts * 2}% minder luchtweerstand`;
@@ -650,10 +657,10 @@ function hud(dt) {
   $('h-draft').classList.toggle('hidden', !me.draft);
   // Eén regel voor je lijn: berm (kost), short cut (winst) of binnen-/buitenbocht.
   const ln = $('h-line'), gain = me.finished && !r.free ? 0 : me.line || 0;
-  const cut = me.onCut && Math.abs(me.x) > 1;
+  const cut = me.onCut && me.cutValid && Math.abs(me.x) > 1;
   ln.classList.toggle('hidden', !me.berm && Math.abs(gain) < 0.012);
   ln.classList.toggle('bad', me.berm || gain < 0);
-  ln.textContent = me.berm ? `⚠️ BERM${me.bermCost != null ? ` −${Math.round(me.bermCost * 100)}%` : ''}`
+  ln.textContent = me.berm ? `⚠️ BERM −${Math.round(-me.line * 100)}%`
     : cut ? `🔀 SHORT CUT +${(gain * 100).toFixed(0)}%`
     : gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`;
   $('h-tot').textContent = `${(r.stats.km || 0).toFixed(2)} km · ${Math.round(r.stats.hm || 0)} hm`;
