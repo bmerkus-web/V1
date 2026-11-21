@@ -801,7 +801,10 @@ document.addEventListener('visibilitychange', () => {
 if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touchy');
 bindTouch($('t-left'), 'left'); bindTouch($('t-right'), 'right'); bindTouch($('t-pedal'), 'pedal');
 $('t-left').classList.add('on'); $('t-right').classList.add('on');
-$('h-item').onclick = () => input.trigger('item');
+// Power-upknop op 'pointerdown': een 'click' komt op een tablet niet door zolang er al een andere vinger
+// op het scherm staat (bijv. op TRAP). De click alleen nog voor toetsenbordbediening (detail 0).
+$('h-item').addEventListener('pointerdown', (e) => { e.preventDefault(); input.trigger('item'); });
+$('h-item').addEventListener('click', (e) => { if (e.detail === 0) input.trigger('item'); });
 $('h-menu').onclick = () => togglePause();
 window.addEventListener('pointerdown', () => audio.unlock(), { once: true });
 window.addEventListener('keydown', () => audio.unlock(), { once: true });
