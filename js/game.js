@@ -35,6 +35,7 @@ export const JURY = { bottle: [0.2, 7], dirty: [0.2, 5], kwak: [1 / 15, 1] };
 const TOW_BONUS = 0.35; // plakbidon: 35% sneller vooruit zolang je de bidon vasthoudt
 const WALL_W = 0.5, TACKS_W = 0.5; // halve breedte in halve wegbreedtes: samen de halve weg
 const FLAT = 0.3, FLAT_SECS = 6, WHEEL_SECS = 3; // lek: 30% trager tot de sealant dicht; soms een wielwissel
+const ANTILEK_SECS = 30, ANTILEK_BERM = 0.5; // Gouden Kassei: 30 s geen lek, en de berm (en de klap op de trainer) half zo erg
 // Rubber banding: wie achter de koploper ligt, krijgt gratis extra voortgang (vanaf 20 m tot max 10% bij 150 m).
 export const RUBBER = { from: 20, full: 150, max: 0.1 };
 const CUT_BONUS = 0.12; // extra voortgang op het short-cut-pad
@@ -112,6 +113,7 @@ export class Race {
     this.t0 = this.lapStart = this.time;
     if (c?.greenId) this.greenId = c.greenId;
     if (c?.komId) { this.komId = c.komId; this.komBest = c.komBest; }
+    if (c?.cassId) { this.cassId = c.cassId; this.cassBest = c.cassBest; }
     this.lapD0 = this.me.dist; // waar ik was toen deze ronde begon (t.o.v. de streep)
     if (cfg.rolling) { this.state = 'race'; this.countdown = 0; this.startedAt ||= Date.now(); this._startGhost('lap', `${this.track.id}|lapghost`, 'PR ronde', 0); }
     this.rank();
@@ -123,7 +125,7 @@ export class Race {
       id: r.id, name: r.name, color: r.color, kind: r.kind,
       dist: -3 - row * 4, x: [-0.5, 0, 0.5][col], v: 0, power: 0, cadence: 0, steer: 0,
       item: null, roulette: 0, bolts: 0, draft: false, mask: 0,
-      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0, kom: 0, scooter: 0, tow: 0, flat: 0, wheel: 0 },
+      fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0, kom: 0, scooter: 0, tow: 0, flat: 0, wheel: 0, antilek: 0 },
       bermWear: 0, penalty: 0,
       kwakCd: 0, kwakSafe: 0, bumpCd: 0,
       finished: false, finishTime: null, rank: i + 1, bell: 0, net: null,
@@ -210,7 +212,7 @@ export class Race {
     this._ghosts();
 
     const seg = this.track.segAt(me.dist);
-    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) + (me.bermKick > 0 ? BERM_KICK : 0) + (me.onCobble ? 3 + (Math.floor(this.clock * 2) % 2 ? 2 : -2) : 0) /* hobbelen op de kasseien */ + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
+    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) + (me.bermKick > 0 ? BERM_KICK * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) : 0) + (me.onCobble ? 3 + (Math.floor(this.clock * 2) % 2 ? 2 : -2) : 0) /* hobbelen op de kasseien */ + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
     this._net(dt);
   }
 
@@ -304,7 +306,7 @@ export class Race {
     const viaCut = r.onCut && r.cutValid;
     r.line = 1 / (1 - (viaCut ? r.x : clamp(r.x, -w, w)) * seg.curve * LINE_K) - 1;
     if (viaCut && Math.abs(r.x) > 1) r.line += CUT_BONUS;
-    if (r.berm) r.line = -BERM_COST;
+    if (r.berm) r.line = -BERM_COST * (e.antilek > 0 ? ANTILEK_BERM : 1);
     r.rubber = 0;
     if (this.rubber && !this.free && !r.finished && this.order?.[0] && this.order[0] !== r && !this.order[0].finished)
       r.rubber = clamp((this.order[0].dist - r.dist - RUBBER.from) / (RUBBER.full - RUBBER.from), 0, 1) * RUBBER.max;
@@ -312,7 +314,7 @@ export class Race {
       (r.towing ? 1 + TOW_BONUS : 1) * (e.flat > 0 ? 1 - FLAT : 1) * (e.wheel > 0 ? 0.05 : 1);
     r.prog = prog;
     r.dist += r.v * dt * prog;
-    if (r.dist > prev && !r.finished && !this.free) { this._sprintLine(r, prev); this._climbLine(r, prev); }
+    if (r.dist > prev && !r.finished && !this.free) { this._sprintLine(r, prev); this._timedZones(r, prev); }
 
     if (r.dist >= 0 && !this.free) this._pickups(r, prev);
     if (r.roulette > 0) {
@@ -477,7 +479,7 @@ export class Race {
     for (const r of this.riders) riders[r.id] = { gap: warm ? 0 : r.dist - this.total, x: r.x, v: r.v, bolts: warm ? 0 : r.bolts, item: this.free ? null : r.item, finished: r.finished, finishTime: r.finishTime, penalty: r.penalty || 0 };
     return {
       time: warm ? 0 : this.time, logT: warm ? this.logT + this.time : this.logT, logDist: this.logDist + Math.max(0, this.me.dist),
-      stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders, greenId: this.greenId, komId: this.komId, komBest: this.komBest,
+      stats: this.stats, startedAt: this.startedAt, prs: this.prs, riders, greenId: this.greenId, komId: this.komId, komBest: this.komBest, cassId: this.cassId, cassBest: this.cassBest,
     };
   }
 
@@ -658,21 +660,41 @@ export class Race {
     this.storms = this.storms.filter((s) => !s.done);
   }
 
-  // Bolletjestrui: wie in deze race een klim het snelst oprijdt. Een nieuwe snelste tijd pakt de trui over.
-  _climbLine(r, prev) {
+  // Klimmen en kasseienstroken worden geklokt. Per strook telt de snelste tijd van de race:
+  // wie die verbetert, pakt de bolletjestrui (klim) of de Gouden Kassei (kasseien).
+  _timedZones(r, prev) {
     if (this.riders.length < 2) return;
     for (const z of this.track.zones) {
-      if (z.type !== 'climb') continue;
+      if (z.type !== 'climb' && z.type !== 'cobble') continue;
       const cross = (at) => { const lap = Math.floor((r.dist - at) / this.L), line = lap * this.L + at; return lap >= 0 && prev < line && r.dist >= line ? this.time - (r.dist - line) / Math.max(r.v, 1) : null; };
       const t0 = cross(z.start);
-      if (t0 != null) (r.climbT ||= {})[z.id] = t0;
+      if (t0 != null) (r.zoneT ||= {})[z.id] = t0;
       const t1 = cross(z.end);
-      if (t1 == null || r.climbT?.[z.id] == null) continue;
-      const t = t1 - r.climbT[z.id];
-      delete r.climbT[z.id];
+      if (t1 == null || r.zoneT?.[z.id] == null) continue;
+      const t = t1 - r.zoneT[z.id];
+      delete r.zoneT[z.id];
       const key = `${this.stageIdx | 0}|${z.id}`;
-      if (this.local(r) && this._claimKom(key, r.id, t, z.name)) this.room?.send({ t: 'kom', key, id: r.id, time: t, zone: z.name });
+      if (!this.local(r)) continue;
+      if (z.type === 'climb') { if (this._claimKom(key, r.id, t, z.name)) this.room?.send({ t: 'kom', key, id: r.id, time: t, zone: z.name }); }
+      else if (this._claimCass(key, r.id, t, z.name)) this.room?.send({ t: 'cass', key, id: r.id, time: t, zone: z.name });
     }
+  }
+
+  // Gouden Kassei: de snelste over de kasseien krijgt een nieuwe antilekband (een lek van dat moment is meteen weg).
+  _claimCass(key, id, t, zone) {
+    const best = (this.cassBest ||= {});
+    if (best[key] && best[key].t <= t) return false;
+    best[key] = { id, t };
+    const prevId = this.cassId, r = this.byId(id), me = this.me;
+    this.cassId = id;
+    if (!r) return true;
+    if (this.local(r)) { r.fx.antilek = ANTILEK_SECS; r.fx.flat = 0; r.fx.wheel = 0; r.bermWear = 0; }
+    if (r === me) { this.emit('banner', { icon: 'cass', text: 'GOUDEN KASSEI!', sub: `${zone} in ${fmtTime(t)} · ${ANTILEK_SECS} s een antilekband`, color: '#ffd166' }); this.emit('sfx', 'pr'); }
+    else {
+      this.say(`${r.name} pakt de Gouden Kassei (${zone} ${fmtTime(t)})`, 'cass');
+      if (prevId === me.id) this.emit('banner', { icon: 'cass', text: 'Gouden Kassei kwijt', sub: `${r.name} was sneller: ${fmtTime(t)}`, color: '#f5f5ff' });
+    }
+    return true;
   }
 
   _claimKom(key, id, t, zone) {
@@ -723,7 +745,7 @@ export class Race {
 
   // Lekke band: meestal dicht de tubeless sealant hem na een paar seconden, soms moet er een nieuw wiel in.
   _flat(r, why) {
-    if (r.fx.flat > 0 || r.fx.wheel > 0) return;
+    if (r.fx.flat > 0 || r.fx.wheel > 0 || r.fx.antilek > 0) return; // antilekband: geen lek
     r.bermWear = 0;
     const wheel = this.rng() < 0.25;
     if (wheel) r.fx.wheel = WHEEL_SECS; else r.fx.flat = FLAT_SECS;
@@ -983,9 +1005,11 @@ export class Race {
         this.objCool[id] = Math.max(this.objCool[id], this.time + Math.min(20, Math.max(0, +msg.c || 0)));
         break;
       }
-      case 'kom': {
+      case 'kom':
+      case 'cass': {
         if (typeof msg.key !== 'string' || msg.key.length > 60 || typeof msg.time !== 'number' || !(msg.time > 1) || !this.byId(msg.id)) break;
-        this._claimKom(msg.key, msg.id, msg.time, String(msg.zone || 'klim').slice(0, 30));
+        if (msg.t === 'kom') this._claimKom(msg.key, msg.id, msg.time, String(msg.zone || 'klim').slice(0, 30));
+        else this._claimCass(msg.key, msg.id, msg.time, String(msg.zone || 'kasseien').slice(0, 30));
         break;
       }
       case 'jury': {
