@@ -118,9 +118,17 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   c.fillStyle = '#0c0c14'; c.fillRect(-0.045 * u, -0.7 * u, 0.09 * u, 0.7 * u);
   c.fillStyle = '#c9c9d9'; c.fillRect(-0.012 * u, -0.66 * u, 0.024 * u, 0.62 * u);
   if (m & 2) { c.fillStyle = '#b44dff'; c.beginPath(); c.ellipse(0, -0.05 * u, 0.3 * u, 0.1 * u, 0, 0, 7); c.fill(); }
-  if (m & 128) { // lekke band: wolkjes lucht bij het achterwiel
-    c.fillStyle = 'rgba(230,230,240,.55)';
-    for (let i = 0; i < 3; i++) { const k = (t * 2.5 + i / 3) % 1; c.beginPath(); c.arc((0.08 + k * 0.3) * u, (-0.1 - k * 0.25) * u, (0.04 + k * 0.08) * u, 0, 7); c.fill(); }
+  if (m & 128) { // lekke band: witte straaltjes lucht die uit het achterwiel spuiten
+    c.lineCap = 'round';
+    for (let i = 0; i < 10; i++) {
+      const k = (t * 3 + i / 10) % 1, side = i % 2 ? 1 : -1;
+      const ang = 0.15 + (i % 5) * 0.3 + Math.sin(t * 17 + i) * 0.1; // schuin omhoog en opzij
+      const r0 = (0.06 + k * 0.5) * u, len = (0.18 + 0.12 * (1 - k)) * u;
+      const x0 = side * Math.cos(ang) * r0, y0 = -0.08 * u - Math.sin(ang) * r0 * 0.9;
+      c.strokeStyle = `rgba(255,255,255,${0.95 * (1 - k * 0.85)})`; c.lineWidth = Math.max(1.5, 0.04 * u * (1 - k * 0.5));
+      c.beginPath(); c.moveTo(x0, y0); c.lineTo(x0 + side * Math.cos(ang) * len, y0 - Math.sin(ang) * len * 0.9); c.stroke();
+    }
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(0, -0.06 * u, (0.18 + 0.04 * Math.sin(t * 20)) * u, 0.06 * u, 0, 0, 7); c.fill();
   }
   // benen
   const ph = r._ph || 0;
@@ -266,18 +274,45 @@ export function drawScooter(c, X, Y, u) {
   c.restore();
 }
 
-// Ploegwagen van achteren, met fietsen op het dak.
-export function drawCar(c, X, Y, u) {
+// Ploegwagen van achteren in de kleur van de renner, met fietsen op het dak.
+export function drawCar(c, X, Y, u, color = '#f5f5ff') {
   c.save(); c.translate(X, Y);
   c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.ellipse(0, 0, 1.0 * u, 0.15 * u, 0, 0, 7); c.fill();
   c.fillStyle = '#0c0c14'; c.fillRect(-0.85 * u, -0.35 * u, 0.25 * u, 0.35 * u); c.fillRect(0.6 * u, -0.35 * u, 0.25 * u, 0.35 * u);
-  c.fillStyle = '#f5f5ff'; c.fillRect(-0.95 * u, -1.0 * u, 1.9 * u, 0.7 * u); // carrosserie
-  c.fillStyle = '#7df9ff'; c.beginPath(); c.moveTo(-0.75 * u, -1.0 * u); c.lineTo(0.75 * u, -1.0 * u); c.lineTo(0.6 * u, -1.45 * u); c.lineTo(-0.6 * u, -1.45 * u); c.fill(); // achterruit
-  c.fillStyle = '#ff3fa4'; c.fillRect(-0.95 * u, -0.72 * u, 1.9 * u, 0.12 * u); // ploegstreep
-  c.fillStyle = '#ff3b3b'; c.fillRect(-0.9 * u, -0.9 * u, 0.2 * u, 0.12 * u); c.fillRect(0.7 * u, -0.9 * u, 0.2 * u, 0.12 * u);
-  c.strokeStyle = '#2b2540'; c.lineWidth = Math.max(1, 0.05 * u); // fietsen op het dak
-  for (const fx of [-0.45, 0, 0.45]) { c.beginPath(); c.moveTo(fx * u, -1.45 * u); c.lineTo(fx * u, -2.0 * u); c.stroke(); c.beginPath(); c.arc(fx * u, -1.73 * u, 0.25 * u, 0, 7); c.stroke(); }
+  c.fillStyle = color; c.fillRect(-0.95 * u, -1.0 * u, 1.9 * u, 0.7 * u); // carrosserie
+  c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(-0.95 * u, -0.45 * u, 1.9 * u, 0.15 * u); // bumper
+  c.fillStyle = '#9fe9ff'; c.beginPath(); c.moveTo(-0.75 * u, -1.0 * u); c.lineTo(0.75 * u, -1.0 * u); c.lineTo(0.6 * u, -1.42 * u); c.lineTo(-0.6 * u, -1.42 * u); c.fill(); // achterruit
+  c.fillStyle = color; c.fillRect(-0.62 * u, -1.47 * u, 1.24 * u, 0.06 * u); // dak
+  c.fillStyle = '#f5f5ff'; c.fillRect(-0.95 * u, -0.74 * u, 1.9 * u, 0.1 * u); // witte ploegstreep
+  c.fillStyle = '#ff3b3b'; c.fillRect(-0.9 * u, -0.92 * u, 0.2 * u, 0.12 * u); c.fillRect(0.7 * u, -0.92 * u, 0.2 * u, 0.12 * u); // achterlichten
+  c.fillStyle = '#15152a'; c.fillRect(-0.6 * u, -1.52 * u, 1.2 * u, 0.05 * u); // dakdrager
+  for (const [bx, by, fc] of [[-0.3, 0, '#ff3fa4'], [0.05, -0.06, '#7df9ff'], [0.38, 0, '#ffd166']]) { // drie fietsen op het dak (van opzij getekend, zodat je ze herkent)
+    const x = bx * u, y = (-1.52 + by) * u, r = 0.2 * u;
+    c.strokeStyle = '#0c0c14'; c.lineWidth = Math.max(1, 0.04 * u);
+    c.beginPath(); c.arc(x - 0.26 * u, y - r, r, 0, 7); c.stroke(); // wielen
+    c.beginPath(); c.arc(x + 0.26 * u, y - r, r, 0, 7); c.stroke();
+    c.strokeStyle = fc; c.lineWidth = Math.max(1, 0.045 * u); // frame
+    c.beginPath(); c.moveTo(x - 0.26 * u, y - r); c.lineTo(x - 0.05 * u, y - r * 2.3); c.lineTo(x + 0.18 * u, y - r * 2.3); c.lineTo(x + 0.26 * u, y - r);
+    c.moveTo(x - 0.26 * u, y - r); c.lineTo(x + 0.02 * u, y - r); c.lineTo(x - 0.05 * u, y - r * 2.3); c.moveTo(x + 0.02 * u, y - r); c.lineTo(x + 0.18 * u, y - r * 2.3); c.stroke();
+    c.fillStyle = '#15152a'; c.fillRect(x - 0.1 * u, y - r * 2.5, 0.1 * u, 0.035 * u); // zadel
+    c.strokeStyle = '#2b2540'; c.lineWidth = Math.max(1, 0.03 * u); c.beginPath(); c.moveTo(x + 0.18 * u, y - r * 2.3); c.lineTo(x + 0.22 * u, y - r * 2.6); c.stroke(); // stuur
+  }
   c.restore();
+}
+
+// Arm uit het autoraam met een bidon, naar de hand van de renner. side = richting van de auto naar de renner.
+export function drawBottleArm(c, carX, carY, cu, riderX, riderY, ru, side, t) {
+  const sx = carX + side * 0.95 * cu, sy = carY - 1.15 * cu; // raam aan de kant van de renner
+  const hx = riderX - side * 0.34 * ru, hy = riderY - 1.12 * ru; // hand van de renner aan de kant van de auto
+  const ex = (sx + hx) / 2, ey = Math.min(sy, hy) - 0.06 * ru + Math.sin(t * 9) * 0.01 * ru;
+  c.strokeStyle = '#e8b58f'; c.lineWidth = Math.max(2, 0.07 * ru); c.lineCap = 'round';
+  c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(ex, ey, hx - side * 0.12 * ru, hy); c.stroke();
+  c.strokeStyle = '#f5f5ff'; c.lineWidth = Math.max(2, 0.09 * ru); // mouw
+  c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + (ex - sx) * 0.35, sy + (ey - sy) * 0.35); c.stroke();
+  const bx = hx - side * 0.06 * ru, by = hy; // bidon, tussen beide handen
+  c.fillStyle = '#f5f5ff'; c.fillRect(bx - 0.05 * ru, by - 0.2 * ru, 0.1 * ru, 0.22 * ru);
+  c.fillStyle = '#ff3fa4'; c.fillRect(bx - 0.05 * ru, by - 0.12 * ru, 0.1 * ru, 0.05 * ru);
+  c.fillStyle = '#15152a'; c.fillRect(bx - 0.025 * ru, by - 0.25 * ru, 0.05 * ru, 0.05 * ru);
 }
 
 export function drawRocket(c, X, Y, u) {

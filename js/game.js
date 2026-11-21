@@ -230,6 +230,7 @@ export class Race {
     // Bij een short cut is er meer berm (ook aan de buitenkant van het pad).
     const lim = seg.cut ? 1.7 : 1.45;
     if (Math.abs(r.x) > lim) r.x -= Math.sign(r.x) * Math.min(Math.abs(r.x) - lim, 1.5 * dt);
+    if (e.tow > 0 && r.towSide * r.x > 0.96) r.x = r.towSide * 0.96; // de ploegwagen houdt je uit de berm
     const cc = seg.cut ? seg.cut.a + (seg.cut.b - seg.cut.a) * (mod(r.dist, SEG) / SEG) : 0;
     const wasCut = r.onCut;
     r.onCut = !!seg.cut && Math.abs(r.x - cc) < seg.cut.hw;
