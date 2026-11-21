@@ -14,6 +14,10 @@ import { GEARS, getGear, shift, gearOffset } from './gears.js';
 import { boardKeys, boardRows, mergeEntry, entriesToShare } from './board.js';
 
 const $ = (id) => document.getElementById(id);
+// Alleen naar de pagina schrijven als er echt iets verandert: elke schrijfactie kost de browser
+// een nieuwe opmaakronde, en de HUD wordt elk beeld bijgewerkt (zwaar voor oude tablets).
+const setText = (el, v) => { v = String(v); if (el._v !== v) { el._v = v; el.textContent = v; } };
+const setHTML = (el, v) => { if (el._v !== v) { el._v = v; el.innerHTML = v; } };
 const P = store.profile;
 const trainer = new Trainer();
 const sterzo = new Sterzo();
@@ -97,12 +101,37 @@ function watchDevice(d) {
   d.onback = () => toast(`${d.label} weer verbonden ✓`);
 }
 [trainer, sterzo, hrm].forEach(watchDevice);
+// Zwarte doos: tijdens een rit leggen we elke 5 s lokaal vast waar je was en hoe soepel het liep.
+// Stopt de rit netjes (einde, stoppen, pagina sluiten), dan wissen we het. Staat er bij het openen
+// nog iets, dan is de vorige rit onverwacht gestopt (bijv. een crash) en tonen we wat er net daarvoor gebeurde.
+const BOX = 'wb-blackbox';
+let crashed = null, boxT = 0, boxFrames = 0, boxWorst = 0;
+try { crashed = JSON.parse(localStorage.getItem(BOX) || 'null'); localStorage.removeItem(BOX); } catch {}
+if (crashed && Date.now() - crashed.at > 6 * 3600e3) crashed = null;
+function crashText(c) {
+  const at = new Date(c.at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+  return `Vorige rit stopte onverwacht (${at}): ${c.track}, ${(c.dist / 1000).toFixed(2).replace(".", ",")} km, ${c.state}${c.cobble ? ', op de kasseien' : ''} · ${c.fps} fps (traagste beeld ${c.worst} ms)${c.heap ? ` · geheugen ${c.heap} MB` : ''} · ${c.min} min onderweg`;
+}
+function boxTick(dt) {
+  boxFrames++; boxWorst = Math.max(boxWorst, dt);
+  if ((boxT += dt) < 5) return;
+  try {
+    localStorage.setItem(BOX, JSON.stringify({ at: Date.now(), track: race.track.name, dist: Math.round(Math.max(0, race.me.dist)), state: paused ? 'pauze' : race.state,
+      cobble: !!race.me.onCobble, fps: Math.round(boxFrames / boxT), worst: Math.round(boxWorst * 1000), min: Math.round((race.time - race.t0) / 60),
+      heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : null }));
+  } catch {}
+  boxT = 0; boxFrames = 0; boxWorst = 0;
+}
+const boxClear = () => { try { localStorage.removeItem(BOX); } catch {} };
+addEventListener('pagehide', boxClear);
+if (crashed) setTimeout(() => toast(crashText(crashed)), 800);
+
 $('b-diag').onclick = () => {
   const t = (ms) => new Date(ms).toLocaleTimeString('nl-NL');
   const devs = [trainer, sterzo, hrm, ...pads].filter((d) => d.device);
   const body = devs.length ? devs.map((d) => `<p><b>${esc(d.label)} – ${esc(d.name)}</b> ${d.connected ? '✓ verbonden' : d._wantConnected ? '⚠️ opnieuw verbinden…' : 'losgekoppeld'}</p><div class="diag">${d.log.map(([ms, ev]) => `${t(ms)}  ${esc(ev)}`).join('\n') || '–'}</div>`).join('')
     : '<p class="small">Nog geen apparaten gekoppeld.</p>';
-  overlay(`<h2>Verbindingen</h2>${body}<p class="small">Valt er iets weg, maak dan een schermafbeelding van dit scherm; dan zie ik wat er gebeurde.</p><div class="menu"><button class="big" id="ov-close">Sluiten</button></div>`);
+  overlay(`<h2>Verbindingen</h2>${crashed ? `<p class="small">⚠️ ${esc(crashText(crashed))}</p>` : ''}${body}<p class="small">Valt er iets weg, maak dan een schermafbeelding van dit scherm; dan zie ik wat er gebeurde.</p><div class="menu"><button class="big" id="ov-close">Sluiten</button></div>`);
   $('ov-close').onclick = hideOverlay;
 };
 async function connect(dev, label) {
@@ -491,6 +520,7 @@ function nextStage() {
 }
 
 function endRace() {
+  boxClear();
   if (race) race.savePower();
   training = null;
   race = null;
@@ -615,15 +645,15 @@ const itemKeys = Object.keys(ITEMS);
 function hud(dt) {
   const r = race, me = r.me;
   $('h-watt').firstChild.nodeValue = Math.round(me.power);
-  $('h-spd').textContent = (me.v * 3.6 * (me.prog ?? 1)).toFixed(0); // echte voortgang: berm, lijn, truien, lek en bidon tellen mee
-  $('h-time').textContent = fmtTime(r.time);
+  setText($('h-spd'), (me.v * 3.6 * (me.prog ?? 1)).toFixed(0)); // echte voortgang: berm, lijn, truien, lek en bidon tellen mee
+  setText($('h-time'), fmtTime(r.time));
   const it = $('h-item');
   if (me.roulette > 0) {
     rouletteTick -= dt;
-    if (rouletteTick <= 0) { rouletteTick = 0.08; $('h-item-i').textContent = ITEMS[itemKeys[Math.floor(Math.random() * itemKeys.length)]].icon; audio.sfx('tick'); }
+    if (rouletteTick <= 0) { rouletteTick = 0.08; setText($('h-item-i'), ITEMS[itemKeys[Math.floor(Math.random() * itemKeys.length)]].icon); audio.sfx('tick'); }
     it.classList.remove('has');
   } else {
-    $('h-item-i').textContent = me.item ? ITEMS[me.item].icon : '';
+    setText($('h-item-i'), me.item ? ITEMS[me.item].icon : '');
     it.classList.toggle('has', !!me.item);
   }
   // banners
@@ -641,64 +671,64 @@ function hud(dt) {
   if (hudSlow > 0) return;
   hudSlow = 0.2;
   const total = r.riders.length;
-  $('h-pos').innerHTML = `${me.rank}<small>/${total}</small>`;
+  setHTML($('h-pos'), `${me.rank}<small>/${total}</small>`);
   const left = r.timed ? fmtTime(Math.ceil(Math.max(0, r.timed - (r.time - r.t0))), 0) : '';
-  $('h-lap').textContent = r.mode === 'warm' ? `WARMING-UP · nog ${left}` : r.mode === 'cool' ? `COOLING-DOWN · nog ${left}`
-    : `${r.training ? `Etappe ${r.stageN}/${r.stageCount} · ` : ''}Ronde ${clamp(Math.floor(Math.max(0, me.dist) / r.L) + 1, 1, r.laps)}/${r.laps} · ${(Math.max(0, r.total - me.dist) / 1000).toFixed(2)} km`;
-  $('h-cad').textContent = Math.round(me.cadence);
-  $('h-grade').textContent = r.track.segAt(me.dist).grade.toFixed(1);
-  $('h-bolts').textContent = `⚡ ${me.bolts}/10${me.bolts >= 10 ? ' FULL BLITZ' : ''}`;
+  setText($('h-lap'), r.mode === 'warm' ? `WARMING-UP · nog ${left}` : r.mode === 'cool' ? `COOLING-DOWN · nog ${left}`
+    : `${r.training ? `Etappe ${r.stageN}/${r.stageCount} · ` : ''}Ronde ${clamp(Math.floor(Math.max(0, me.dist) / r.L) + 1, 1, r.laps)}/${r.laps} · ${(Math.max(0, r.total - me.dist) / 1000).toFixed(2)} km`);
+  setText($('h-cad'), Math.round(me.cadence));
+  setText($('h-grade'), r.track.segAt(me.dist).grade.toFixed(1));
+  setText($('h-bolts'), `⚡ ${me.bolts}/10${me.bolts >= 10 ? ' FULL BLITZ' : ''}`);
   const lost = [trainer, sterzo, hrm, ...pads].filter((d) => d._wantConnected && !d.connected);
   $('h-dev').classList.toggle('hidden', !lost.length);
-  $('h-dev').textContent = lost.length ? `⚠️ ${lost.map((d) => d.label).join(', ')} kwijt – opnieuw verbinden…` : '';
+  setText($('h-dev'), lost.length ? `⚠️ ${lost.map((d) => d.label).join(', ')} kwijt – opnieuw verbinden…` : '');
   const w = r.warn;
   $('h-warn').classList.toggle('hidden', !w);
-  if (w) $('h-warn').textContent = w.text;
+  if (w) setText($('h-warn'), w.text);
   const kom = r.komId === me.id;
   $('h-kom').classList.toggle('hidden', !kom);
-  if (kom) $('h-kom').innerHTML = POLKA_SVG + (me.fx.kom > 0 ? `Bolletjestrui · +5% nog ${Math.ceil(me.fx.kom)} s` : 'Bolletjestrui');
+  if (kom) setHTML($('h-kom'), POLKA_SVG + (me.fx.kom > 0 ? `Bolletjestrui · +5% nog ${Math.ceil(me.fx.kom)} s` : 'Bolletjestrui'));
   const cass = r.cassId === me.id;
   $('h-cass').classList.toggle('hidden', !cass);
-  if (cass) $('h-cass').innerHTML = CASS_SVG + (me.fx.antilek > 0 ? `Gouden Kassei · antilekband nog ${Math.ceil(me.fx.antilek)} s` : 'Gouden Kassei');
+  if (cass) setHTML($('h-cass'), CASS_SVG + (me.fx.antilek > 0 ? `Gouden Kassei · antilekband nog ${Math.ceil(me.fx.antilek)} s` : 'Gouden Kassei'));
   const green = r.greenId === me.id;
   $('h-green').classList.toggle('hidden', !green);
-  if (green) $('h-green').innerHTML = JERSEY_SVG + (me.fx.sprint > 0 ? `Groene trui · +5% nog ${Math.ceil(me.fx.sprint)} s` : 'Groene trui');
+  if (green) setHTML($('h-green'), JERSEY_SVG + (me.fx.sprint > 0 ? `Groene trui · +5% nog ${Math.ceil(me.fx.sprint)} s` : 'Groene trui'));
   $('h-rubber').classList.toggle('hidden', !(me.rubber > 0.005));
-  if (me.rubber > 0.005) $('h-rubber').textContent = `🪢 Rubber band +${Math.round(me.rubber * 100)}%`;
+  if (me.rubber > 0.005) setText($('h-rubber'), `🪢 Rubber band +${Math.round(me.rubber * 100)}%`);
   $('h-gear').classList.toggle('hidden', !P.vshift);
-  $('h-gear').textContent = `⚙ ${getGear()}/${GEARS}`;
+  setText($('h-gear'), `⚙ ${getGear()}/${GEARS}`);
   $('h-bolts').title = `${me.bolts * 2}% minder luchtweerstand`;
   $('h-hr').classList.toggle('hidden', !me.hr);
-  $('h-hr-v').textContent = me.hr || '';
+  setText($('h-hr-v'), me.hr || '');
   $('h-draft').classList.toggle('hidden', !me.draft && !me.inScooter);
-  $('h-draft').textContent = me.inScooter ? '🛵 SLIPSTREAM SCOOTER' : '💨 SLIPSTREAM';
+  setText($('h-draft'), me.inScooter ? '🛵 SLIPSTREAM SCOOTER' : '💨 SLIPSTREAM');
   // Eén regel voor je lijn: berm (kost), short cut (winst) of binnen-/buitenbocht.
   const ln = $('h-line'), gain = me.finished && !r.free ? 0 : me.line || 0;
   const cut = me.onCut && me.cutValid && Math.abs(me.x) > 1;
   ln.classList.toggle('hidden', !me.berm && !me.onCobble && !me.inGutter && Math.abs(gain) < 0.012);
   ln.classList.toggle('bad', me.berm || me.onCobble || (!me.inGutter && gain < 0));
-  ln.textContent = me.berm ? `⚠️ BERM −${Math.round(-me.line * 100)}%` : me.onCobble ? '🪨 KASSEIEN −15%' : me.inGutter ? '🪨 GOOTJE'
+  setText(ln, me.berm ? `⚠️ BERM −${Math.round(-me.line * 100)}%` : me.onCobble ? '🪨 KASSEIEN −15%' : me.inGutter ? '🪨 GOOTJE'
     : cut ? `🔀 SHORT CUT +${(gain * 100).toFixed(0)}%`
-    : gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`;
-  $('h-tot').textContent = `${(r.stats.km || 0).toFixed(2)} km · ${Math.round(r.stats.hm || 0)} hm`;
-  $('h-item-n').textContent = me.item ? ITEMS[me.item].name : 'spatie';
+    : gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`);
+  setText($('h-tot'), `${(r.stats.km || 0).toFixed(2)} km · ${Math.round(r.stats.hm || 0)} hm`);
+  setText($('h-item-n'), me.item ? ITEMS[me.item].name : 'spatie');
   const d = $('h-delta');
   if (r.ghostDelta != null) {
-    d.textContent = `${fmtDelta(r.ghostDelta)} vs PR ${r.ghostLabel}`;
+    setText(d, `${fmtDelta(r.ghostDelta)} vs PR ${r.ghostLabel}`);
     d.className = r.ghostDelta <= 0 ? 'ahead' : 'behind';
-  } else d.textContent = '';
+  } else setText(d, '');
   const z = $('h-zone');
   z.classList.toggle('hidden', !r.activeZone);
   if (r.activeZone) {
     const a = r.activeZone;
-    z.textContent = `${a.zone.name} ${fmtTime(r.time - a.t0)}${a.pr ? ' · PR ' + fmtTime(a.pr) : ''}`;
+    setText(z, `${a.zone.name} ${fmtTime(r.time - a.t0)}${a.pr ? ' · PR ' + fmtTime(a.pr) : ''}`);
     z.style.borderColor = a.zone.type === 'sprint' ? '#39ffb0' : '#ff7b1c';
   }
-  $('h-rank').innerHTML = r.order.map((x) => {
+  setHTML($('h-rank'), r.order.map((x) => {
     const gap = x === me ? '' : x.finished ? ' 🏁' : ` ${x.dist > me.dist ? '+' : '−'}${Math.abs(x.dist - me.dist).toFixed(0)}m`;
     return `<div class="${x === me ? 'me' : ''}"><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${x.penalty ? ` ⚖️+${x.penalty}s` : ''}${gap}</div>`;
-  }).join('');
-  $('h-feed').innerHTML = r.feed.filter((f) => r.clock - f.at < 6).map((f) => `<div>${f.icon ? ICONS[f.icon] || '' : ''}${esc(f.text)}</div>`).join('');
+  }).join(''));
+  setHTML($('h-feed'), r.feed.filter((f) => r.clock - f.at < 6).map((f) => `<div>${f.icon ? ICONS[f.icon] || '' : ''}${esc(f.text)}</div>`).join(''));
   // stippen op het profiel
   const dots = $('h-dots');
   const list = [...r.riders, ...r.ghostRiders.filter((g) => !g.hidden)];
@@ -744,6 +774,7 @@ function frame(now) {
     if ((rattleT -= frameDt) <= 0) { rattleT = 0.13; audio.sfx('rattle'); }
   }
   renderer.draw(race, paused ? 0 : frameDt);
+  boxTick(frameDt);
   // Ritfoto: kort na de start (bij een training: na de start van de eerste etappe), op een moment
   // dat er iemand vlak voor je rijdt; lukt dat niet binnen 12 seconden, dan alsnog.
   if (!rideShot && race.state === 'race' && !race.free) {
