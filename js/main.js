@@ -790,7 +790,11 @@ function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen?.().catch(() => {});
 }
-window.addEventListener('resize', () => renderer.resize());
+// Formaatwijzigingen samenvoegen: bij fullscreen of in- en uitschuivende balken komen er vaak vele achter elkaar.
+let resizeT = 0;
+const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(() => renderer.resize(), 200); };
+window.addEventListener('resize', onResize);
+document.addEventListener('fullscreenchange', onResize);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && race) navigator.wakeLock?.request('screen').then((w) => { wake = w; }).catch(() => {});
 });
