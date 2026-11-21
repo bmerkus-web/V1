@@ -25,14 +25,14 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-11 | Bluetooth-presentatieklikker als power-up-knop (PageUp/PageDown en pijltjes koppelen). | idee | S |
 | WB-12 | Apparaten onthouden, zodat ze na verversen vanzelf terugkomen zonder keuzelijst (eerst nakijken of Chrome dat toestaat). | idee | M |
 | WB-13 | Eigen verbindingsdienst plus hulpserver (TURN) voor multiplayer, zodat het niet afhangt van de gratis PeerJS-dienst en ook op strenge netwerken werkt. | idee | M |
-| WB-14 | Strengere straf buiten de baan. Nu loont dwars door de berm afsnijden nog te veel. Berm zwaarder maken en/of de winst van de short cut verkleinen. | Sebas | S |
+| WB-14 | Strengere straf in de berm, vooral bij de short cut. Voorstel: in de berm meteen 33% minder voortgang (niet pas na het afremmen), en de short cut-winst telt alleen als je via de oprit op het pad komt, niet als je er dwars door de berm heen springt. | Sebas, zelf | S |
 | WB-15 | Waarschuwing als er een aanval op je afkomt (vuurpijl, lijm voor je, tegenwind), zodat je op tijd je schild kunt inzetten. Nu alleen bij een vuurpijl in multiplayer. | Sebas | S |
-| WB-16 | Tussensprints met iets te winnen: wie de sprint als eerste uitrijdt, krijgt direct een beloning (bijv. power-up of blitzjes). | Sebas, zelf | S |
+| WB-16 | Groene sprinttrui: wie per ronde als eerste onder de eindboog van de sprint door rijdt, krijgt de trui en 5% snelheid. Voorstel: de trui blijft tot iemand een volgende sprint wint, het voordeel duurt 30 seconden. | Sebas, zelf | M |
 | WB-17 | Klimtrui: wie in de race de snelste tijd op de klim heeft, rijdt in een bolletjestrui met een voordeel. Rijdt iemand sneller, dan pakt die de trui over. *Open vraag: +10% snelheid is veel; liever iets kleiners?* | Sebas, zelf | M |
 | WB-18 | Rubber banding: gratis extra snelheid naarmate je verder achter de koploper ligt, zodat races spannend blijven. Aan/uit per race; in een race met rubber banding tellen tijden niet voor records. *Open vraag: tot hoeveel procent, vanaf hoeveel meter?* | Sebas | S |
 | WB-19 | Chat in de lobby (en misschien snelle emoji's tijdens de race). | Sebas | M |
-| WB-32 | Gekkere power-ups (eerste reeks), bijv. een muur op de weg, en een ploegwagen die je even meetrekt met een "plakbidon". *Ontwerp ploegwagen: rijdt door de berm aan jouw kant, zodat hij niemand ramt.* | Sebas | M |
-| WB-33 | "Gekke race"-stand in de lobby: meer en wildere power-ups en meer chaos, naast een gewone stand. | Sebas | M |
+| WB-32 | Gekkere power-ups, standaard in het spel (geen aparte stand): bijv. een muur op de weg, en een ploegwagen die je even meetrekt met een "plakbidon". *Ontwerp ploegwagen: rijdt door de berm aan jouw kant, zodat hij niemand ramt.* | Sebas | M |
+| WB-34 | Power-up "scooter": er rijdt opeens een scooter voor je uit waar je flink in de slipstream zit (zoals een derny). | zelf | S |
 
 ## Publieke beta
 
