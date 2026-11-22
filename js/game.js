@@ -3,6 +3,7 @@ import { SEG, ROAD_W, GUTTER } from './track.js';
 import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
 import { submitTime, getTime, setGhost, getGhost, submitPower, store, save } from './storage.js';
+import { at as wkAt, targetW } from './workout.js';
 
 export const ITEMS = {
   turbo: { name: 'Turbo', icon: '⚡', hint: 'Korte megaversnelling' },
@@ -193,7 +194,10 @@ export class Race {
 
     // Ik
     // Eerlijk: vermogen t.o.v. FTP. Anders: watt per kilo (omgerekend naar een renner van 75 kg).
-    const eff = this.profile.fair ? (me.power * REF_FTP) / Math.max(80, this.profile.ftp) : (me.power * REF_KG) / clamp(this.profile.weight || REF_KG, 40, 150);
+    let eff = this.profile.fair ? (me.power * REF_FTP) / Math.max(80, this.profile.ftp) : (me.power * REF_KG) / clamp(this.profile.weight || REF_KG, 40, 150);
+    // Workout-game: je snelheid volgt hoe goed je je doel haalt. Meer dan 3% boven het (geplande) doel levert niets op.
+    if (this.wk && this.wgame) { const tg = this._wkTarget(); eff = (Math.min(me.power, tg != null ? tg * 1.03 : Infinity) * REF_FTP) / Math.max(80, this.profile.ftp); }
+    if (this.wkFinish && !this.wkDone && this.time - this.t0 + this.wkOffset >= this.wkFinish) { this.wkDone = true; this._wkClassify(); }
     if (me.finished && !this.free) this._stepLocal(me, 110, clamp(-me.x * 2, -1, 1), dt, true);
     else {
       this._stepLocal(me, eff, this.getSteer(dt), dt, false);
@@ -877,6 +881,7 @@ export class Race {
     const ai = r.ai, me = this.me;
     const seg = this.track.segAt(r.dist);
     let p = ai.base * (1 + 0.08 * Math.sin(this.time * 0.13 + ai.ph) + 0.05 * Math.sin(this.time * 0.47 + ai.ph * 2));
+
     if (seg.grade > 3) p *= 1.08;
     if (seg.zone === 'sprint') p *= 1.3;
     if (this.finishAt - r.dist < 300 && this.finishAt > r.dist) p *= 1.35;
@@ -884,6 +889,11 @@ export class Race {
     if (r.finished) p = 100;
     // Warming-up / uitrijden: rustig meerijden in de buurt van de speler.
     if (this.mode === 'warm' || (this.free && r.finished)) p = ai.base * 0.5 * (1 + clamp((me.dist - 4 - r.dist) / 60, -0.5, 0.6));
+    if (this.wk && this.wgame && !r.finished) { // workout-game: bots rijden de workout, de een wat netter dan de ander
+      const tg = this._wkTarget(), ftp = Math.max(80, this.profile.ftp);
+      const comply = { makkelijk: 0.94, normaal: 0.97, zwaar: 0.99, beul: 1.01 }[this.difficulty] ?? 0.97;
+      p = REF_FTP * (tg != null ? tg / ftp : 0.6) * Math.min(1.03, comply + 0.03 * (ai.skill - 0.5) + 0.01 * Math.sin(this.time * 0.31 + ai.ph));
+    }
     r.power = p;
     r.cadence = 85 + 10 * Math.sin(this.time * 0.2 + ai.ph);
 
@@ -950,6 +960,27 @@ export class Race {
         r.item === 'wall' ? (r.rank === 1 ? behind : gap < 120) || ai.itemT > 10 : true;
       if (ready && ok) { ai.itemT = 0; this.useItem(r); }
     }
+  }
+
+  // Workout: het geplande doel (watt, zonder ±5%) op dit moment, of null bij vrij rijden / na afloop.
+  _wkTarget() {
+    const p = wkAt(this.wk, this.time - this.t0 + this.wkOffset);
+    return p.done ? null : targetW(this.wk, p.b, p.tIn, Math.max(80, this.profile.ftp));
+  }
+  // Workout-game: aan het eind van het laatste zware blok is de race voorbij. Wie dan achter de koploper rijdt,
+  // krijgt het tijdsverschil dat hij op dat moment nodig zou hebben om bij hem te komen (zoals in een etappe).
+  _wkClassify() {
+    const T = this.wkFinish, lead = Math.max(...this.riders.map((r) => r.dist));
+    const vref = Math.max(1, lead / Math.max(1, this.time - this.t0));
+    for (const r of this.riders) {
+      if (r.finished || !this.local(r)) continue;
+      r.finished = true; r.finishDist = r.dist;
+      r.finishTime = T + (lead - r.dist) / vref + (r.penalty || 0);
+      this.room?.send({ t: 'fin', id: r.id, time: r.finishTime });
+      if (r !== this.me) this.say(`🏁 ${r.name}`);
+    }
+    this.rank();
+    if (this.me.finished && this.state !== 'done') { this.state = 'done'; this.emit('finish'); }
   }
 
   // ---------- netwerk ----------
