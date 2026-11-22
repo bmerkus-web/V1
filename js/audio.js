@@ -1,5 +1,6 @@
 // Geluid: alles gesynthetiseerd met WebAudio (geen bestanden nodig).
 import { makeMusic } from './music.js';
+import { makeClub, CLUB_ORDER } from './clubsound.js';
 let ctx = null, master = null, musicGain = null, sfxGain = null;
 let musicOn = true, sfxOn = true, musicTimer = null, step = 0, nextAt = 0;
 let intensity = 0.5;
@@ -67,10 +68,20 @@ const SFX = {
 };
 
 // Muziek: zie music.js (thema per baan, lagen die meegaan met de race en de workout).
-let music = null, scene = 'polder';
+// Twee soorten muziek: 'club' (gebakken klanken, standaard) of 'arcade' (de oude 8-bit, live).
+let music = null, club = null, scene = 'polder', mode = 'club', userTrack = null;
+const ARCADE_ORDER = ['polder', 'vulkaan', 'kosmo', 'zen'];
+const CLUB_FOR = { polder: 'disco', vulkaan: 'kraut', kosmo: 'electro', zen: 'techno' };
+const ARCADE_NAME = { polder: 'Arcade · Neon', vulkaan: 'Arcade · Vulkaan', kosmo: 'Arcade · Kosmos', zen: 'Arcade · Zen' };
+const currentTrack = () => userTrack || (mode === 'club' ? CLUB_FOR[scene] || 'disco' : scene);
 function schedule() {
-  if (!ctx || !musicOn || !music) return;
-  music.schedule(ctx.currentTime + 0.25);
+  if (!ctx || !musicOn) return;
+  if (mode === 'club') club?.schedule(ctx.currentTime + 0.25);
+  else music?.schedule(ctx.currentTime + 0.25);
+}
+function applyTrack() {
+  const t = currentTrack();
+  if (mode === 'club') { if (club) club.setStyle(t); } else if (music) music.setTheme(t);
 }
 
 export const audio = {
@@ -80,15 +91,38 @@ export const audio = {
     SFX[name]?.(ctx.currentTime + 0.005);
   },
   setIntensity(v) { intensity = Math.max(0, Math.min(1, v)); if (music) music.state.intensity = intensity; },
-  // Sfeer kiezen: 'polder', 'vulkaan', 'kosmo' of 'zen'.
-  setScene(name) { scene = name; if (music) music.setTheme(name); },
+  // Sfeer van de baan: 'polder', 'vulkaan', 'kosmo' of 'zen'. Een zelfgekozen nummer blijft staan tot de race voorbij is.
+  setScene(name) { scene = name; if (!userTrack) applyTrack(); },
   // Wat er in het spel gebeurt: { intensity, zone, lastLap, finale, wkLevel, wkFree, riser, done }
-  setState(o) { if (music) Object.assign(music.state, o); },
+  setState(o) { if (music) Object.assign(music.state, o); if (club) Object.assign(club.state, o); },
+  // 'club' of 'arcade'
+  setMode(m) {
+    if (m === mode) return;
+    mode = m; userTrack = null;
+    if (musicTimer) { this.stopMusic(); this.startMusic(); }
+  },
+  // Klanken alvast klaarzetten (bijv. in het menu), zodat de muziek meteen bij de start begint.
+  prepare(sceneName) { if (mode === 'club' && ensure()) { club ||= makeClub(ctx, musicGain); club.prepare(CLUB_FOR[sceneName] || 'disco').catch(() => {}); } },
+  // Carrousel: naar het volgende nummer. Geeft de naam terug.
+  nextTrack() {
+    const list = mode === 'club' ? CLUB_ORDER : ARCADE_ORDER, cur = currentTrack();
+    userTrack = list[(list.indexOf(cur) + 1) % list.length];
+    applyTrack();
+    return this.trackName();
+  },
+  trackName() { const t = currentTrack(); return mode === 'club' ? (club ? club.name(t) : t) : ARCADE_NAME[t] || t; },
+  clearUserTrack() { userTrack = null; },
   startMusic() {
     if (!ensure() || musicTimer) return;
-    if (!music) music = makeMusic(ctx, musicGain);
-    music.setTheme(scene);
-    music.reset(ctx.currentTime + 0.1);
+    if (mode === 'club') {
+      club ||= makeClub(ctx, musicGain);
+      club.reset(ctx.currentTime + 0.1);
+      club.setStyle(currentTrack());
+    } else {
+      music ||= makeMusic(ctx, musicGain);
+      music.setTheme(currentTrack());
+      music.reset(ctx.currentTime + 0.1);
+    }
     musicTimer = setInterval(schedule, 80);
   },
   stopMusic() { clearInterval(musicTimer); musicTimer = null; },

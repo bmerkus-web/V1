@@ -12,7 +12,7 @@ const ACTIONS = {
   Space: 'item', Enter: 'item', Digit1: 'item', KeyX: 'item',
   KeyB: 'bell', Digit2: 'bell',
   KeyE: 'gearUp', KeyQ: 'gearDown',
-  KeyC: 'center', KeyM: 'music', KeyN: 'skip', KeyR: 'erg', Escape: 'pause', KeyP: 'pause', KeyF: 'fullscreen',
+  KeyC: 'center', KeyM: 'music', KeyN: 'skip', KeyR: 'erg', KeyT: 'track', Escape: 'pause', KeyP: 'pause', KeyF: 'fullscreen',
 };
 
 window.addEventListener('keydown', (e) => {

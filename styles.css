@@ -123,6 +123,7 @@ svg.jersey { height: 1.05em; width: auto; vertical-align: -0.15em; margin-right:
 .touch { width: 16vw; max-width: 130px; height: 22vh; bottom: 30vh; font-size: 30px; }
 #t-left { left: 8px; } #t-right { right: 8px; } #t-pedal { right: 8px; bottom: calc(52vh + 10px); height: 12vh; font-size: 18px; }
 body.touchy .touch.on { display: block; }
+#h-music { position: absolute; pointer-events: auto; background: rgba(255, 255, 255, .12); border: 2px solid rgba(255, 255, 255, .3); font-style: normal; display: block; top: 10px; left: 50%; margin-left: clamp(178px, 30vh, 232px); padding: 6px 10px; border-radius: 10px; font-size: 16px; }
 #h-fs { display: block; top: 10px; left: 50%; margin-left: clamp(134px, 23vh, 180px); padding: 6px 10px; border-radius: 10px; font-size: 16px; }
 #h-menu { display: block; top: 10px; left: 50%; margin-left: clamp(90px, 16vh, 130px); padding: 6px 10px; border-radius: 10px; font-size: 16px; }
 
