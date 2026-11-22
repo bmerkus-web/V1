@@ -589,6 +589,30 @@ function getPower(dt) {
   const p = input.demoPower(dt, P.ftp);
   return { power: p, cadence: p > 20 ? 60 + (p / P.ftp) * 28 : 0, hr: hrm.value };
 }
+// Muziek: vertel de muziekmotor wat er gebeurt (sprint, klim, kasseien, laatste ronde, workoutblok, opbouw).
+function musicState() {
+  const r = race, me = r.me, az = r.activeZone?.zone?.type;
+  const st = {
+    intensity: me.power / (P.ftp * 1.5),
+    zone: me.onCobble || me.inGutter ? 'cobble' : az === 'sprint' || az === 'climb' ? az : null,
+    lastLap: r.laps > 1 && r.laps < 900 && !me.finished && Math.floor(Math.max(0, me.dist) / r.L) === r.laps - 1,
+    finale: false, wkLevel: null, wkFree: false, riser: 0,
+    done: r.state === 'done' && !(wk && !wk.ended),
+  };
+  if (wk && !wk.ended) {
+    const p = wkAt(wk.w, wkTime());
+    if (p.done) st.done = true;
+    else {
+      const f = blockFrac(wk.w, p.b, P.ftp), nx = p.next[0];
+      st.wkLevel = f; st.wkFree = f == null;
+      st.finale = wk.game && p.i === wk.finalIdx && !me.finished;
+      // opbouw in de laatste 4 seconden vóór een zwaarder blok
+      if (nx && p.left <= 4 && (blockFrac(wk.w, nx, P.ftp) ?? 0.6) > (f ?? 0.6) + 0.1) st.riser = p.left;
+    }
+  }
+  audio.setState(st);
+}
+
 // ---------- workout tijdens de rit ----------
 const wkTime = () => (race ? Math.max(0, race.time - race.t0 + race.wkOffset) : 0);
 function wkTarget() { if (!wk || !race || wk.ended) return null; const p = wkAt(wk.w, wkTime()); return p.done ? null : targetW(wk.w, p.b, p.tIn, P.ftp, wk.bias); }
@@ -738,6 +762,7 @@ function launch(cfg, carry) {
     profile: { ...P, fair: cfg.fair, assist: !!P.assist && ((cfg.workout && cfg.wkMode === 'ride') || (!!cfg.plan && !room)) /* stuurhulp alleen bij Ride en solo training */ }, difficulty: cfg.diff, rubber: !!cfg.rubber, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
   });
   race.multi = !!room;
+  audio.setScene(wk?.zen ? 'zen' : track.id); // elke baan zijn eigen muziek
   drawProfile($('h-prof'), track, profDots);
   $('h-dots').innerHTML = '';
 }
@@ -1139,7 +1164,7 @@ function frame(now) {
   if (!paused) {
     while (dt > 0.0001 && race) { const step = Math.min(dt, 0.04); race.update(step); dt -= step; }
     if (!race) return;
-    audio.setIntensity(race.me.power / (P.ftp * 1.5));
+    musicState();
     const wkOn = wk && !wk.ended && (race.state === 'race' || (wk.game && race.state === 'done'));
     const ergW = wkOn && wk.erg ? wkTarget() : null;
     if (ergW != null) trainer.setTargetPower(ergW); // ERG: de trainer houdt het doel vast
