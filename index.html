@@ -71,6 +71,7 @@
         <input id="wk-file" type="file" accept=".zwo,.erg,.mrc,.xml,.txt" multiple hidden></div>
       <p class="small" id="wk-msg"></p>
       <label class="check"><input id="o-erg" type="checkbox"> ERG: de trainer houdt zelf het doelvermogen vast</label>
+      <label class="check" id="o-assist-wk-l"><input id="o-assist-wk" type="checkbox"> Stuurhulp: je blijft vanzelf op de weg</label>
       <div class="seg" id="wk-modes" role="radiogroup" aria-label="Soort workout">
         <button data-m="zen" role="radio">🧘 Zen</button><button data-m="ride" role="radio">🚴 Ride</button><button data-m="game" role="radio">🎮 Game</button>
       </div>
@@ -85,6 +86,7 @@
       <button id="t-add" class="ghost">＋ Etappe toevoegen</button>
       <label class="check"><input id="t-cool" type="checkbox"> Cooling-down (7 min)</label>
       <p class="small" id="plan-sum"></p>
+      <label class="check" id="o-assist-tr-l"><input id="o-assist-tr" type="checkbox"> Stuurhulp: je blijft vanzelf op de weg</label>
     </div>
     <div class="card opts">
       <label id="o-laps-l">Rondes <select id="o-laps"><option>1</option><option selected>2</option><option>3</option><option>5</option></select></label>
@@ -93,6 +95,7 @@
       <label id="o-diff-l">Niveau bots <select id="o-diff"><option>makkelijk</option><option selected>normaal</option><option>zwaar</option><option>beul</option></select></label>
       <label class="check"><input id="o-fair" type="checkbox"> Eerlijk (vermogen t.o.v. FTP)</label>
       <p class="small" id="o-fair-note"></p>
+      <p class="small" id="o-steer-note"></p>
       <label class="check"><input id="o-rubber" type="checkbox"> Rubber banding (achterblijvers tot 10% sneller; tijden tellen niet voor records)</label>
       <div class="row ghosts"><span>👻 Spook van mijn PR</span>
         <label class="check" id="o-ghost-l"><input id="o-ghost" type="checkbox"> Race</label>
@@ -136,7 +139,6 @@
       <p class="small">Hoe sterk je KICKR klimmetjes laat voelen. 0% = altijd vlak, 100% = de echte helling.</p>
       <label class="check"><input id="p-vshift" type="checkbox"> Virtueel schakelen</label>
       <p class="small">Voor een Zwift Cog, Zwift Ride of een fiets zonder versnellingen op de trainer. De schakelknoppen van je Zwift-knoppen (of Q en E) maken de trainer lichter of zwaarder, in 24 versnellingen. Zet dit uit als je gewoon met je eigen versnellingen schakelt; de knoppen gebruiken dan een power-up.</p>
-      <label class="check"><input id="p-assist" type="checkbox"> Stuurhulp in bochten</label>
       <p class="small">Uit (standaard): een bocht duwt je naar buiten, harder naarmate je sneller gaat. Aan: je blijft vanzelf op de weg.</p>
       <label class="check"><input id="p-music" type="checkbox"> Muziek</label>
       <label class="check"><input id="p-sfx" type="checkbox"> Geluidseffecten</label>
