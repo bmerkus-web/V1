@@ -3,7 +3,7 @@ import { makeMusic } from './music.js';
 import { makeClub, CLUB_ORDER } from './clubsound.js';
 let ctx = null, master = null, musicGain = null, sfxGain = null;
 let musicOn = true, sfxOn = true, musicTimer = null, step = 0, nextAt = 0;
-let intensity = 0.5;
+let intensity = 0.5, musicVol = 1, sfxVol = 1; // volumeschuiven (0..1)
 
 function ensure() {
   if (ctx) return true;
@@ -11,8 +11,8 @@ function ensure() {
   if (!AC) return false;
   ctx = new AC();
   master = ctx.createGain(); master.gain.value = 0.6; master.connect(ctx.destination);
-  musicGain = ctx.createGain(); musicGain.gain.value = 0.22; musicGain.connect(master);
-  sfxGain = ctx.createGain(); sfxGain.gain.value = 0.5; sfxGain.connect(master);
+  musicGain = ctx.createGain(); musicGain.gain.value = 0.22 * musicVol; musicGain.connect(master);
+  sfxGain = ctx.createGain(); sfxGain.gain.value = 0.5 * sfxVol; sfxGain.connect(master);
   return true;
 }
 
@@ -127,4 +127,9 @@ export const audio = {
   },
   stopMusic() { clearInterval(musicTimer); musicTimer = null; },
   setOptions(music, sfx) { musicOn = music; sfxOn = sfx; },
+  // Volumes uit de instellingen (0..1); kwadratisch, zodat de schuif natuurlijker aanvoelt.
+  setVolumes(m, s) {
+    musicVol = m * m; sfxVol = s * s;
+    if (ctx) { musicGain.gain.setTargetAtTime(0.22 * musicVol, ctx.currentTime, 0.05); sfxGain.gain.setTargetAtTime(0.5 * sfxVol, ctx.currentTime, 0.05); }
+  },
 };
