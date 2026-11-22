@@ -69,6 +69,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- Stuurhulp weg uit de instellingen: alleen nog als optie bij workout Ride en solo training; in races, multiplayer en workout Game stuurt iedereen zelf (met een melding als er geen stuur gekoppeld is)
 - WB-47 Workout als drieweg-keuze Zen / Ride / Game; Game ook met je maten in een kamer: ieder op zijn eigen FTP, trainer altijd in ERG, race-events raken alleen je snelheid, snelheid volgt je doel, finish na het laatste zware blok, daarna uitrijden en de uitslag
 - Workouts: knoppen −5%, +5% en overslaan op het scherm (altijd linksboven), R voor ERG, en een zen-modus: alleen het dashboard op een donkere achtergrond die meekleurt met de zone
 - Workouts (solo): ingebouwde workouts en eigen .zwo/.erg/.mrc importeren, ERG op de trainer, scherm met klok en wattages in het midden, 3-2-1 bij elke blokwissel, doel ±5% met de schakelknoppen, blok overslaan, spelmodus met bots en power-ups, nabespreking met medailles per blok en NP/IF/TSS

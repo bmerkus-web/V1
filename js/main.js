@@ -191,11 +191,11 @@ $('b-board').onclick = () => show('board');
 $('b-help').onclick = () => show('help');
 $('b-settings').onclick = () => {
   $('p-feel').value = P.trainerFeel; $('p-feel-v').textContent = P.trainerFeel + '%';
-  $('p-vshift').checked = P.vshift; $('p-assist').checked = P.assist; $('p-music').checked = P.music; $('p-sfx').checked = P.sfx;
+  $('p-vshift').checked = P.vshift; $('p-music').checked = P.music; $('p-sfx').checked = P.sfx;
   show('settings');
 };
 $('p-feel').oninput = (e) => { P.trainerFeel = +e.target.value; $('p-feel-v').textContent = P.trainerFeel + '%'; save(); };
-for (const k of ['vshift', 'assist', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };
+for (const k of ['vshift', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };
 audio.setOptions(P.music, P.sfx);
 $('help-items').innerHTML = Object.values(ITEMS).map((i) => `<div>${i.icon} <b>${i.name}</b> – ${i.hint}</div>`).join('');
 
@@ -260,6 +260,14 @@ function renderSetup() {
   $('o-fair-note').classList.toggle('hidden', wk_);
   document.querySelector('.ghosts').classList.toggle('hidden', wk_);
   $('o-erg').checked = store.wkErg ?? true; // ERG is een eigen keuze, ook in een kamer
+  // Stuurhulp alleen bij rustig rijden (workout Ride, solo training). In races en multiplayer stuurt iedereen zelf.
+  const assistOk = (wk_ && sel.wkMode === 'ride') || (tr_ && !lobby);
+  $('o-assist-wk-l').classList.toggle('hidden', !(wk_ && sel.wkMode === 'ride'));
+  $('o-assist-tr-l').classList.toggle('hidden', !(tr_ && !lobby));
+  $('o-assist-wk').checked = $('o-assist-tr').checked = !!P.assist;
+  const steers = !(wk_ && sel.wkMode === 'zen') && !(assistOk && P.assist);
+  const hasWheel = sterzo.connected || pads.some((d) => d.connected);
+  $('o-steer-note').textContent = steers && !hasWheel ? '🎮 Geen stuur gekoppeld: je stuurt met ← → of met de knoppen op het scherm. In bochten word je naar buiten geduwd als je niet stuurt.' : '';
   for (const b of $('wk-modes').children) { b.classList.toggle('sel', b.dataset.m === sel.wkMode); b.setAttribute('aria-checked', b.dataset.m === sel.wkMode); b.disabled = !canEdit || (lobby && b.dataset.m !== 'game'); }
   $('wk-mode-note').textContent = { zen: 'Zen: geen wereld, alleen je klok, wattages en grafiek.', ride: 'Ride: alleen op de baan, zonder bots en power-ups.',
     game: 'Game: samen (of met bots) dezelfde workout, ieder op zijn eigen FTP, met power-ups. Alles in het spel raakt alleen je snelheid; je trainer doet gewoon de workout. Je snelheid volgt hoe goed je je doel haalt. De race eindigt na het laatste zware blok (🏁).' }[sel.wkMode];
@@ -313,6 +321,7 @@ $('m-race').onclick = () => { sel.mode = 'race'; pushSettings(); };
 $('m-training').onclick = () => { sel.mode = 'training'; pushSettings(); };
 $('m-workout').onclick = () => { sel.mode = 'workout'; pushSettings(); };
 $('o-erg').onchange = (e) => { store.wkErg = e.target.checked; save(); };
+for (const id of ['o-assist-wk', 'o-assist-tr']) $(id).onchange = (e) => { P.assist = e.target.checked; save(); renderSetup(); };
 $('wk-modes').onclick = (e) => { const b = e.target.closest('[data-m]'); if (!b || b.disabled) return; sel.wkMode = store.wkMode = b.dataset.m; save(); pushSettings(); };
 
 // ---------- workouts kiezen en importeren ----------
@@ -726,7 +735,7 @@ function launch(cfg, carry) {
   }
   race = new Race({
     track, laps: st.laps, seed: cfg.seed + (training ? training.idx : 0), riders, room, isHost: iRunBots, ns: n,
-    profile: { ...P, fair: cfg.fair }, difficulty: cfg.diff, rubber: !!cfg.rubber, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
+    profile: { ...P, fair: cfg.fair, assist: !!P.assist && ((cfg.workout && cfg.wkMode === 'ride') || (!!cfg.plan && !room)) /* stuurhulp alleen bij Ride en solo training */ }, difficulty: cfg.diff, rubber: !!cfg.rubber, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
   });
   race.multi = !!room;
   drawProfile($('h-prof'), track, profDots);
