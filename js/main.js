@@ -782,6 +782,9 @@ function launch(cfg, carry) {
   });
   race.multi = !!room;
   audio.setScene(wk?.zen ? 'zen' : track.id); // elke baan zijn eigen muziek
+  // Training: de muziek van de volgende baan alvast klaarzetten, zodat hij na de teleport meteen wisselt.
+  const nxt = training?.stages.slice(training.idx + 1).find((s) => s.track !== st.track);
+  if (nxt) { const r = race; setTimeout(() => { if (race === r) audio.prepare(nxt.track); }, 10000); }
   drawProfile($('h-prof'), track, profDots);
   $('h-dots').innerHTML = '';
 }

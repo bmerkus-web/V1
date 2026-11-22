@@ -133,6 +133,7 @@ export const audio = {
   },
   setIntensity(v) { intensity = Math.max(0, Math.min(1, v)); if (music) music.state.intensity = intensity; },
   // Sfeer van de baan: 'polder', 'vulkaan', 'kosmo' of 'zen'. Een zelfgekozen nummer blijft staan tot de race voorbij is.
+  // Club en Arcade wisselen mee na een teleport; de radio niet (die zender ligt vast zodra hij speelt).
   setScene(name) { scene = name; if (!userTrack) applyTrack(); },
   // Wat er in het spel gebeurt: { intensity, zone, lastLap, finale, wkLevel, wkFree, riser, done }
   setState(o) { if (music) Object.assign(music.state, o); if (club) Object.assign(club.state, o); },
@@ -160,7 +161,8 @@ export const audio = {
   startMusic() {
     if (!ensure() || musicTimer) return;
     if (mode === 'radio') {
-      playStation(currentTrack());
+      userTrack ||= currentTrack(); // zender vastzetten: bij een teleport naar een andere baan blijft hij staan
+      playStation(userTrack);
       musicTimer = setInterval(schedule, 1000); // markeert 'speelt'
       return;
     }
