@@ -191,9 +191,16 @@ $('b-board').onclick = () => show('board');
 $('b-help').onclick = () => show('help');
 $('b-settings').onclick = () => {
   $('p-feel').value = P.trainerFeel; $('p-feel-v').textContent = P.trainerFeel + '%';
+  $('p-mvol').value = P.musicVol ?? 100; $('p-mvol-v').textContent = (P.musicVol ?? 100) + '%';
+  $('p-svol').value = P.sfxVol ?? 100; $('p-svol-v').textContent = (P.sfxVol ?? 100) + '%';
   $('p-vshift').checked = P.vshift; $('p-music').checked = P.music; $('p-sfx').checked = P.sfx; $('p-sound').value = P.sound || 'club';
   show('settings');
 };
+const applyVolumes = () => audio.setVolumes((P.musicVol ?? 100) / 100, (P.sfxVol ?? 100) / 100);
+applyVolumes();
+$('p-mvol').oninput = (e) => { P.musicVol = +e.target.value; $('p-mvol-v').textContent = P.musicVol + '%'; applyVolumes(); save(); };
+$('p-svol').oninput = (e) => { P.sfxVol = +e.target.value; $('p-svol-v').textContent = P.sfxVol + '%'; applyVolumes(); save(); };
+$('p-svol').onchange = () => { audio.unlock(); audio.sfx('bolt'); }; // even laten horen hoe hard het is
 $('p-feel').oninput = (e) => { P.trainerFeel = +e.target.value; $('p-feel-v').textContent = P.trainerFeel + '%'; save(); };
 for (const k of ['vshift', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };
 audio.setOptions(P.music, P.sfx);
