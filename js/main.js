@@ -191,12 +191,14 @@ $('b-board').onclick = () => show('board');
 $('b-help').onclick = () => show('help');
 $('b-settings').onclick = () => {
   $('p-feel').value = P.trainerFeel; $('p-feel-v').textContent = P.trainerFeel + '%';
-  $('p-vshift').checked = P.vshift; $('p-music').checked = P.music; $('p-sfx').checked = P.sfx;
+  $('p-vshift').checked = P.vshift; $('p-music').checked = P.music; $('p-sfx').checked = P.sfx; $('p-sound').value = P.sound || 'club';
   show('settings');
 };
 $('p-feel').oninput = (e) => { P.trainerFeel = +e.target.value; $('p-feel-v').textContent = P.trainerFeel + '%'; save(); };
 for (const k of ['vshift', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };
 audio.setOptions(P.music, P.sfx);
+audio.setMode(P.sound || 'club');
+$('p-sound').onchange = (e) => { P.sound = e.target.value; save(); audio.setMode(P.sound); };
 $('help-items').innerHTML = Object.values(ITEMS).map((i) => `<div>${i.icon} <b>${i.name}</b> – ${i.hint}</div>`).join('');
 
 // ---------- race-instellingen / lobby ----------
@@ -242,7 +244,7 @@ function renderSetup() {
     b.disabled = !canEdit;
     const pr = getTime(ns(), `${d.id}|race|${sel.laps}`);
     b.innerHTML = `<b>${d.name}</b><canvas width="300" height="54"></canvas><span>${(tr.length / 1000).toFixed(1)} km · ${Math.round(tr.climbTotal)} hm per ronde</span><span class="small">${d.desc}</span><span class="pr">${pr ? '🏆 PR ' + fmtTime(pr) : 'Nog geen PR'}</span>`;
-    b.onclick = () => { sel.track = d.id; pushSettings(); };
+    b.onclick = () => { sel.track = d.id; audio.prepare(d.id); pushSettings(); };
     $('tracks').appendChild(b);
     drawProfile(b.querySelector('canvas'), tr);
   }
@@ -589,6 +591,14 @@ function getPower(dt) {
   const p = input.demoPower(dt, P.ftp);
   return { power: p, cadence: p > 20 ? 60 + (p / P.ftp) * 28 : 0, hr: hrm.value };
 }
+// Carrousel: naar het volgende nummer (wisselt op de volgende maat).
+function nextTrack() {
+  if (!P.music) { toast('Muziek staat uit (M)'); return; }
+  toast(`🎵 ${audio.nextTrack()}`);
+}
+$('h-music').addEventListener('pointerdown', (e) => { e.preventDefault(); nextTrack(); });
+$('h-music').addEventListener('click', (e) => { if (e.detail === 0) nextTrack(); });
+
 // Muziek: vertel de muziekmotor wat er gebeurt (sprint, klim, kasseien, laatste ronde, workoutblok, opbouw).
 function musicState() {
   const r = race, me = r.me, az = r.activeZone?.zone?.type;
@@ -692,6 +702,7 @@ const getSteer = (dt) => (wk?.zen && race ? clamp(-race.me.x * 2.5, -1, 1) : cla
 let profDots = {};
 function startRace(cfg) {
   rideShot = null; lobbyReady = false; rerenderResults = null;
+  audio.clearUserTrack(); // elke race begint met het nummer van de baan
   wk = cfg.workout ? { w: cfg.workout, mode: cfg.wkMode || (cfg.zen ? 'zen' : cfg.wgame ? 'game' : 'ride'), bias: 0, erg: store.wkErg ?? true, zen: !!cfg.zen, game: !!cfg.wgame,
     finish: cfg.wkFinish || 0, finalIdx: cfg.wkFinish ? cfg.workout.blocks.findIndex((b) => Math.abs(b.t0 + b.dur - cfg.wkFinish) < 0.5) : -1, log: [], sec: -1, bi: -1, p3: 0, beep: 4 } : null;
   $('hud').classList.toggle('zen', !!wk?.zen); document.body.classList.toggle('zen', !!wk?.zen);
@@ -1154,6 +1165,7 @@ function frame(now) {
   if (input.take('bell')) race.bell();
   const gu = input.take('gearUp'), gd = input.take('gearDown');
   if (input.take('skip')) wkSkip();
+  if (input.take('track')) nextTrack();
   if (input.take('erg')) wkErg();
   if (wk && (gu || gd)) wkBias(gu ? 0.05 : -0.05); // workout: schakelknoppen maken het 5% zwaarder of lichter
   else if (P.vshift && (gu || gd) && shift(gu ? 1 : -1)) {

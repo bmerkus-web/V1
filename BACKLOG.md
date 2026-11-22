@@ -69,6 +69,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- Clubsound: vier nummers (space disco, krautrock, electro à la Justice/Soulwax, techno) met gebakken klanken, licht genoeg voor oude tablets; opbouw met break, aanloop en drop; volgt race en workout; 🎵-knop/T voor het volgende nummer; keuze tussen Clubsound en Arcade 8-bit in de instellingen
 - Muziek: eigen sfeer per baan (polder, vulkaan, kosmo) en voor Zen; meer drums en melodie in sprints en klimmen, geratel op de kasseien, sneller in de laatste ronde; in workouts rustig bij herstel en opzwepend in intervallen, met een opbouw bij de 3-2-1; wisselende akkoordenreeksen en melodieën
 - Stuurhulp weg uit de instellingen: alleen nog als optie bij workout Ride en solo training; in races, multiplayer en workout Game stuurt iedereen zelf (met een melding als er geen stuur gekoppeld is)
 - WB-47 Workout als drieweg-keuze Zen / Ride / Game; Game ook met je maten in een kamer: ieder op zijn eigen FTP, trainer altijd in ERG, race-events raken alleen je snelheid, snelheid volgt je doel, finish na het laatste zware blok, daarna uitrijden en de uitslag
