@@ -27,6 +27,8 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-12 | Apparaten onthouden, zodat ze na verversen vanzelf terugkomen zonder keuzelijst (eerst nakijken of Chrome dat toestaat). | idee | M |
 | WB-13 | Eigen verbindingsdienst plus hulpserver (TURN) voor multiplayer, zodat het niet afhangt van de gratis PeerJS-dienst en ook op strenge netwerken werkt. | idee | M |
 | WB-19 | Chat in de lobby (en misschien snelle emoji's tijdens de race). | Sebas | M |
+| WB-51 | Radio: titel en artiest van het nummer dat speelt in beeld (KEXP en FIP hebben openbare gegevens; nakijken of die vanuit de browser bereikbaar zijn). | zelf | S |
+| WB-52 | Spotify bedienen vanuit de game (nu speelt, volgende nummer); vraagt Premium, inloggen en goedkeuring van Spotify voor meer dan een handvol gebruikers. Eventueel voor de publieke beta. | zelf | M |
 | WB-50 | Workout-game: blitzjes en boxen verdienen door in de zone te rijden (bijv. elke 30 s binnen 5% van je doel een blitzje, een heel blok in de zone een box), in plaats van of naast de boxen op de weg. Twijfel nog. | zelf | S |
 | WB-48 | Workouts: medailles en bogen op de weg voor het volgende blok, en een spook van je vorige poging. | zelf | S |
 | WB-49 | Workouts uit JOIN en Fondo: kijken welke bestanden die exporteren (eventueel .fit inlezen). Wacht op een voorbeeldbestand. | zelf | S |
@@ -69,6 +71,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- 📻 Radio als derde soort muziek: tien zenders met elk een eigen sound, voorkeurszender per baan (Polder FIP Groove, Vulkaanpas FIP Rock, Kosmodroom Intergalactic FM, Zen SomaFM DEF CON), zappen met de 🎵-knop, automatisch door bij een zender die niet bereikbaar is
 - Clubsound: vier nummers (space disco, krautrock, electro à la Justice/Soulwax, techno) met gebakken klanken, licht genoeg voor oude tablets; opbouw met break, aanloop en drop; volgt race en workout; 🎵-knop/T voor het volgende nummer; keuze tussen Clubsound en Arcade 8-bit in de instellingen
 - Muziek: eigen sfeer per baan (polder, vulkaan, kosmo) en voor Zen; meer drums en melodie in sprints en klimmen, geratel op de kasseien, sneller in de laatste ronde; in workouts rustig bij herstel en opzwepend in intervallen, met een opbouw bij de 3-2-1; wisselende akkoordenreeksen en melodieën
 - Stuurhulp weg uit de instellingen: alleen nog als optie bij workout Ride en solo training; in races, multiplayer en workout Game stuurt iedereen zelf (met een melding als er geen stuur gekoppeld is)
