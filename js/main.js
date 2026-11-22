@@ -205,6 +205,7 @@ $('p-feel').oninput = (e) => { P.trainerFeel = +e.target.value; $('p-feel-v').te
 for (const k of ['vshift', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };
 audio.setOptions(P.music, P.sfx);
 audio.setMode(P.sound || 'club');
+audio.onNotice((m) => toast(m));
 $('p-sound').onchange = (e) => { P.sound = e.target.value; save(); audio.setMode(P.sound); };
 $('help-items').innerHTML = Object.values(ITEMS).map((i) => `<div>${i.icon} <b>${i.name}</b> – ${i.hint}</div>`).join('');
 
@@ -601,7 +602,7 @@ function getPower(dt) {
 // Carrousel: naar het volgende nummer (wisselt op de volgende maat).
 function nextTrack() {
   if (!P.music) { toast('Muziek staat uit (M)'); return; }
-  toast(`🎵 ${audio.nextTrack()}`);
+  toast(audio.nextTrack());
 }
 $('h-music').addEventListener('pointerdown', (e) => { e.preventDefault(); nextTrack(); });
 $('h-music').addEventListener('click', (e) => { if (e.detail === 0) nextTrack(); });

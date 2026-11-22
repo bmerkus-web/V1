@@ -73,15 +73,56 @@ let music = null, club = null, scene = 'polder', mode = 'club', userTrack = null
 const ARCADE_ORDER = ['polder', 'vulkaan', 'kosmo', 'zen'];
 const CLUB_FOR = { polder: 'disco', vulkaan: 'kraut', kosmo: 'electro', zen: 'techno' };
 const ARCADE_NAME = { polder: 'Arcade · Neon', vulkaan: 'Arcade · Vulkaan', kosmo: 'Arcade · Kosmos', zen: 'Arcade · Zen' };
-const currentTrack = () => userTrack || (mode === 'club' ? CLUB_FOR[scene] || 'disco' : scene);
+// Radio: tien zenders met elk een eigen sound; per baan een voorkeurszender.
+export const STATIONS = {
+  fipgroove: { name: 'FIP Groove', sound: 'funk, soul, disco', urls: ['https://icecast.radiofrance.fr/fipgroove-midfi.mp3', 'https://icecast.radiofrance.fr/fipgroove-hifi.aac'] },
+  fiprock: { name: 'FIP Rock', sound: 'rock', urls: ['https://icecast.radiofrance.fr/fiprock-midfi.mp3', 'https://icecast.radiofrance.fr/fiprock-hifi.aac'] },
+  intergalactic: { name: 'Intergalactic FM', sound: 'electro en italo', urls: ['https://radio.intergalactic.fm/1', 'http://radio.intergalactic.fm/1'] },
+  defcon: { name: 'SomaFM DEF CON', sound: 'donkere, stuwende elektronica', urls: ['https://ice1.somafm.com/defcon-128-mp3', 'https://ice2.somafm.com/defcon-128-mp3'] },
+  kexp: { name: 'KEXP', sound: 'indie en alternatief', urls: ['https://kexp-mp3-128.streamguys1.com/kexp128.mp3', 'https://kexp.streamguys1.com/kexp160.aac'] },
+  fipelectro: { name: 'FIP Electro', sound: 'elektronisch', urls: ['https://icecast.radiofrance.fr/fipelectro-midfi.mp3', 'https://icecast.radiofrance.fr/fipelectro-hifi.aac'] },
+  fipjazz: { name: 'FIP Jazz', sound: 'jazz', urls: ['https://icecast.radiofrance.fr/fipjazz-midfi.mp3', 'https://icecast.radiofrance.fr/fipjazz-hifi.aac'] },
+  fipworld: { name: 'FIP World', sound: 'wereldmuziek', urls: ['https://icecast.radiofrance.fr/fipworld-midfi.mp3', 'https://icecast.radiofrance.fr/fipworld-hifi.aac'] },
+  groovesalad: { name: 'SomaFM Groove Salad', sound: 'chill downtempo', urls: ['https://ice1.somafm.com/groovesalad-128-mp3', 'https://ice2.somafm.com/groovesalad-128-mp3'] },
+  paradise: { name: 'Radio Paradise', sound: 'eclectisch, van rock tot elektronica', urls: ['https://stream.radioparadise.com/mp3-128', 'https://stream.radioparadise.com/aac-128'] },
+};
+const RADIO_ORDER = Object.keys(STATIONS);
+const RADIO_FOR = { polder: 'fipgroove', vulkaan: 'fiprock', kosmo: 'intergalactic', zen: 'defcon' };
+let radio = null, radioTry = 0, radioSkips = 0, notice = () => {};
+const currentTrack = () => userTrack || (mode === 'club' ? CLUB_FOR[scene] || 'disco' : mode === 'radio' ? RADIO_FOR[scene] || 'fipgroove' : scene);
+// Speelt een zender af; lukt het niet, dan het reserve-adres en daarna de volgende zender.
+function playStation(id, fresh = true) {
+  const st = STATIONS[id]; if (!st) return;
+  if (!radio) {
+    radio = new Audio(); radio.preload = 'none';
+    radio.addEventListener('error', () => {
+      const cur = STATIONS[radio._id]; if (!cur || !radio._on) return;
+      if (++radioTry < cur.urls.length) { radio.src = cur.urls[radioTry]; radio.play().catch(() => {}); return; }
+      if (++radioSkips >= RADIO_ORDER.length) { notice('📻 Geen enkele zender bereikbaar (internet?)'); return; }
+      notice(`📻 ${cur.name} niet bereikbaar – volgende zender`);
+      userTrack = RADIO_ORDER[(RADIO_ORDER.indexOf(radio._id) + 1) % RADIO_ORDER.length];
+      playStation(userTrack, false);
+    });
+    radio.addEventListener('playing', () => { radioSkips = 0; });
+  }
+  if (fresh) radioSkips = 0;
+  radio._id = id; radio._on = true; radioTry = 0;
+  radio.volume = Math.min(1, 0.55 * musicVol);
+  radio.src = st.urls[0];
+  radio.play().catch(() => {}); // fouten komen via het 'error'-event
+}
+function stopRadio() { if (!radio) return; radio._on = false; radio.pause(); radio.removeAttribute('src'); radio.load(); }
 function schedule() {
   if (!ctx || !musicOn) return;
+  if (mode === 'radio') return;
   if (mode === 'club') club?.schedule(ctx.currentTime + 0.25);
   else music?.schedule(ctx.currentTime + 0.25);
 }
 function applyTrack() {
   const t = currentTrack();
-  if (mode === 'club') { if (club) club.setStyle(t); } else if (music) music.setTheme(t);
+  if (mode === 'club') { if (club) club.setStyle(t); }
+  else if (mode === 'radio') { if (musicTimer) playStation(t); }
+  else if (music) music.setTheme(t);
 }
 
 export const audio = {
@@ -105,15 +146,24 @@ export const audio = {
   prepare(sceneName) { if (mode === 'club' && ensure()) { club ||= makeClub(ctx, musicGain); club.prepare(CLUB_FOR[sceneName] || 'disco').catch(() => {}); } },
   // Carrousel: naar het volgende nummer. Geeft de naam terug.
   nextTrack() {
-    const list = mode === 'club' ? CLUB_ORDER : ARCADE_ORDER, cur = currentTrack();
+    const list = mode === 'club' ? CLUB_ORDER : mode === 'radio' ? RADIO_ORDER : ARCADE_ORDER, cur = currentTrack();
     userTrack = list[(list.indexOf(cur) + 1) % list.length];
     applyTrack();
     return this.trackName();
   },
-  trackName() { const t = currentTrack(); return mode === 'club' ? (club ? club.name(t) : t) : ARCADE_NAME[t] || t; },
+  trackName() {
+    const t = currentTrack();
+    if (mode === 'radio') return `📻 ${STATIONS[t].name} · ${STATIONS[t].sound}`;
+    return '🎵 ' + (mode === 'club' ? (club ? club.name(t) : t) : ARCADE_NAME[t] || t);
+  },
   clearUserTrack() { userTrack = null; },
   startMusic() {
     if (!ensure() || musicTimer) return;
+    if (mode === 'radio') {
+      playStation(currentTrack());
+      musicTimer = setInterval(schedule, 1000); // markeert 'speelt'
+      return;
+    }
     if (mode === 'club') {
       club ||= makeClub(ctx, musicGain);
       club.reset(ctx.currentTime + 0.1);
@@ -125,11 +175,14 @@ export const audio = {
     }
     musicTimer = setInterval(schedule, 80);
   },
-  stopMusic() { clearInterval(musicTimer); musicTimer = null; },
-  setOptions(music, sfx) { musicOn = music; sfxOn = sfx; },
+  stopMusic() { clearInterval(musicTimer); musicTimer = null; stopRadio(); },
+  setOptions(music, sfx) { musicOn = music; sfxOn = sfx; if (!musicOn) stopRadio(); else if (mode === 'radio' && musicTimer && !radio?._on) playStation(currentTrack()); },
+  // Meldingen voor de speler (bijv. een zender die niet bereikbaar is).
+  onNotice(fn) { notice = fn; },
   // Volumes uit de instellingen (0..1); kwadratisch, zodat de schuif natuurlijker aanvoelt.
   setVolumes(m, s) {
     musicVol = m * m; sfxVol = s * s;
     if (ctx) { musicGain.gain.setTargetAtTime(0.22 * musicVol, ctx.currentTime, 0.05); sfxGain.gain.setTargetAtTime(0.5 * sfxVol, ctx.currentTime, 0.05); }
+    if (radio) radio.volume = Math.min(1, 0.55 * musicVol);
   },
 };
