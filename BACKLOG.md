@@ -69,6 +69,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- Workouts: knoppen −5%, +5% en overslaan op het scherm (altijd linksboven), R voor ERG, en een zen-modus: alleen het dashboard op een donkere achtergrond die meekleurt met de zone
 - Workouts (solo): ingebouwde workouts en eigen .zwo/.erg/.mrc importeren, ERG op de trainer, scherm met klok en wattages in het midden, 3-2-1 bij elke blokwissel, doel ±5% met de schakelknoppen, blok overslaan, spelmodus met bots en power-ups, nabespreking met medailles per blok en NP/IF/TSS
 - Uitslag in stappen: voorlopige uitslag, jurybeslissing (met waarvoor en tegen wie) en definitieve uitslag met stijgers en dalers, segmentwinnaars en eindtruien; het eindscherm blijft staan als de host naar de kamer gaat of vertrekt
 - Gouden Kassei voor de snelste kasseientijd: 30 s een antilekband (geen lek, lopend lek meteen weg, berm half zo erg), te zien aan een gekleurde band en een gouden keitje bij de naam

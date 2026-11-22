@@ -164,14 +164,13 @@ small.pen { color: var(--gold); font-weight: 700; }
 /* ---------- workout ---------- */
 #hud.workout #h-time, #hud.workout #h-tot, #hud.workout #h-delta, #hud.workout #h-zone, #hud.workout #h-lap, #hud.workout #h-watt,
 #hud.workout .h-sub, #hud.workout #h-hr, #hud.workout #h-gear, #hud.workout .h-bc { display: none !important; }
-#hud.workout:not(.wkgame) #h-pos, #hud.workout:not(.wkgame) .h-tr, #hud.workout:not(.wkgame) .h-br { display: none !important; }
+#hud.workout #h-pos, #hud.workout:not(.wkgame) .h-tr, #hud.workout:not(.wkgame) .h-br { display: none !important; }
 #hud.workout.wkgame .h-tr { top: 96px; }
 #hud.workout #h-banner { top: 50%; }
 #wk { inset: 0; pointer-events: none; font-style: normal; }
 #wk > * { position: absolute; }
 #wk-l { left: 22px; top: max(18px, env(safe-area-inset-top)); max-width: min(340px, 28vw); }
-#hud.wkgame #wk-l { top: calc(max(10px, env(safe-area-inset-top)) + clamp(48px, 9vh, 86px)); }
-#wk-blk { font-size: clamp(12px, 2.1vh, 16px); font-weight: 800; letter-spacing: .12em; color: var(--gold); text-shadow: 0 1px 4px rgba(0, 0, 0, .95); }
+#wk-blk { white-space: nowrap; font-size: clamp(12px, 2.1vh, 16px); font-weight: 800; letter-spacing: .12em; color: var(--gold); text-shadow: 0 1px 4px rgba(0, 0, 0, .95); }
 #wk-cue { margin-top: 6px; font-size: clamp(15px, 2.8vh, 22px); font-weight: 900; font-style: italic; color: var(--cyan); text-shadow: 0 0 12px rgba(125, 249, 255, .45), 0 2px 6px #000; }
 #wk-c { left: 50%; top: 6px; transform: translateX(-50%); text-align: center; padding: 6px 48px 14px; border-radius: 40px;
   background: radial-gradient(ellipse at 50% 45%, rgba(8, 2, 24, .62) 0%, rgba(8, 2, 24, .45) 45%, rgba(8, 2, 24, 0) 72%); }
@@ -203,12 +202,11 @@ small.pen { color: var(--gold); font-weight: 700; }
 #hud.wkgame #wk-next { display: none; }
 #wk-chart { left: 50%; bottom: 10px; transform: translateX(-50%); width: min(820px, 64vw); height: 90px; border-radius: 12px; background: rgba(8, 2, 24, .55); }
 #hud.wkgame #wk-chart { transform: translateX(-58%); width: min(700px, 56vw); }
-#wk-ctl { right: 22px; bottom: 112px; display: flex; gap: 8px; pointer-events: auto; }
+#wk-ctl { display: flex; gap: 8px; margin: 10px 0 2px; pointer-events: auto; }
 #wk-ctl button { touch-action: none; min-width: 58px; height: 46px; padding: 0 12px; border-radius: 12px; font: 800 16px system-ui, sans-serif; color: #fff;
   background: rgba(8, 2, 24, .6); border: 2px solid rgba(255, 255, 255, .28); text-shadow: none; }
 #wk-ctl button:active { background: rgba(255, 255, 255, .2); }
 #wk-ctl button.confirm { border-color: var(--gold); color: var(--gold); min-width: 92px; }
-#wk-l #wk-ctl { position: static; margin-top: 10px; } /* spelmodus: onder het blok, want rechts staan de stand, de power-up en de stuurknoppen */
 .wk-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin-bottom: 10px; }
 .wk-card { position: relative; text-align: left; padding: 10px; border-radius: 12px; background: #0d0626; border: 2px solid transparent; color: var(--text); }
 .wk-card.sel { border-color: var(--gold); }
@@ -220,3 +218,22 @@ small.pen { color: var(--gold); font-weight: 700; }
 .wk-medal { font-size: 18px; }
 .wk-sw { display: inline-block; width: 9px; height: 14px; border-radius: 2px; margin-right: 8px; vertical-align: -2px; }
 .wk-sum th { text-align: left; font-size: 12px; color: var(--dim); }
+
+/* ---------- zen-modus: alleen het workout-dashboard op een donkere achtergrond ---------- */
+#zen-bg { position: fixed; inset: 0; display: none; background: #0a0418; }
+#zen-bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 70% 60% at 50% 42%, var(--zc, #39d98a) 0%, transparent 70%); opacity: .16; }
+body.zen #game { visibility: hidden; }
+body.zen #zen-bg { display: block; }
+#hud.zen > div:not(#wk):not(#h-count), #hud.zen .touch:not(#t-pedal) { display: none !important; }
+#hud.zen #wk-c { top: 47%; transform: translate(-50%, -50%); background: none; padding: 0; }
+#hud.zen #wk-cd { font-size: clamp(84px, 17vh, 170px); -webkit-text-stroke: 0; }
+#hud.zen .wk-bar { width: clamp(300px, 52vh, 540px); height: 10px; margin-top: 12px; }
+#hud.zen .wk-pw { margin-top: clamp(14px, 3.5vh, 34px); gap: clamp(20px, 4vh, 40px); }
+#hud.zen #wk-now { font-size: clamp(104px, 22vh, 220px); -webkit-text-stroke: 0; }
+#hud.zen #wk-tgt { font-size: clamp(52px, 10vh, 100px); -webkit-text-stroke: 0; }
+#hud.zen .wk-tl { font-size: clamp(13px, 1.9vh, 18px); }
+#hud.zen .wk-gauge { width: clamp(340px, 62vh, 620px); height: 14px; margin-top: 16px; }
+#hud.zen .wk-gauge i { top: -6px; height: 26px; }
+#hud.zen #wk-meta { margin-top: 16px; font-size: clamp(32px, 6vh, 56px); -webkit-text-stroke: 0; }
+#hud.zen #wk-chart { width: 90vw; height: 21vh; bottom: 3vh; transform: translateX(-50%); background: rgba(255, 255, 255, .04); }
+#hud.zen #wk-r { top: 22px; }

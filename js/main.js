@@ -34,7 +34,7 @@ let training = null; // lopende training: { stages, idx, courseLen, gone }
 // Workouts: ingebouwd + zelf geïmporteerd. wk = de lopende workout.
 let myWorkouts = loadWorkouts();
 const allWorkouts = () => [...BUILTIN, ...myWorkouts];
-Object.assign(sel, { wk: store.wkSel || 'b-kennis', erg: store.wkErg ?? true, wgame: false });
+Object.assign(sel, { wk: store.wkSel || 'b-kennis', erg: store.wkErg ?? true, wgame: false, zen: !!store.wkZen });
 let wk = null; // { w, bias, erg, log: [{t,p,tgt,hr,cad}], sec, bi, p3, chartAt }
 const clock = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = String(sec % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
 
@@ -257,7 +257,10 @@ function renderSetup() {
   for (const id of ['o-fair', 'o-rubber']) $(id).parentElement.classList.toggle('hidden', wk_ && !sel.wgame);
   $('o-fair-note').classList.toggle('hidden', wk_ && !sel.wgame);
   document.querySelector('.ghosts').classList.toggle('hidden', wk_);
-  $('o-erg').checked = sel.erg; $('o-wgame').checked = sel.wgame;
+  if (sel.zen) sel.wgame = false; // zen: geen wereld, dus ook geen spel
+  $('o-erg').checked = sel.erg; $('o-wgame').checked = sel.wgame; $('o-zen').checked = sel.zen;
+  $('o-wgame').disabled = sel.zen;
+  $('tracks').classList.toggle('hidden', tr_ || (wk_ && sel.zen)); // zen: geen baan te kiezen
   $('o-fair-note').textContent = sel.fair ? 'Iedereen die op zijn eigen FTP rijdt is even snel.' : 'Uit: snelheid volgt je watt per kilo (vul je gewicht in bij Renner).';
   $('o-laps').value = sel.laps; $('o-bots').value = Math.max(1, Math.min(sel.bots, maxBots || 1)); $('o-diff').value = sel.diff; $('o-fair').checked = sel.fair;
   $('o-ghost').checked = P.ghostRace; $('o-ghost-lap').checked = P.ghostLap; $('o-ghost-seg').checked = P.ghostSeg;
@@ -306,6 +309,7 @@ $('m-training').onclick = () => { sel.mode = 'training'; pushSettings(); };
 $('m-workout').onclick = () => { sel.mode = 'workout'; pushSettings(); };
 $('o-erg').onchange = (e) => { sel.erg = store.wkErg = e.target.checked; save(); };
 $('o-wgame').onchange = (e) => { sel.wgame = e.target.checked; renderSetup(); };
+$('o-zen').onchange = (e) => { sel.zen = store.wkZen = e.target.checked; save(); renderSetup(); };
 
 // ---------- workouts kiezen en importeren ----------
 // Workout als staafjes in zonekleuren (kaartje, HUD-grafiek en nabespreking).
@@ -398,7 +402,7 @@ $('b-start').onclick = () => {
   }));
   const cfg = { track: sel.track, laps: sel.laps, diff: sel.diff, fair: sel.fair, rubber: !!sel.rubber, seed: (Math.random() * 1e9) | 0, roster, bots };
   if (sel.mode === 'training') Object.assign(cfg, { plan: sel.plan.map((s) => ({ track: s.track, laps: s.laps })), warm: sel.warm, cool: sel.cool });
-  if (sel.mode === 'workout' && !room) Object.assign(cfg, { workout: allWorkouts().find((w) => w.id === sel.wk) || BUILTIN[0], erg: sel.erg, wgame: sel.wgame, laps: 999, rubber: sel.wgame && !!sel.rubber });
+  if (sel.mode === 'workout' && !room) Object.assign(cfg, { workout: allWorkouts().find((w) => w.id === sel.wk) || BUILTIN[0], erg: sel.erg, wgame: sel.wgame && !sel.zen, zen: sel.zen, laps: 999, rubber: sel.wgame && !sel.zen && !!sel.rubber, track: sel.zen ? 'polder' : sel.track });
   room?.start(cfg);
   startRace(cfg);
 };
@@ -609,6 +613,7 @@ function wkHud() {
   setHTML($('wk-tgt'), tg == null ? '–' : `${tg}<small>W</small>`);
   setText($('wk-tgt-l'), `DOEL${bias}`);
   $('wk-c').classList.toggle('free', tg == null);
+  if (wk.zen && wk.zc !== p.i) { wk.zc = p.i; $('zen-bg').style.setProperty('--zc', b.a == null ? '#5b5675' : zoneColor(f)); } // zen: achtergrond gloeit in de zonekleur
   $('wk-gauge').style.left = `${clamp(50 + (dev / 0.4) * 100, 0, 100)}%`;
   const cad = Math.round(me.cadence);
   setHTML($('wk-cad'), b.cad && Math.abs(cad - b.cad) > 8 ? `<span class="warn">${cad}</span>` : String(cad));
@@ -619,15 +624,17 @@ function wkHud() {
     return `<div><i style="background:${zoneColor(blockFrac(w, n, P.ftp))}"></i>${i ? 'dan' : 'straks'} ${esc(blockName(n).toLowerCase())} · ${clock(n.dur)}${nt == null ? '' : ` · ${nt === nt2 ? nt : nt + '→' + nt2} W`}</div>`; }).join(''));
   if (performance.now() - (wk.chartAt || 0) > 500) { wk.chartAt = performance.now(); drawWorkout($('wk-chart'), w, { pad: 14, top: 18, bottom: 6, now: t, log: wk.log, ftpLine: true, line: 3 }); }
 }
-const getSteer = (dt) => clamp(input.steer(dt) + sterzo.steer, -1, 1);
+// Zen: je ziet de weg niet, dus de renner stuurt zelf netjes over het midden.
+const getSteer = (dt) => (wk?.zen && race ? clamp(-race.me.x * 2.5, -1, 1) : clamp(input.steer(dt) + sterzo.steer, -1, 1));
 
 let profDots = {};
 function startRace(cfg) {
   rideShot = null; lobbyReady = false; rerenderResults = null;
-  wk = cfg.workout ? { w: cfg.workout, bias: 0, erg: !!cfg.erg, log: [], sec: -1, bi: -1, p3: 0, beep: 4 } : null;
+  wk = cfg.workout ? { w: cfg.workout, bias: 0, erg: !!cfg.erg, zen: !!cfg.zen, log: [], sec: -1, bi: -1, p3: 0, beep: 4 } : null;
+  $('hud').classList.toggle('zen', !!wk?.zen); document.body.classList.toggle('zen', !!wk?.zen);
+  const chart = $('wk-chart'), zc = !!wk?.zen; if (chart.width !== (zc ? 2400 : 1640)) { chart.width = zc ? 2400 : 1640; chart.height = zc ? 440 : 180; }
   $('hud').classList.toggle('workout', !!wk); $('hud').classList.toggle('wkgame', !!wk && !!cfg.wgame);
   $('wk').classList.toggle('hidden', !wk);
-  (wk && cfg.wgame ? $('wk-l') : $('wk')).appendChild($('wk-ctl'));
   lastCfg = cfg;
   hideOverlay();
   training = null;
@@ -705,7 +712,7 @@ function nextStage() {
 
 function endRace() {
   boxClear();
-  wk = null; $('wk').classList.add('hidden'); $('hud').classList.remove('workout', 'wkgame');
+  wk = null; $('wk').classList.add('hidden'); $('hud').classList.remove('workout', 'wkgame', 'zen'); document.body.classList.remove('zen');
   rerenderResults = null; lobbyReady = false;
   if (race) race.savePower();
   training = null;
@@ -748,7 +755,7 @@ function rideImage(r) {
   const where = r.wkName ? `Workout · ${r.wkName}` : r.training ? `Training · ${training ? training.count : ''} etappes` : r.track.name;
   const stats = [[`${(st.km || 0).toFixed(1)} km`, 'afstand'], [fmtTime(secs, 0), 'tijd'], [`${Math.round(avgP)} W`, 'gemiddeld'], [`${Math.round(st.hm || 0)} m`, 'hoogtemeters']];
   if (me.finished && r.riders.length > 1) stats.push([`${me.rank}/${r.riders.length}`, 'plaats']);
-  return compose(rideShot || grab($('game')), `${where} · ${when}`, stats); // te vroeg gestopt: het beeld van nu
+  return compose(rideShot || (r.zenShot ? r.zenShot : grab($('game'))), `${where} · ${when}`, stats); // te vroeg gestopt: het beeld van nu
 }
 const canSave = (r) => r.ns === 'real' && r.stats.log.length > 5;
 function wireSave(r) {
@@ -834,6 +841,13 @@ function finishWorkout(partial = false) {
     <div class="menu">${canSave(r) ? (r.saved ? '<p class="small">Rit opgeslagen.</p>' : SAVE_BTN) : ''}${SHOT_BTN}</div>
     <div class="menu"><button class="big" id="ov-again">Nog een keer</button><button class="ghost" id="ov-quit">Menu</button></div>`);
   drawWorkout($('wk-sum-chart'), w, { pad: 16, top: 14, bottom: 8, log, ftpLine: true, line: 3, avg: 10 });
+  if (wk.zen) { // zen: de grafiek is de ritfoto
+    const shot = document.createElement('canvas'); shot.width = 1600; shot.height = 900;
+    const g = shot.getContext('2d'), ch = document.createElement('canvas'); ch.width = 1400; ch.height = 520;
+    drawWorkout(ch, w, { pad: 10, top: 16, bottom: 4, log, ftpLine: true, line: 4, avg: 10 });
+    g.fillStyle = '#0a0418'; g.fillRect(0, 0, 1600, 900); g.drawImage(ch, 100, 190);
+    r.zenShot = shot;
+  }
   $('ov-again').onclick = () => startRace({ ...lastCfg, seed: (Math.random() * 1e9) | 0 });
   $('ov-quit').onclick = quitToMenu;
   wireSave(r);
@@ -1084,11 +1098,11 @@ function frame(now) {
     renderer.shake = Math.max(renderer.shake, 2.2);
     if ((rattleT -= frameDt) <= 0) { rattleT = 0.13; audio.sfx('rattle'); }
   }
-  renderer.draw(race, paused ? 0 : frameDt);
+  if (!wk?.zen) renderer.draw(race, paused ? 0 : frameDt); // zen: geen wereld tekenen (scheelt ook stroom)
   boxTick(frameDt);
   // Ritfoto: kort na de start (bij een training: na de start van de eerste etappe), op een moment
   // dat er iemand vlak voor je rijdt; lukt dat niet binnen 12 seconden, dan alsnog.
-  if (!rideShot && race.state === 'race' && !race.free) {
+  if (!rideShot && race.state === 'race' && !race.free && !wk?.zen) {
     const t = race.time - race.t0, me = race.me;
     const ahead = race.riders.some((o) => o !== me && o.dist - me.dist > 3 && o.dist - me.dist < 40);
     if ((t >= 3 && ahead) || t >= 12) rideShot = grab($('game'));
