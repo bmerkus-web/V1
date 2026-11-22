@@ -905,3 +905,13 @@ test('Workout-game: finish na het laatste zware blok, snelheid volgt het doel, t
   assert.equal(r.state, 'done');
   assert.ok(Math.abs(r.riders[1].finishTime - r.me.finishTime - 20 / (1000 / 100)) < 0.5, 'tijdsverschil = afstand / gemiddelde snelheid');
 });
+
+test('Muziek: energie volgt race en workout, elke baan heeft een thema', async () => {
+  const { energy, THEMES } = await import('../js/music.js');
+  for (const id of ['polder', 'vulkaan', 'kosmo', 'zen']) assert.ok(THEMES[id] && THEMES[id].progs.length >= 2, id);
+  assert.ok(energy({ intensity: 0.3 }) < energy({ intensity: 0.9 }), 'harder trappen = meer energie');
+  assert.ok(energy({ intensity: 0.5, zone: 'sprint' }) > energy({ intensity: 0.5 }), 'sprint geeft extra');
+  assert.ok(energy({ intensity: 0.5, lastLap: true }) > energy({ intensity: 0.5 }), 'laatste ronde geeft extra');
+  assert.ok(energy({ wkLevel: 0.5 }) < 0.3 && energy({ wkLevel: 1.15 }) > 1, 'workout: herstel rustig, interval vol');
+  assert.equal(energy({ done: true, intensity: 1 }), 0.25, 'na afloop rustig');
+});

@@ -1,4 +1,5 @@
 // Geluid: alles gesynthetiseerd met WebAudio (geen bestanden nodig).
+import { makeMusic } from './music.js';
 let ctx = null, master = null, musicGain = null, sfxGain = null;
 let musicOn = true, sfxOn = true, musicTimer = null, step = 0, nextAt = 0;
 let intensity = 0.5;
@@ -65,22 +66,11 @@ const SFX = {
   lap: (t) => { tone(660, t, 0.1, 'triangle', 0.3); tone(880, t + 0.1, 0.25, 'triangle', 0.3); },
 };
 
-// Simpele synthwave-lus: bas + arpeggio + hihat.
-const BASS = [110, 110, 87.3, 87.3, 130.8, 130.8, 98, 98];
-const ARP = [0, 7, 12, 7, 15, 12, 7, 12];
+// Muziek: zie music.js (thema per baan, lagen die meegaan met de race en de workout).
+let music = null, scene = 'polder';
 function schedule() {
-  if (!ctx || !musicOn) return;
-  const spb = 60 / (112 + intensity * 30) / 2;
-  while (nextAt < ctx.currentTime + 0.25) {
-    const bar = Math.floor(step / 8) % BASS.length, s = step % 8;
-    const root = BASS[bar];
-    if (s % 2 === 0) tone(root / 2, nextAt, spb * 1.6, 'sawtooth', 0.35, musicGain);
-    tone(root * 2 * Math.pow(2, ARP[s] / 12), nextAt, spb * 0.9, 'square', 0.12 + intensity * 0.1, musicGain);
-    if (s % 2 === 1) noise(nextAt, 0.04, 0.12, musicGain, 6000);
-    if (s % 4 === 0) tone(120, nextAt, 0.12, 'sine', 0.5, musicGain, 40);
-    nextAt += spb;
-    step++;
-  }
+  if (!ctx || !musicOn || !music) return;
+  music.schedule(ctx.currentTime + 0.25);
 }
 
 export const audio = {
@@ -89,10 +79,16 @@ export const audio = {
     if (!sfxOn || !ensure() || ctx.state !== 'running') return;
     SFX[name]?.(ctx.currentTime + 0.005);
   },
-  setIntensity(v) { intensity = Math.max(0, Math.min(1, v)); },
+  setIntensity(v) { intensity = Math.max(0, Math.min(1, v)); if (music) music.state.intensity = intensity; },
+  // Sfeer kiezen: 'polder', 'vulkaan', 'kosmo' of 'zen'.
+  setScene(name) { scene = name; if (music) music.setTheme(name); },
+  // Wat er in het spel gebeurt: { intensity, zone, lastLap, finale, wkLevel, wkFree, riser, done }
+  setState(o) { if (music) Object.assign(music.state, o); },
   startMusic() {
     if (!ensure() || musicTimer) return;
-    nextAt = ctx.currentTime + 0.1;
+    if (!music) music = makeMusic(ctx, musicGain);
+    music.setTheme(scene);
+    music.reset(ctx.currentTime + 0.1);
     musicTimer = setInterval(schedule, 80);
   },
   stopMusic() { clearInterval(musicTimer); musicTimer = null; },
