@@ -132,6 +132,22 @@ export function at(w, t) {
 }
 export const cueAt = (w, t) => w.cues.filter((c) => t >= c.t && t < c.t + (c.dur || 10)).pop() || null;
 
+// Waar eindigt de race in de Game-modus? Aan het eind van het laatste zware blok (≥ 85% FTP, ≥ 20 s,
+// geen warming-up/cooling-down). Geen zwaar blok: bij het begin van de cooling-down; anders aan het eind.
+// Geeft { t: seconden, i: index van het laatste blok vóór de finish }.
+export function raceEnd(w, ftp = 250) {
+  const f = (v) => (v == null ? 0 : w.unit === 'w' ? v / ftp : v);
+  const hard = (b) => b.a != null && b.dur >= 20 && b.kind !== 'warm' && b.kind !== 'cool' && Math.max(f(b.a), f(b.b)) >= 0.85;
+  let last = -1;
+  w.blocks.forEach((b, i) => { if (hard(b)) last = i; });
+  if (last >= 0) return { t: w.blocks[last].t0 + w.blocks[last].dur, i: last };
+  const easyEnd = (b) => b.kind === 'cool' || (b.a != null && (Math.max(f(b.a), f(b.b)) < 0.6 || (b.b < b.a && f(b.b) < 0.6)));
+  let i = w.blocks.length;
+  while (i > 1 && easyEnd(w.blocks[i - 1])) i--;
+  if (i < w.blocks.length) return { t: w.blocks[i].t0, i: i - 1 };
+  return { t: w.total, i: w.blocks.length - 1 };
+}
+
 // ---------- nabespreking ----------
 // NP (genormaliseerd vermogen), IF en TSS uit vermogen per seconde.
 export function metrics(secs, ftp) {

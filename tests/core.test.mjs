@@ -869,3 +869,39 @@ test('ERG: FTMS Set Target Power-opdracht', async () => {
   assert.deepEqual([...targetPowerCommand(250)], [0x05, 250, 0]);
   assert.deepEqual([...targetPowerCommand(300)], [0x05, 0x2c, 0x01]);
 });
+
+test('Workout-game: finish na het laatste zware blok, snelheid volgt het doel, tijdsverschil bij de finish', async () => {
+  const W = await import('../js/workout.js');
+  const ss = W.BUILTIN.find((w) => w.id === 'b-ss');
+  assert.equal(W.raceEnd(ss).t, 600 + 600 + 300 + 600 + 300 + 600, 'eind van het 3e sweet-spotblok');
+  assert.equal(W.raceEnd(W.BUILTIN.find((w) => w.id === 'b-duur')).t, 300 + 2100, 'duurrit: begin cooling-down');
+  const vo2 = W.BUILTIN.find((w) => w.id === 'b-vo2');
+  assert.equal(W.raceEnd(vo2).t, 600 + 4 * 360 + 180, 'eind van het 5e interval');
+  const flat = W.finish({ name: 'x', unit: 'w', blocks: [{ dur: 600, a: 150, b: 150 }], cues: [] });
+  assert.equal(W.raceEnd(flat, 250).t, 600, 'niets zwaars en geen cooling-down: aan het eind');
+  // snelheid: boven het doel levert niets op, eronder kost het
+  const { Race } = await import('../js/game.js');
+  const mk = (power) => {
+    const r = new Race({ track: getTrack('polder'), laps: 999, seed: 1, room: null, isHost: true, ns: 'demo', mode: 'workout', timed: ss.total, wgame: true, wk: ss, wkFinish: W.raceEnd(ss).t,
+      riders: [{ id: 'p0', name: 'A', color: '#fff', kind: 'me' }, { id: 'b0', name: 'B', color: '#000', kind: 'bot', skill: 0.5 }],
+      profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+      getPower: () => ({ power, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+    r.countdown = 0; r.update(0.04); r.time = 700; // in het eerste sweet-spotblok: doel 180 W
+    for (let i = 0; i < 600; i++) r.update(0.05);
+    return r.me.dist;
+  };
+  const on = mk(180), over = mk(300), under = mk(150);
+  assert.ok(over < on * 1.03, 'veel harder trappen dan het doel helpt nauwelijks');
+  assert.ok(under < on * 0.95, 'te weinig trappen kost snelheid');
+  // finish: iedereen geklasseerd met een tijdsverschil
+  const r = new Race({ track: getTrack('polder'), laps: 999, seed: 1, room: null, isHost: true, ns: 'demo', mode: 'workout', timed: ss.total, wgame: true, wk: ss, wkFinish: 100,
+    riders: [{ id: 'p0', name: 'A', color: '#fff', kind: 'me' }, { id: 'b0', name: 'B', color: '#000', kind: 'bot', skill: 0.5 }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 100, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  r.countdown = 0; r.update(0.04);
+  r.me.dist = 1000; r.riders[1].dist = 980; r.time = 99.99; r.update(0.05);
+  assert.ok(r.me.finished && r.riders[1].finished);
+  assert.ok(r.me.finishTime < r.riders[1].finishTime);
+  assert.equal(r.state, 'done');
+  assert.ok(Math.abs(r.riders[1].finishTime - r.me.finishTime - 20 / (1000 / 100)) < 0.5, 'tijdsverschil = afstand / gemiddelde snelheid');
+});

@@ -27,7 +27,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-12 | Apparaten onthouden, zodat ze na verversen vanzelf terugkomen zonder keuzelijst (eerst nakijken of Chrome dat toestaat). | idee | M |
 | WB-13 | Eigen verbindingsdienst plus hulpserver (TURN) voor multiplayer, zodat het niet afhangt van de gratis PeerJS-dienst en ook op strenge netwerken werkt. | idee | M |
 | WB-19 | Chat in de lobby (en misschien snelle emoji's tijdens de race). | Sebas | M |
-| WB-47 | Workout-modus als drieweg-keuze: Zen / Ride / Game. **Game**: met bots of met je maten in een kamer dezelfde workout, ieder op zijn eigen FTP (de host kiest, de klok loopt gelijk). De trainer blijft altijd in ERG: berm, kasseien, hellingen, power-ups en andere race-events hebben alleen invloed op je snelheid, nooit op de weerstand. Snelheid volgt hoe goed je je doel haalt (plafond ~103%), dus extra watts helpen niet en te weinig kost snelheid; vrij rijden telt je vermogen t.o.v. FTP. Blitzjes en power-ups zoals in een gewone race. Doel ±5% mag (lichter = langzamer); in een kamer geen blok overslaan en geen pauze. Bots volgen de workout ook. De race eindigt aan het eind van het laatste zware blok (finale), daarna cooling-down en de uitslag met jury en eindtruien. | zelf | M |
+| WB-50 | Workout-game: blitzjes en boxen verdienen door in de zone te rijden (bijv. elke 30 s binnen 5% van je doel een blitzje, een heel blok in de zone een box), in plaats van of naast de boxen op de weg. Twijfel nog. | zelf | S |
 | WB-48 | Workouts: medailles en bogen op de weg voor het volgende blok, en een spook van je vorige poging. | zelf | S |
 | WB-49 | Workouts uit JOIN en Fondo: kijken welke bestanden die exporteren (eventueel .fit inlezen). Wacht op een voorbeeldbestand. | zelf | S |
 | WB-46 | Sterren van een kasseienstrook laten meetellen (nu alleen een label). Voorstel: 3★ / 4★ / 5★ = 10% / 15% / 20% trager op de stenen, lage / normale / hoge kans op lek, licht / normaal / stevig hobbelen op de trainer, breed / normaal / smal gootje. Eerst WB-06 afwachten. | zelf | S |
@@ -69,6 +69,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- WB-47 Workout als drieweg-keuze Zen / Ride / Game; Game ook met je maten in een kamer: ieder op zijn eigen FTP, trainer altijd in ERG, race-events raken alleen je snelheid, snelheid volgt je doel, finish na het laatste zware blok, daarna uitrijden en de uitslag
 - Workouts: knoppen −5%, +5% en overslaan op het scherm (altijd linksboven), R voor ERG, en een zen-modus: alleen het dashboard op een donkere achtergrond die meekleurt met de zone
 - Workouts (solo): ingebouwde workouts en eigen .zwo/.erg/.mrc importeren, ERG op de trainer, scherm met klok en wattages in het midden, 3-2-1 bij elke blokwissel, doel ±5% met de schakelknoppen, blok overslaan, spelmodus met bots en power-ups, nabespreking met medailles per blok en NP/IF/TSS
 - Uitslag in stappen: voorlopige uitslag, jurybeslissing (met waarvoor en tegen wie) en definitieve uitslag met stijgers en dalers, segmentwinnaars en eindtruien; het eindscherm blijft staan als de host naar de kamer gaat of vertrekt

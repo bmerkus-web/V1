@@ -237,3 +237,9 @@ body.zen #zen-bg { display: block; }
 #hud.zen #wk-meta { margin-top: 16px; font-size: clamp(32px, 6vh, 56px); -webkit-text-stroke: 0; }
 #hud.zen #wk-chart { width: 90vw; height: 21vh; bottom: 3vh; transform: translateX(-50%); background: rgba(255, 255, 255, .04); }
 #hud.zen #wk-r { top: 22px; }
+
+.seg { display: flex; gap: 0; margin: 10px 0 4px; border-radius: 12px; overflow: hidden; border: 2px solid var(--line); width: fit-content; }
+.seg button { padding: 8px 16px; font-weight: 800; font-size: 15px; background: #0d0626; color: var(--dim); border: 0; border-radius: 0; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.sel { background: var(--pink); color: #fff; }
+.seg button:disabled { opacity: .4; }
