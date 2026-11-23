@@ -754,6 +754,7 @@ let profDots = {};
 const PHONE = matchMedia('(max-height: 500px) and (orientation: landscape)'); // zelfde grens als in styles.css
 function startRace(cfg) {
   rideShot = null; lobbyReady = false; rerenderResults = null;
+  for (const k in tapStats) tapStats[k] = 0;
   audio.clearUserTrack(); // elke race begint met het nummer van de baan
   if (gyro.on) gyro.calibrate(); // telefoonstuur: zoals je hem nu houdt is rechtdoor
   wk = cfg.workout ? { w: cfg.workout, mode: cfg.wkMode || (cfg.zen ? 'zen' : cfg.wgame ? 'game' : 'ride'), bias: 0, erg: store.wkErg ?? true, zen: !!cfg.zen, game: !!cfg.wgame,
@@ -919,7 +920,8 @@ function togglePause() {
     ${room ? '' : '<button class="ghost" id="ov-restart">Opnieuw</button>'}
     ${race.timed && (race.mode === 'cool' || race.mode === 'warm') && (race.mode === 'cool' || !room) ? `<button class="ghost" id="ov-skip">${race.mode === 'warm' ? 'Warming-up' : 'Cooling-down'} overslaan</button>` : ''}
     ${wk ? `${room ? '' : '<button class="ghost" id="ov-wkskip">⏭ Blok overslaan</button>'}<button class="ghost" id="ov-erg">ERG ${wk.erg ? 'uitzetten' : 'aanzetten'}</button><button class="ghost" id="ov-easy">−5%</button><button class="ghost" id="ov-hard">+5%</button>` : ''}
-    ${sterzo.connected || gyro.on ? '<button class="ghost" id="ov-center">🎯 Stuur recht zetten</button>' : ''}<button class="ghost" id="ov-quit">Stoppen</button></div><div class="menu">${canSave(race) ? SAVE_BTN : ''}${race.stats.secs.length > 5 ? SHOT_BTN : ''}</div>`);
+    ${sterzo.connected || gyro.on ? '<button class="ghost" id="ov-center">🎯 Stuur recht zetten</button>' : ''}<button class="ghost" id="ov-quit">Stoppen</button></div><div class="menu">${canSave(race) ? SAVE_BTN : ''}${race.stats.secs.length > 5 ? SHOT_BTN : ''}</div>
+    ${document.body.classList.contains('touchy') ? `<p class="small">Power-upknop: ${tapStats.touch} tikken op de knop (van ${tapStats.screen} aanrakingen in totaal) · ${tapStats.used} gebruikt · ${tapStats.empty} zonder power-up · ${tapStats.roulette} tijdens het draaien${tapStats.blocked ? ` · ${tapStats.blocked} niet toegestaan` : ''}</p>` : ''}`);
   wireSave(race);
   $('ov-resume').onclick = () => { paused = false; hideOverlay(); };
   if ($('ov-center')) $('ov-center').onclick = () => { centerSteer(); paused = false; hideOverlay(); };
@@ -1208,6 +1210,18 @@ function hud(dt) {
   });
 }
 
+// Power-up: een tik terwijl de box nog draait stopt het draaien meteen (dan staat je power-up direct klaar).
+// tapStats houdt bij wat er met elke tik gebeurde; te zien in het pauzemenu (om haperende knoppen op te sporen).
+const tapStats = { screen: 0, touch: 0, used: 0, empty: 0, roulette: 0, blocked: 0 };
+document.addEventListener('touchstart', () => { tapStats.screen++; }, { passive: true, capture: true });
+function itemTap() {
+  const me = race.me;
+  if (me.roulette > 0) { me.roulette = Math.min(me.roulette, 0.001); tapStats.roulette++; return; }
+  if (!me.item) { tapStats.empty++; return; }
+  race.useItem();
+  tapStats[me.item ? 'blocked' : 'used']++;
+}
+
 // ---------- hoofdlus ----------
 let last = performance.now(), rattleT = 0;
 function frame(now) {
@@ -1219,7 +1233,7 @@ function frame(now) {
   if (input.take('music')) { P.music = !P.music; save(); audio.setOptions(P.music, P.sfx); if (race && P.music) audio.startMusic(); }
   if (!race) { input.clear(); return; }
   if (input.take('pause')) togglePause();
-  if (input.take('item')) race.useItem();
+  if (input.take('item')) itemTap();
   if (input.take('bell')) race.bell();
   const gu = input.take('gearUp'), gd = input.take('gearDown');
   if (input.take('skip')) wkSkip();
@@ -1281,7 +1295,7 @@ $('t-left').classList.add('on'); $('t-right').classList.add('on');
 // Power-upknop op 'pointerdown': een 'click' komt op een tablet niet door zolang er al een andere vinger
 // op het scherm staat (bijv. op TRAP). De click alleen nog voor toetsenbordbediening (detail 0).
 // Op een telefoon direct op 'touchstart' (komt het betrouwbaarst door, ook met een tweede vinger); muis en pen via pointerdown.
-const fireItem = (e) => { e.preventDefault(); input.trigger('item'); const el = $('h-item'); el.classList.add('tap'); setTimeout(() => el.classList.remove('tap'), 140); };
+const fireItem = (e) => { e.preventDefault(); if (e.type === 'touchstart') tapStats.touch++; input.trigger('item'); const el = $('h-item'); el.classList.add('tap'); setTimeout(() => el.classList.remove('tap'), 140); };
 $('h-item').addEventListener('touchstart', fireItem, { passive: false });
 $('t-zone').addEventListener('touchstart', fireItem, { passive: false });
 $('h-item').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') fireItem(e); });
