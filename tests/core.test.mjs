@@ -5,6 +5,7 @@ import { parseIndoorBikeData, parseCyclingPower, simParamsCommand } from '../js/
 import { TRACK_DEFS, getTrack, SEG } from '../js/track.js';
 import { steadySpeed } from '../js/physics.js';
 import { simulate } from './sim.mjs';
+import { axes, heading, wrap } from '../js/gyro.js';
 
 const dv = (bytes) => new DataView(Uint8Array.from(bytes).buffer);
 
@@ -914,4 +915,14 @@ test('Muziek: energie volgt race en workout, elke baan heeft een thema', async (
   assert.ok(energy({ intensity: 0.5, lastLap: true }) > energy({ intensity: 0.5 }), 'laatste ronde geeft extra');
   assert.ok(energy({ wkLevel: 0.5 }) < 0.3 && energy({ wkLevel: 1.15 }) > 1, 'workout: herstel rustig, interval vol');
   assert.equal(energy({ done: true, intensity: 1 }), 0.25, 'na afloop rustig');
+});
+
+test('telefoonstuur: stuur naar rechts draaien = positieve hoek, hoe de telefoon ook hangt', () => {
+  // alpha telt tegen de klok in (van boven gezien); stuur naar rechts = met de klok mee = alpha omlaag.
+  const turn = (beta, gamma, axis) => wrap(heading(axes(-10, beta, gamma)[axis]).deg - heading(axes(0, beta, gamma)[axis]).deg);
+  for (const [beta, gamma, axis, what] of [[80, 0, 'z', 'rechtop'], [0, -90, 'z', 'liggend rechtop'], [60, -20, 'z', 'scheef'], [0, 0, 'y', 'plat']]) {
+    assert.ok(Math.abs(turn(beta, gamma, axis) - 10) < 0.5, `${what}: ${turn(beta, gamma, axis).toFixed(2)}`);
+  }
+  assert.ok(heading(axes(0, 0, 0).z).flat < 0.01, 'plat: schermnormaal staat verticaal');
+  assert.equal(wrap(190), -170); assert.equal(wrap(-190), 170);
 });

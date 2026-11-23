@@ -18,7 +18,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-05 | Multiplayer met 5–6 spelers en via mobiel internet. Werkt het vinden van elkaar en blijft het soepel? | zelf | S |
 | WB-06 | Kasseien op de fiets: voelt het hobbelen van de trainer goed, is het gootje te vinden en niet te breed, en hoe vaak rijd je lek? Ook kijken of de tablet niet hapert op de stenen. | zelf | S |
 | WB-49 | Workouts uit JOIN en Fondo: beide exporteren .zwo, dat lezen we al. Een echt bestand importeren en kijken of blokken, wattages en namen goed overkomen. | zelf | S |
-| WB-07 | iPhone: in Bluefy verbinden met KICKR, Sterzo, Click en hartslagmeter; voelt de helling, werkt ERG, blijft het scherm aan, speelt de muziek? En de telefoonindeling op een echte iPhone (notch, duimknoppen). | zelf | S |
+| WB-07 | iPhone: in Bluefy verbinden met KICKR, Sterzo, Click en hartslagmeter; voelt de helling, werkt ERG, blijft het scherm aan, speelt de muziek? En de telefoonindeling op een echte iPhone (notch, duimknoppen), en sturen met de telefoon vast op het stuur: voelt het goed, welke gevoeligheid, verloopt het midden? | zelf | S |
 
 ## Volgende
 
@@ -29,6 +29,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-12 | Apparaten onthouden, zodat ze na verversen vanzelf terugkomen zonder keuzelijst (eerst nakijken of Chrome dat toestaat). | idee | M |
 | WB-13 | Eigen verbindingsdienst plus hulpserver (TURN) voor multiplayer, zodat het niet afhangt van de gratis PeerJS-dienst en ook op strenge netwerken werkt. | idee | M |
 | WB-19 | Chat in de lobby (en misschien snelle emoji's tijdens de race). | Sebas | M |
+| WB-53 | Telefoon als stuur en afstandsbediening voor de tablet of laptop: telefoon op je stuur verbindt met een code (zoals een kamer), stuurt met de gyroscoop en heeft de power-upknop (en misschien bel, schakelen, −5%/+5%). Zo heb je geen Sterzo nodig. Volgt na het sturen met de telefoon. | zelf | M |
 | WB-51 | Radio: titel en artiest van het nummer dat speelt in beeld (KEXP en FIP hebben openbare gegevens; nakijken of die vanuit de browser bereikbaar zijn). | zelf | S |
 | WB-52 | Spotify in de game: afspelen in de game zelf (Web Playback SDK) of de Spotify-app bedienen (Web API), met playlist kiezen, volgende nummer en nu speelt. Kan zonder server (inloggen met PKCE). Beperking: een Spotify-app in ontwikkelmodus mag sinds feb 2026 maar 5 gebruikers hebben (zelf per e-mail toevoegen in het Spotify-dashboard, maker moet Premium hebben); meer kan alleen met goedkeuring van Spotify. Op Android Chrome eerst testen of het afspelen werkt (DRM). Dus alleen voor de eigen groep, niet voor een publieke beta. | zelf | M |
 | WB-50 | Workout-game: blitzjes en boxen verdienen door in de zone te rijden (bijv. elke 30 s binnen 5% van je doel een blitzje, een heel blok in de zone een box), in plaats van of naast de boxen op de weg. Twijfel nog. | zelf | S |
@@ -72,6 +73,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- 📱 Sturen met je telefoon: telefoon vast op je stuur, de gyroscoop werkt als een Sterzo (zonder kompas, met verloopcorrectie); aan te zetten bij Apparaten, gevoeligheid bij Instellingen, rechtzetten met C of via pauze
 - 📱 Telefoonindeling: compacte HUD liggend, TRAP linksonder, sturen en power-up rechtsonder, rekening met de notch, klassement alleen met koploper en je directe concurrenten, draai-hint als je de telefoon rechtop houdt (Zen-workout werkt ook rechtop). Op iPhone/iPad een melding om Bluefy te gebruiken (met link kopiëren); demo-modus werkt in elke browser. Pictogram voor het beginscherm
 - 📻 Radio als derde soort muziek: tien zenders met elk een eigen sound, voorkeurszender per baan (Polder FIP Groove, Vulkaanpas FIP Rock, Kosmodroom Intergalactic FM, Zen SomaFM DEF CON), zappen met de 🎵-knop, automatisch door bij een zender die niet bereikbaar is
 - Clubsound: vier nummers (space disco, krautrock, electro à la Justice/Soulwax, techno) met gebakken klanken, licht genoeg voor oude tablets; opbouw met break, aanloop en drop; volgt race en workout; 🎵-knop/T voor het volgende nummer; keuze tussen Clubsound en Arcade 8-bit in de instellingen
