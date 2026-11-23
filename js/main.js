@@ -715,7 +715,13 @@ function wkHud() {
   setText($('wk-tot2'), `nog ${clock(w.total - t)}`);
   setHTML($('wk-next'), p.next.map((n, i) => { const nt = targetW(w, n, 0, P.ftp, wk.bias), nt2 = targetW(w, n, n.dur, P.ftp, wk.bias);
     return `<div><i style="background:${zoneColor(blockFrac(w, n, P.ftp))}"></i>${i ? 'dan' : 'straks'} ${esc(blockName(n).toLowerCase())} · ${clock(n.dur)}${nt == null ? '' : ` · ${nt === nt2 ? nt : nt + '→' + nt2} W`}</div>`; }).join(''));
-  if (performance.now() - (wk.chartAt || 0) > 500) { wk.chartAt = performance.now(); drawWorkout($('wk-chart'), w, { pad: 14, top: 18, bottom: 6, now: t, log: wk.log, ftpLine: true, line: 3, finish: wk.finish }); }
+  if (performance.now() - (wk.chartAt || 0) > 500) {
+    wk.chartAt = performance.now();
+    // Canvas volgt de getoonde maat (liggend, rechtop, zen), zodat de grafiek nooit uitgerekt is.
+    const cv = $('wk-chart'), k = Math.min(2, devicePixelRatio || 1), cw = Math.round(cv.clientWidth * k), ch = Math.round(cv.clientHeight * k);
+    if (cw && ch && (cv.width !== cw || cv.height !== ch)) { cv.width = cw; cv.height = ch; }
+    drawWorkout(cv, w, { pad: 7 * k, top: 9 * k, bottom: 3 * k, now: t, log: wk.log, ftpLine: true, line: 1.5 * k, finish: wk.finish });
+  }
 }
 // Zen: je ziet de weg niet, dus de renner stuurt zelf netjes over het midden.
 const getSteer = (dt) => (wk?.zen && race ? clamp(-race.me.x * 2.5, -1, 1) : clamp(input.steer(dt) + sterzo.steer, -1, 1));
@@ -728,7 +734,6 @@ function startRace(cfg) {
   wk = cfg.workout ? { w: cfg.workout, mode: cfg.wkMode || (cfg.zen ? 'zen' : cfg.wgame ? 'game' : 'ride'), bias: 0, erg: store.wkErg ?? true, zen: !!cfg.zen, game: !!cfg.wgame,
     finish: cfg.wkFinish || 0, finalIdx: cfg.wkFinish ? cfg.workout.blocks.findIndex((b) => Math.abs(b.t0 + b.dur - cfg.wkFinish) < 0.5) : -1, log: [], sec: -1, bi: -1, p3: 0, beep: 4 } : null;
   $('hud').classList.toggle('zen', !!wk?.zen); document.body.classList.toggle('zen', !!wk?.zen);
-  const chart = $('wk-chart'), zc = !!wk?.zen; if (chart.width !== (zc ? 2400 : 1640)) { chart.width = zc ? 2400 : 1640; chart.height = zc ? 440 : 180; }
   $('hud').classList.toggle('workout', !!wk); $('hud').classList.toggle('wkgame', !!wk && !!cfg.wgame);
   $('wk').classList.toggle('hidden', !wk);
   $('wk-skip').classList.toggle('hidden', !!room); // in een kamer rijdt iedereen tegelijk
