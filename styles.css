@@ -110,7 +110,8 @@ svg.jersey { height: 1.05em; width: auto; vertical-align: -0.15em; margin-right:
 #h-item.has { border-color: var(--gold); box-shadow: 0 0 24px rgba(255, 209, 102, .7); animation: pulse .7s infinite alternate; }
 #h-item-i { font-size: clamp(38px, 8vh, 62px); line-height: 1; } #h-item small { font-size: 11px; color: var(--dim); font-weight: 600; }
 @keyframes pulse { to { transform: scale(1.06); } }
-#h-item.tap { filter: brightness(1.9); border-color: #fff; } /* zichtbaar dat je tik is aangekomen */
+#h-item.tap { filter: brightness(1.9); border-color: #fff; }
+#t-zone { display: none; pointer-events: auto; touch-action: none; } /* zichtbaar dat je tik is aangekomen */
 .h-bc { left: 50%; bottom: 8px; transform: translateX(-50%); width: min(600px, 62vw); height: 46px; }
 #h-prof { width: 100%; height: 100%; opacity: .85; } #h-dots { position: absolute; inset: 0; }
 #h-dots i { position: absolute; width: 10px; height: 10px; border-radius: 50%; margin: -5px; border: 2px solid #000; }
@@ -296,6 +297,7 @@ body.zen #zen-bg { display: block; }
   #h-bolts { font-size: 17px; } #h-warn { font-size: 12px; padding: 2px 8px; }
   #h-item { width: 84px; height: 84px; border-radius: 18px; border-width: 3px; } #h-item-i { font-size: 40px; } #h-item small { display: none; }
   .h-bc { width: min(360px, 40vw); height: 34px; bottom: 6px; }
+  body.touchy #t-zone.on { display: block; left: 50%; right: 0; top: 84px; bottom: 0; } /* grote power-upzone als je niet met knoppen stuurt */
   .touch { width: 84px; max-width: none; height: 84px; bottom: var(--sb); font-size: 26px; border-radius: 16px; }
   /* links alleen TRAP; rechts sturen met de power-up erboven */
   #t-right { right: var(--sr); left: auto; } #t-left { right: calc(var(--sr) + 94px); left: auto; }

@@ -109,6 +109,7 @@ function devStatus() {
   // Met een Sterzo of Zwift-knoppen zijn de stuurknoppen op het scherm niet nodig.
   const ownSteer = sterzo.connected || gyro.on || pads.some((p) => p.connected);
   $('t-left').classList.toggle('on', !ownSteer); $('t-right').classList.toggle('on', !ownSteer);
+  $('t-zone').classList.toggle('on', ownSteer);
   if (!bleSupported()) {
     const demo = document.body.classList.contains('touchy') ? 'houd TRAP ingedrukt en stuur met ◀ ▶' : '↑ = trappen, Shift = sprint, ←/→ = sturen';
     $('ble-note').innerHTML = IOS ? `Op een iPhone of iPad kan geen enkele browser Bluetooth, behalve de gratis app <a href="${BLUEFY}" target="_blank" rel="noopener">Bluefy</a>. Open Watt Blitz daarin om je apparaten te koppelen. Hier speel je in demo-modus: ${demo}.`
@@ -1282,6 +1283,7 @@ $('t-left').classList.add('on'); $('t-right').classList.add('on');
 // Op een telefoon direct op 'touchstart' (komt het betrouwbaarst door, ook met een tweede vinger); muis en pen via pointerdown.
 const fireItem = (e) => { e.preventDefault(); input.trigger('item'); const el = $('h-item'); el.classList.add('tap'); setTimeout(() => el.classList.remove('tap'), 140); };
 $('h-item').addEventListener('touchstart', fireItem, { passive: false });
+$('t-zone').addEventListener('touchstart', fireItem, { passive: false });
 $('h-item').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') fireItem(e); });
 $('h-item').addEventListener('click', (e) => { if (e.detail === 0) input.trigger('item'); });
 $('h-menu').onclick = () => togglePause();
