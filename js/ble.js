@@ -441,6 +441,7 @@ export class Sterzo extends Device {
     super('Sterzo');
     this.angle = 0; // graden, + = rechts
     this.center = 0;
+    this.range = 24; // graden voorbij de dode zone voor volle uitslag (stuurgevoeligheid)
     this.lastData = 0;
   }
   async connect() {
@@ -480,6 +481,6 @@ export class Sterzo extends Device {
     const a = this.angle - this.center;
     const dead = 1.5;
     if (Math.abs(a) < dead) return 0;
-    return Math.max(-1, Math.min(1, (a - Math.sign(a) * dead) / 24));
+    return Math.max(-1, Math.min(1, (a - Math.sign(a) * dead) / this.range));
   }
 }

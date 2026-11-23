@@ -11,7 +11,7 @@ export const REMOTE_ACTIONS = ['item', 'bell', 'gearUp', 'gearDown', 'pause', 't
 export class RemoteHost {
   constructor() {
     this.code = null; this.listening = false; this.t = null;
-    this.steerV = 0; this.steering = false; this.ctlName = ''; this.lastMsg = -1e9;
+    this.steerV = 0; this.steering = false; this.ctlName = ''; this.lastMsg = -1e9; this.range = 20;
     this.onaction = () => {}; this.onstatus = () => {}; this.onconnect = () => {}; this.onlost = () => {};
     this._was = false;
     setInterval(() => this._check(), 500);
@@ -44,7 +44,10 @@ export class RemoteHost {
     if (!m || typeof m !== 'object') return;
     this.lastMsg = performance.now();
     if (m.t === 'hi') { this.ctlName = String(m.name || 'telefoon').slice(0, 20); }
-    else if (m.t === 's') { this.steerV = Math.max(-1, Math.min(1, +m.v || 0)); if (this.steering !== !!m.g) { this.steering = !!m.g; this.onstatus(); } }
+    else if (m.t === 's') {
+      // Met hoek (graden): de gevoeligheid van deze game; anders de waarde van de telefoon zelf.
+      if (typeof m.a === 'number') { const a = m.a, dead = 1.5; this.steerV = Math.abs(a) < dead ? 0 : Math.max(-1, Math.min(1, (a - Math.sign(a) * dead) / Math.max(4, this.range - dead))); }
+      else this.steerV = Math.max(-1, Math.min(1, +m.v || 0)); if (this.steering !== !!m.g) { this.steering = !!m.g; this.onstatus(); } }
     else if (m.t === 'b' && REMOTE_ACTIONS.includes(m.a)) this.onaction(m.a);
     this._check();
   }
@@ -93,8 +96,8 @@ export class RemoteCtl {
       if (!this._retryAt || now > this._retryAt) { this._retryAt = now + 3000; this.onstatus(); this._join().catch(() => {}); }
       return;
     }
-    const g = this.useGyro && this.gyro.on, v = g ? Math.round(this.gyro.steer * 100) / 100 : 0;
-    if (v !== this._lastSent.v || now - this._lastSent.at > 300) { this.t?.send(null, { t: 's', v, g }); this._lastSent = { v, at: now }; }
+    const g = this.useGyro && this.gyro.active, v = g ? Math.round(this.gyro.steer * 100) / 100 : 0, a = g ? Math.round(this.gyro.angle * 10) / 10 : 0;
+    if (a !== this._lastSent.a || now - this._lastSent.at > 300) { this.t?.send(null, { t: 's', v, a, g }); this._lastSent = { a, at: now }; }
   }
   press(a) { if (this.linked) this.t?.send(null, { t: 'b', a }); }
   stop() { this.on = false; clearInterval(this._timer); this.t?.close(); this.t = null; this.linked = false; this.onstatus(); }
