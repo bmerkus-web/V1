@@ -3,6 +3,7 @@ import { TRACK_DEFS, getTrack } from './track.js';
 import { Race, ITEMS, BOT_NAMES, juryWhat } from './game.js';
 import { Renderer } from './render.js';
 import { Trainer, Sterzo, HeartRate, ZwiftPad, bleSupported } from './ble.js';
+import { GyroSteer } from './gyro.js';
 import { input, bindTouch } from './input.js';
 import { audio } from './audio.js';
 import { store, save, COLORS, getTime, getGhost, levelOf } from './storage.js';
@@ -85,6 +86,7 @@ $('p-weight').onchange = (e) => { P.weight = clamp(Math.round(+e.target.value) |
 $('p-ftp').onchange = (e) => { P.ftp = clamp(Math.round(+e.target.value) || 200, 80, 500); e.target.value = P.ftp; save(); };
 
 // iPhone en iPad: geen Web Bluetooth in Safari of Chrome; wel in de app Bluefy. (iPad meldt zich soms als Mac.)
+const gyro = new GyroSteer();
 const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const BLUEFY = 'https://apps.apple.com/app/id1492822055';
 const noBle = () => toast(IOS ? '📱 Op een iPhone of iPad werkt Bluetooth alleen in de app Bluefy. Open Watt Blitz daarin.' : 'Bluetooth werkt alleen in Chrome (Android / Mac) via https.');
@@ -100,10 +102,12 @@ function devStatus() {
   const np = pads.filter((p) => p.connected).length;
   $('b-pads').classList.toggle('on', np > 0);
   $('st-pads').textContent = np ? `${np} verbonden ✓ · tik voor nog één` : pads.length ? 'Verbinding kwijt…' : 'Niet verbonden';
-  $('b-center').classList.toggle('hidden', !sterzo.connected);
+  $('b-gyro').classList.toggle('on', gyro.on);
+  $('st-gyro').textContent = gyro.on ? (gyro.active ? 'Aan ✓ · rechtdoor = midden' : 'Aan · wacht op de sensor…') : 'Uit · tik om aan te zetten';
+  $('b-center').classList.toggle('hidden', !sterzo.connected && !gyro.on);
   $('t-pedal').classList.toggle('on', !trainer.connected);
   // Met een Sterzo of Zwift-knoppen zijn de stuurknoppen op het scherm niet nodig.
-  const ownSteer = sterzo.connected || pads.some((p) => p.connected);
+  const ownSteer = sterzo.connected || gyro.on || pads.some((p) => p.connected);
   $('t-left').classList.toggle('on', !ownSteer); $('t-right').classList.toggle('on', !ownSteer);
   if (!bleSupported()) {
     const demo = document.body.classList.contains('touchy') ? 'houd TRAP ingedrukt en stuur met ◀ ▶' : '↑ = trappen, Shift = sprint, ←/→ = sturen';
@@ -196,7 +200,20 @@ $('b-fs').onclick = $('h-fs').onclick = () => toggleFullscreen();
 // Een iPhone kan een webpagina niet zelf schermvullend maken; via het beginscherm wel.
 const CAN_FS = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
 if (!CAN_FS) { $('h-fs').classList.add('hidden'); $('b-fs').onclick = () => toast(IOS ? 'Volledig scherm op een iPhone: tik in Safari op Deel → Zet op beginscherm en start Watt Blitz vanaf je beginscherm.' : 'Deze browser kan geen volledig scherm.'); }
-$('b-center').onclick = () => { sterzo.calibrate(); toast('Stuur staat nu recht'); };
+$('b-center').onclick = () => centerSteer();
+function centerSteer(quiet) { if (sterzo.connected) sterzo.calibrate(); if (gyro.on) gyro.calibrate(); if (!quiet) toast('Stuur staat nu recht'); }
+// Sturen met de telefoon (vast op je stuur). Op een iPhone vraagt Safari eerst toestemming; dat moet vanuit een tik.
+$('b-gyro').classList.toggle('hidden', !(GyroSteer.available() && matchMedia('(pointer: coarse)').matches));
+$('b-gyro').onclick = async () => {
+  audio.unlock();
+  if (gyro.on) { gyro.stop(); P.gyro = false; save(); devStatus(); return; }
+  try { await gyro.start(); P.gyro = true; save(); toast('📱 Telefoonstuur aan: zet je telefoon vast op je stuur. Rechtdoor is het midden; rechtzetten met C of via pauze.'); }
+  catch (e) { toast('📱 ' + e.message); }
+  devStatus();
+};
+gyro.range = P.gyroRange || 20;
+if (P.gyro && GyroSteer.available()) gyro.start().then(devStatus, devStatus); // lukt niet zonder tik (iPhone)? dan blijft hij uit
+setInterval(() => { if (gyro.on && !race) devStatus(); }, 1000); // status van de sensor bijwerken in het menu
 
 for (const b of document.querySelectorAll('[data-go]')) b.onclick = () => show(b.dataset.go);
 $('b-records').onclick = () => show('records');
@@ -204,6 +221,8 @@ $('b-board').onclick = () => show('board');
 $('b-help').onclick = () => show('help');
 $('b-settings').onclick = () => {
   $('p-feel').value = P.trainerFeel; $('p-feel-v').textContent = P.trainerFeel + '%';
+  $('p-gyro').value = P.gyroRange || 20; $('p-gyro-v').textContent = (P.gyroRange || 20) + '°';
+  $('p-gyro-l').classList.toggle('hidden', $('b-gyro').classList.contains('hidden')); $('p-gyro-n').classList.toggle('hidden', $('b-gyro').classList.contains('hidden'));
   $('p-mvol').value = P.musicVol ?? 100; $('p-mvol-v').textContent = (P.musicVol ?? 100) + '%';
   $('p-svol').value = P.sfxVol ?? 100; $('p-svol-v').textContent = (P.sfxVol ?? 100) + '%';
   $('p-vshift').checked = P.vshift; $('p-music').checked = P.music; $('p-sfx').checked = P.sfx; $('p-sound').value = P.sound || 'club';
@@ -214,6 +233,7 @@ applyVolumes();
 $('p-mvol').oninput = (e) => { P.musicVol = +e.target.value; $('p-mvol-v').textContent = P.musicVol + '%'; applyVolumes(); save(); };
 $('p-svol').oninput = (e) => { P.sfxVol = +e.target.value; $('p-svol-v').textContent = P.sfxVol + '%'; applyVolumes(); save(); };
 $('p-svol').onchange = () => { audio.unlock(); audio.sfx('bolt'); }; // even laten horen hoe hard het is
+$('p-gyro').oninput = (e) => { P.gyroRange = +e.target.value; gyro.range = P.gyroRange; $('p-gyro-v').textContent = P.gyroRange + '°'; save(); };
 $('p-feel').oninput = (e) => { P.trainerFeel = +e.target.value; $('p-feel-v').textContent = P.trainerFeel + '%'; save(); };
 for (const k of ['vshift', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };
 audio.setOptions(P.music, P.sfx);
@@ -289,7 +309,7 @@ function renderSetup() {
   $('o-assist-tr-l').classList.toggle('hidden', !(tr_ && !lobby));
   $('o-assist-wk').checked = $('o-assist-tr').checked = !!P.assist;
   const steers = !(wk_ && sel.wkMode === 'zen') && !(assistOk && P.assist);
-  const hasWheel = sterzo.connected || pads.some((d) => d.connected);
+  const hasWheel = sterzo.connected || gyro.on || pads.some((d) => d.connected);
   $('o-steer-note').textContent = steers && !hasWheel ? '🎮 Geen stuur gekoppeld: je stuurt met ← → of met de knoppen op het scherm. In bochten word je naar buiten geduwd als je niet stuurt.' : '';
   for (const b of $('wk-modes').children) { b.classList.toggle('sel', b.dataset.m === sel.wkMode); b.setAttribute('aria-checked', b.dataset.m === sel.wkMode); b.disabled = !canEdit || (lobby && b.dataset.m !== 'game'); }
   $('wk-mode-note').textContent = { zen: 'Zen: geen wereld, alleen je klok, wattages en grafiek.', ride: 'Ride: alleen op de baan, zonder bots en power-ups.',
@@ -724,13 +744,14 @@ function wkHud() {
   }
 }
 // Zen: je ziet de weg niet, dus de renner stuurt zelf netjes over het midden.
-const getSteer = (dt) => (wk?.zen && race ? clamp(-race.me.x * 2.5, -1, 1) : clamp(input.steer(dt) + sterzo.steer, -1, 1));
+const getSteer = (dt) => (wk?.zen && race ? clamp(-race.me.x * 2.5, -1, 1) : clamp(input.steer(dt) + sterzo.steer + gyro.steer, -1, 1));
 
 let profDots = {};
 const PHONE = matchMedia('(max-height: 500px) and (orientation: landscape)'); // zelfde grens als in styles.css
 function startRace(cfg) {
   rideShot = null; lobbyReady = false; rerenderResults = null;
   audio.clearUserTrack(); // elke race begint met het nummer van de baan
+  if (gyro.on) gyro.calibrate(); // telefoonstuur: zoals je hem nu houdt is rechtdoor
   wk = cfg.workout ? { w: cfg.workout, mode: cfg.wkMode || (cfg.zen ? 'zen' : cfg.wgame ? 'game' : 'ride'), bias: 0, erg: store.wkErg ?? true, zen: !!cfg.zen, game: !!cfg.wgame,
     finish: cfg.wkFinish || 0, finalIdx: cfg.wkFinish ? cfg.workout.blocks.findIndex((b) => Math.abs(b.t0 + b.dur - cfg.wkFinish) < 0.5) : -1, log: [], sec: -1, bi: -1, p3: 0, beep: 4 } : null;
   $('hud').classList.toggle('zen', !!wk?.zen); document.body.classList.toggle('zen', !!wk?.zen);
@@ -894,9 +915,10 @@ function togglePause() {
     ${room ? '' : '<button class="ghost" id="ov-restart">Opnieuw</button>'}
     ${race.timed && (race.mode === 'cool' || race.mode === 'warm') && (race.mode === 'cool' || !room) ? `<button class="ghost" id="ov-skip">${race.mode === 'warm' ? 'Warming-up' : 'Cooling-down'} overslaan</button>` : ''}
     ${wk ? `${room ? '' : '<button class="ghost" id="ov-wkskip">⏭ Blok overslaan</button>'}<button class="ghost" id="ov-erg">ERG ${wk.erg ? 'uitzetten' : 'aanzetten'}</button><button class="ghost" id="ov-easy">−5%</button><button class="ghost" id="ov-hard">+5%</button>` : ''}
-    <button class="ghost" id="ov-quit">Stoppen</button></div><div class="menu">${canSave(race) ? SAVE_BTN : ''}${race.stats.secs.length > 5 ? SHOT_BTN : ''}</div>`);
+    ${sterzo.connected || gyro.on ? '<button class="ghost" id="ov-center">🎯 Stuur recht zetten</button>' : ''}<button class="ghost" id="ov-quit">Stoppen</button></div><div class="menu">${canSave(race) ? SAVE_BTN : ''}${race.stats.secs.length > 5 ? SHOT_BTN : ''}</div>`);
   wireSave(race);
   $('ov-resume').onclick = () => { paused = false; hideOverlay(); };
+  if ($('ov-center')) $('ov-center').onclick = () => { centerSteer(); paused = false; hideOverlay(); };
   if (!room) $('ov-restart').onclick = () => startRace({ ...lastCfg, seed: (Math.random() * 1e9) | 0 });
   $('ov-quit').onclick = quitToMenu;
   if ($('ov-skip')) $('ov-skip').onclick = () => { const r = race; paused = false; hideOverlay(); r.timed = 0.001; };
@@ -1189,7 +1211,7 @@ function frame(now) {
   let dt = Math.min(0.25, (now - last) / 1000);
   last = now;
   if (input.take('fullscreen')) toggleFullscreen();
-  if (input.take('center') && sterzo.connected) { sterzo.calibrate(); toast('Stuur staat nu recht'); }
+  if (input.take('center') && (sterzo.connected || gyro.on)) centerSteer();
   if (input.take('music')) { P.music = !P.music; save(); audio.setOptions(P.music, P.sfx); if (race && P.music) audio.startMusic(); }
   if (!race) { input.clear(); return; }
   if (input.take('pause')) togglePause();
@@ -1266,4 +1288,4 @@ const join = new URLSearchParams(location.search).get('join') || (/^#join-([a-z]
 if (join) { $('j-code').value = join.toUpperCase().slice(0, 4); show('join'); }
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 if (HOSTED) $('b-copy').textContent = 'Code kopiëren';
-window.__wb = { get race() { return race; }, sel, trainer, sterzo, hrm, renderer, store }; // voor testen/debuggen
+window.__wb = { get race() { return race; }, sel, trainer, sterzo, hrm, gyro, renderer, store }; // voor testen/debuggen

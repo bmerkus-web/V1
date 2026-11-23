@@ -36,6 +36,7 @@
         <h2>Apparaten</h2>
         <button id="b-trainer" class="dev"><b>🚴 Trainer</b><span id="st-trainer">Niet verbonden</span></button>
         <button id="b-sterzo" class="dev"><b>🎮 Sterzo-stuur</b><span id="st-sterzo">Niet verbonden</span></button>
+        <button id="b-gyro" class="dev hidden"><b>📱 Sturen met telefoon</b><span id="st-gyro">Uit</span></button>
         <button id="b-hr" class="dev"><b>❤️ Hartslagmeter</b><span id="st-hr">Niet verbonden</span></button>
         <button id="b-pads" class="dev"><b>🎛️ Zwift-knoppen</b><span id="st-pads">Niet verbonden</span></button>
         <button id="b-diag" class="ghost">🩺 Diagnose verbindingen</button>
@@ -142,6 +143,8 @@
     <div class="card">
       <label>Trainer-gevoel helling <input id="p-feel" type="range" min="0" max="100" step="10"><b id="p-feel-v"></b></label>
       <p class="small">Hoe sterk je KICKR klimmetjes laat voelen. 0% = altijd vlak, 100% = de echte helling.</p>
+      <label id="p-gyro-l">Telefoonstuur: volledig sturen bij <input id="p-gyro" type="range" min="10" max="35" step="1"><b id="p-gyro-v"></b></label>
+      <p class="small" id="p-gyro-n">Hoe ver je je stuur moet draaien als je met je telefoon stuurt. Lager = gevoeliger.</p>
       <label class="check"><input id="p-vshift" type="checkbox"> Virtueel schakelen</label>
       <p class="small">Voor een Zwift Cog, Zwift Ride of een fiets zonder versnellingen op de trainer. De schakelknoppen van je Zwift-knoppen (of Q en E) maken de trainer lichter of zwaarder, in 24 versnellingen. Zet dit uit als je gewoon met je eigen versnellingen schakelt; de knoppen gebruiken dan een power-up.</p>
       <label class="check"><input id="p-music" type="checkbox"> Muziek</label>
@@ -162,6 +165,7 @@
       <p><b>Virtueel schakelen</b> (zet het aan bij Instellingen): <b>Ride</b> rechts = zwaarder, links = lichter. <b>Click (twee knopjes)</b>: + = zwaarder, − = lichter. <b>Play</b>: zijknop rechts = zwaarder, links = lichter. <b>Eerste Click</b>: + en − schakelen (dan niet meer sturen). Toetsenbord: E = zwaarder, Q = lichter.</p>
       <p><b>Click v2 valt weg?</b> Zwift houdt de Click v2 op slot voor andere apps. Het rechter knopje (Y, B, Z, A, +) houdt Watt Blitz zelf in leven door hem elke minuut kort opnieuw te verbinden. Wil je ook het linker knopje gebruiken, verbind de Click v2 dan eerst even in Zwift en sluit Zwift weer af. Valt een apparaat weg, dan probeert het spel het steeds opnieuw; druk op een knop als hij in slaap is gevallen.</p>
       <p><b>Zwift-knoppen:</b> koppel elke knop apart (tik per knop opnieuw op <i>Zwift-knoppen</i>). <b>Click (twee knopjes):</b> links ←/→ = sturen, ↑ = power-up, ↓ = bel; rechts Z/A = sturen, Y = power-up, B = bel; − en + = power-up. <b>Play:</b> pijltjes ←/→ of de flippers = sturen, ↑ / A / Z / zijknop = power-up, ↓ / Y / B = bel. <b>Eerste Click:</b> − en + = sturen, beide tegelijk = power-up.</p>
+      <p><b>Sturen met je telefoon:</b> zet je telefoon vast op je stuur en tik bij Apparaten op <i>Sturen met telefoon</i> (een iPhone vraagt eerst toestemming voor beweging). Draai je je stuur, dan stuur je in het spel, net als met een Sterzo. Bij de start is de stand van dat moment rechtdoor; rechtzetten kan altijd met C of via pauze. Bij Instellingen kies je hoe gevoelig het is.</p>
       <p><b>iPhone en iPad:</b> daar kan geen enkele browser Bluetooth, behalve de gratis app Bluefy. Open Watt Blitz daarin om je trainer, stuur, hartslagmeter of Zwift-knoppen te koppelen. Zonder apparaten speel je in demo-modus: houd TRAP ingedrukt en stuur met ◀ ▶. Op een telefoon speel je liggend (TRAP links, sturen en power-up rechts); een Zen-workout kan ook rechtop; volledig scherm krijg je in Safari via Deel → Zet op beginscherm.</p>
       <div id="help-items" class="items"></div>
       <p><b>Ideale lijn:</b> de binnenbocht is korter, de buitenbocht langer. Snijd bochten aan de binnenkant aan en je wint meters zonder harder te trappen – maar een bocht duwt je naar buiten, dus je moet ervoor sturen.</p>
