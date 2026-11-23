@@ -926,3 +926,14 @@ test('telefoonstuur: stuur naar rechts draaien = positieve hoek, hoe de telefoon
   assert.ok(heading(axes(0, 0, 0).z).flat < 0.01, 'plat: schermnormaal staat verticaal');
   assert.equal(wrap(190), -170); assert.equal(wrap(-190), 170);
 });
+
+test('Bluetooth: volledige UUID-teksten en leesbare foutmeldingen (Bluefy)', async () => {
+  const { uuid16, errText } = await import('../js/ble.js');
+  assert.equal(uuid16(0x1826), '00001826-0000-1000-8000-00805f9b34fb');
+  assert.equal(uuid16(0xfc82), '0000fc82-0000-1000-8000-00805f9b34fb');
+  assert.equal(errText(new Error('kapot')), 'kapot');
+  assert.equal(errText('GATT fout'), 'GATT fout');
+  assert.equal(errText({ name: 'NetworkError' }), 'NetworkError');
+  assert.equal(errText({ code: 19 }), 'foutcode 19');
+  assert.equal(errText(undefined), 'onbekende fout');
+});
