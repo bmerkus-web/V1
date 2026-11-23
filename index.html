@@ -7,6 +7,10 @@
 <title>Watt Blitz</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -18,6 +22,7 @@
   <section id="s-home" class="screen">
     <h1 class="logo">WATT<span>BLITZ</span><i>⚡</i></h1>
     <p class="tag">Trap hard. Stuur slim. Pak de power-ups.</p>
+    <div id="ios-note" class="note hidden">📱 <span>Trainer, stuur of hartslagmeter koppelen op een iPhone of iPad? Dat kan alleen in de gratis app <a href="https://apps.apple.com/app/id1492822055" target="_blank" rel="noopener">Bluefy</a>: installeer hem en open deze pagina daarin. Hier kun je meteen spelen in demo-modus.</span><button id="b-ioslink" class="ghost">Link kopiëren</button></div>
     <div class="cols">
       <div class="card">
         <h2>Renner</h2>
@@ -157,6 +162,7 @@
       <p><b>Virtueel schakelen</b> (zet het aan bij Instellingen): <b>Ride</b> rechts = zwaarder, links = lichter. <b>Click (twee knopjes)</b>: + = zwaarder, − = lichter. <b>Play</b>: zijknop rechts = zwaarder, links = lichter. <b>Eerste Click</b>: + en − schakelen (dan niet meer sturen). Toetsenbord: E = zwaarder, Q = lichter.</p>
       <p><b>Click v2 valt weg?</b> Zwift houdt de Click v2 op slot voor andere apps. Het rechter knopje (Y, B, Z, A, +) houdt Watt Blitz zelf in leven door hem elke minuut kort opnieuw te verbinden. Wil je ook het linker knopje gebruiken, verbind de Click v2 dan eerst even in Zwift en sluit Zwift weer af. Valt een apparaat weg, dan probeert het spel het steeds opnieuw; druk op een knop als hij in slaap is gevallen.</p>
       <p><b>Zwift-knoppen:</b> koppel elke knop apart (tik per knop opnieuw op <i>Zwift-knoppen</i>). <b>Click (twee knopjes):</b> links ←/→ = sturen, ↑ = power-up, ↓ = bel; rechts Z/A = sturen, Y = power-up, B = bel; − en + = power-up. <b>Play:</b> pijltjes ←/→ of de flippers = sturen, ↑ / A / Z / zijknop = power-up, ↓ / Y / B = bel. <b>Eerste Click:</b> − en + = sturen, beide tegelijk = power-up.</p>
+      <p><b>iPhone en iPad:</b> daar kan geen enkele browser Bluetooth, behalve de gratis app Bluefy. Open Watt Blitz daarin om je trainer, stuur, hartslagmeter of Zwift-knoppen te koppelen. Zonder apparaten speel je in demo-modus: houd TRAP ingedrukt en stuur met ◀ ▶. Op een telefoon speel je liggend; volledig scherm krijg je in Safari via Deel → Zet op beginscherm.</p>
       <div id="help-items" class="items"></div>
       <p><b>Ideale lijn:</b> de binnenbocht is korter, de buitenbocht langer. Snijd bochten aan de binnenkant aan en je wint meters zonder harder te trappen – maar een bocht duwt je naar buiten, dus je moet ervoor sturen.</p>
       <p><b>Kerbstones:</b> de blokjes langs de weg zijn de rand. Daarbuiten rijd je in de berm en rem je af; je trainer geeft dan een korte klap en blijft zwaarder zolang je erin rijdt. Elke baan heeft ook één geheime short cut – let goed op de kerbstones.</p>
@@ -227,6 +233,8 @@
   <button id="h-fs" aria-label="Volledig scherm">⛶</button>
   <button id="h-music" aria-label="Volgend nummer" title="Volgend nummer (T)">🎵 ⏭</button>
 </div>
+
+<div id="rotate"><div class="rot-i">📱</div><b>Draai je telefoon een kwartslag</b><span>Watt Blitz speel je liggend.</span></div>
 
 <div id="overlay" class="hidden"><div class="card" id="overlay-card"></div></div>
 <div id="toast" class="hidden"></div>

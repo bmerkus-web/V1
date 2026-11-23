@@ -5,7 +5,8 @@
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; touch-action: manipulation; }
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+input { -webkit-user-select: text; user-select: text; }
 .hidden { display: none !important; }
 #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
@@ -244,3 +245,63 @@ body.zen #zen-bg { display: block; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button.sel { background: var(--pink); color: #fff; }
 .seg button:disabled { opacity: .4; }
+
+/* ---------- iPhone/iPad-melding en draai-hint ---------- */
+.note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: rgba(255, 209, 102, .1); border: 1px solid rgba(255, 209, 102, .5); border-radius: 12px; padding: 10px 14px; font-size: 14px; line-height: 1.4; }
+.note span { flex: 1 1 240px; } .note a { color: var(--gold); font-weight: 800; } .note button { padding: 6px 12px; font-size: 14px; }
+#rotate { display: none; position: fixed; inset: 0; z-index: 20; background: rgba(8, 2, 24, .94); flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; }
+#rotate b { font-size: 22px; font-style: italic; } #rotate span { color: var(--dim); }
+.rot-i { font-size: 64px; animation: rot 2.4s ease-in-out infinite; }
+@keyframes rot { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (max-width: 600px) { #ui.ingame ~ #rotate { display: flex; } }
+
+/* ---------- telefoon liggend: compacte HUD, duimknoppen in de onderhoeken ---------- */
+@media (max-height: 500px) and (orientation: landscape) {
+  #hud { --sl: max(12px, env(safe-area-inset-left, 0px)); --sr: max(12px, env(safe-area-inset-right, 0px)); }
+  .h-tl { top: 6px; left: var(--sl); }
+  #h-pos { font-size: 34px; } #h-lap { font-size: 13px; }
+  .h-tc { top: 4px; } #h-time { font-size: 22px; } #h-tot, #h-delta { font-size: 12px; }
+  #h-zone { font-size: 12px; padding: 2px 10px; margin-top: 2px; }
+  #h-menu, #h-fs, #h-music { top: 6px; left: auto; margin-left: 0; padding: 4px 9px; font-size: 14px; border-radius: 9px; }
+  #h-menu { right: var(--sr); } #h-music { right: calc(var(--sr) + 44px); } #h-fs { right: calc(var(--sr) + 112px); }
+  .h-tr { top: 42px; right: var(--sr); font-size: 11px; }
+  #h-rank div { padding: 0 6px; } #h-feed { margin-top: 4px; }
+  .h-bl { left: var(--sl); bottom: 10px; }
+  body.touchy #hud:has(#t-left.on) .h-bl { bottom: 104px; }
+  #h-watt { font-size: 40px; } .h-sub { font-size: 12px; } #h-hr { font-size: 18px; } #h-gear { font-size: 15px; }
+  #h-kom, #h-cass, #h-green, #h-rubber, #h-line, #h-draft { font-size: 12px; }
+  .h-br { right: var(--sr); bottom: 10px; gap: 4px; }
+  body.touchy #hud:has(#t-pedal.on) .h-br { bottom: 102px; }
+  #h-bolts { font-size: 17px; } #h-warn { font-size: 12px; padding: 2px 8px; }
+  #h-item { width: 70px; height: 70px; border-radius: 16px; border-width: 3px; } #h-item-i { font-size: 34px; } #h-item small { display: none; }
+  .h-bc { width: min(360px, 40vw); height: 34px; bottom: 6px; }
+  .touch { width: 84px; max-width: none; height: 84px; bottom: 10px; font-size: 26px; border-radius: 16px; }
+  #t-left { left: var(--sl); } #t-right { left: calc(var(--sl) + 94px); right: auto; }
+  #t-pedal { right: var(--sr); bottom: 10px; width: 118px; height: 84px; font-size: 18px; }
+  #h-banner { top: 24%; font-size: 22px; }
+  #h-dev { bottom: 48px; font-size: 12px; }
+  #toast { bottom: 10px; font-size: 14px; padding: 8px 14px; }
+  #overlay { padding: 8px; } #overlay h2 { font-size: 22px; } #overlay .card { max-height: 98vh; }
+  /* workout */
+  #wk-l { left: var(--sl); top: 6px; max-width: 30vw; }
+  #wk-blk { font-size: 11px; } #wk-cue { font-size: 13px; margin-top: 2px; }
+  #wk-ctl { gap: 6px; margin-top: 6px; } #wk-ctl button { min-width: 44px; height: 38px; padding: 0 8px; font-size: 14px; border-radius: 10px; }
+  #wk-c { top: 2px; padding: 2px 28px 8px; }
+  #wk-cd { font-size: 38px; } .wk-bar { width: 160px; height: 5px; margin-top: 4px; }
+  .wk-pw { margin-top: 4px; gap: 14px; } .wk-tl { font-size: 10px; }
+  #wk-now { font-size: 50px; } #wk-tgt { font-size: 28px; }
+  .wk-gauge { width: 190px; height: 8px; margin-top: 6px; } .wk-gauge i { top: -4px; height: 16px; }
+  #wk-meta { font-size: 18px; margin-top: 4px; } #wk-meta small { margin: 0 10px 0 3px; }
+  #wk-r { right: var(--sr); top: 42px; } #wk-tot1 { font-size: 11px; } #wk-tot2 { font-size: 18px; } #wk-next { font-size: 11px; margin-top: 4px; }
+  #wk-chart, #hud.wkgame #wk-chart { width: min(420px, 42vw); height: 54px; bottom: 6px; transform: translateX(-50%); border-radius: 8px; }
+  #hud.workout.wkgame .h-tr { top: 132px; }
+  /* zen */
+  #hud.zen #wk-c { top: 44%; }
+  #hud.zen #wk-cd { font-size: 54px; } #hud.zen .wk-bar { width: 260px; height: 7px; margin-top: 6px; }
+  #hud.zen .wk-pw { margin-top: 8px; gap: 22px; } #hud.zen .wk-tl { font-size: 11px; }
+  #hud.zen #wk-now { font-size: 78px; } #hud.zen #wk-tgt { font-size: 40px; }
+  #hud.zen .wk-gauge { width: 280px; height: 10px; margin-top: 8px; } #hud.zen .wk-gauge i { top: -5px; height: 20px; }
+  #hud.zen #wk-meta { font-size: 24px; margin-top: 6px; }
+  #hud.zen #wk-chart { width: 64vw; height: 16vh; bottom: 2vh; }
+  #hud.zen #wk-r { top: 42px; }
+}

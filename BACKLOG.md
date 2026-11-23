@@ -18,6 +18,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-05 | Multiplayer met 5–6 spelers en via mobiel internet. Werkt het vinden van elkaar en blijft het soepel? | zelf | S |
 | WB-06 | Kasseien op de fiets: voelt het hobbelen van de trainer goed, is het gootje te vinden en niet te breed, en hoe vaak rijd je lek? Ook kijken of de tablet niet hapert op de stenen. | zelf | S |
 | WB-49 | Workouts uit JOIN en Fondo: beide exporteren .zwo, dat lezen we al. Een echt bestand importeren en kijken of blokken, wattages en namen goed overkomen. | zelf | S |
+| WB-07 | iPhone: in Bluefy verbinden met KICKR, Sterzo, Click en hartslagmeter; voelt de helling, werkt ERG, blijft het scherm aan, speelt de muziek? En de telefoonindeling op een echte iPhone (notch, duimknoppen). | zelf | S |
 
 ## Volgende
 
@@ -57,7 +58,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
-| WB-40 | iPad en iPhone: Bluefy-browser testen; later eventueel een eigen app. | idee | L |
+| WB-40 | Eigen iPhone-app (bijv. met Capacitor, via TestFlight), alleen als Bluefy tegenvalt (zie WB-07). Vraagt een Apple-ontwikkelaarsaccount. | idee | L |
 | WB-41 | Promofilmpje in staand formaat voor telefoons, met echte namen. | zelf | S |
 | WB-42 | Nieuwe banen. | idee | M |
 | WB-43 | Trainingsschema's (blokken op vermogen, ERG-modus). | idee | M |
@@ -71,6 +72,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- 📱 Telefoonindeling: compacte HUD liggend, stuurknoppen linksonder en TRAP en power-up rechtsonder, rekening met de notch, klassement alleen met koploper en je directe concurrenten, draai-hint als je de telefoon rechtop houdt. Op iPhone/iPad een melding om Bluefy te gebruiken (met link kopiëren); demo-modus werkt in elke browser. Pictogram voor het beginscherm
 - 📻 Radio als derde soort muziek: tien zenders met elk een eigen sound, voorkeurszender per baan (Polder FIP Groove, Vulkaanpas FIP Rock, Kosmodroom Intergalactic FM, Zen SomaFM DEF CON), zappen met de 🎵-knop, automatisch door bij een zender die niet bereikbaar is
 - Clubsound: vier nummers (space disco, krautrock, electro à la Justice/Soulwax, techno) met gebakken klanken, licht genoeg voor oude tablets; opbouw met break, aanloop en drop; volgt race en workout; 🎵-knop/T voor het volgende nummer; keuze tussen Clubsound en Arcade 8-bit in de instellingen
 - Muziek: eigen sfeer per baan (polder, vulkaan, kosmo) en voor Zen; meer drums en melodie in sprints en klimmen, geratel op de kasseien, sneller in de laatste ronde; in workouts rustig bij herstel en opzwepend in intervallen, met een opbouw bij de 3-2-1; wisselende akkoordenreeksen en melodieën
