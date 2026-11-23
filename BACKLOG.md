@@ -17,6 +17,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-04 | Afstellen op gevoel: breedte van de short cut (vooral in de afdaling van de Vulkaanpas), stuurdrempel van de kwak, hoe hard een bocht je naar buiten duwt, extra weerstand in de berm. | zelf | S |
 | WB-05 | Multiplayer met 5–6 spelers en via mobiel internet. Werkt het vinden van elkaar en blijft het soepel? | zelf | S |
 | WB-06 | Kasseien op de fiets: voelt het hobbelen van de trainer goed, is het gootje te vinden en niet te breed, en hoe vaak rijd je lek? Ook kijken of de tablet niet hapert op de stenen. | zelf | S |
+| WB-49 | Workouts uit JOIN en Fondo: beide exporteren .zwo, dat lezen we al. Een echt bestand importeren en kijken of blokken, wattages en namen goed overkomen. | zelf | S |
 
 ## Volgende
 
@@ -31,7 +32,6 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | WB-52 | Spotify in de game: afspelen in de game zelf (Web Playback SDK) of de Spotify-app bedienen (Web API), met playlist kiezen, volgende nummer en nu speelt. Kan zonder server (inloggen met PKCE). Beperking: een Spotify-app in ontwikkelmodus mag sinds feb 2026 maar 5 gebruikers hebben (zelf per e-mail toevoegen in het Spotify-dashboard, maker moet Premium hebben); meer kan alleen met goedkeuring van Spotify. Op Android Chrome eerst testen of het afspelen werkt (DRM). Dus alleen voor de eigen groep, niet voor een publieke beta. | zelf | M |
 | WB-50 | Workout-game: blitzjes en boxen verdienen door in de zone te rijden (bijv. elke 30 s binnen 5% van je doel een blitzje, een heel blok in de zone een box), in plaats van of naast de boxen op de weg. Twijfel nog. | zelf | S |
 | WB-48 | Workouts: medailles en bogen op de weg voor het volgende blok, en een spook van je vorige poging. | zelf | S |
-| WB-49 | Workouts uit JOIN en Fondo: kijken welke bestanden die exporteren (eventueel .fit inlezen). Wacht op een voorbeeldbestand. | zelf | S |
 | WB-46 | Sterren van een kasseienstrook laten meetellen (nu alleen een label). Voorstel: 3★ / 4★ / 5★ = 10% / 15% / 20% trager op de stenen, lage / normale / hoge kans op lek, licht / normaal / stevig hobbelen op de trainer, breed / normaal / smal gootje. Eerst WB-06 afwachten. | zelf | S |
 
 ## Publieke beta
