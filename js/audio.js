@@ -78,16 +78,16 @@ export const STATIONS = {
   fipgroove: { name: 'FIP Groove', sound: 'funk, soul, disco', urls: ['https://icecast.radiofrance.fr/fipgroove-midfi.mp3', 'https://icecast.radiofrance.fr/fipgroove-hifi.aac'] },
   fiprock: { name: 'FIP Rock', sound: 'rock', urls: ['https://icecast.radiofrance.fr/fiprock-midfi.mp3', 'https://icecast.radiofrance.fr/fiprock-hifi.aac'] },
   intergalactic: { name: 'Intergalactic FM', sound: 'electro en italo', urls: ['https://radio.intergalactic.fm/1', 'http://radio.intergalactic.fm/1'] },
-  defcon: { name: 'SomaFM DEF CON', sound: 'donkere, stuwende elektronica', urls: ['https://ice1.somafm.com/defcon-128-mp3', 'https://ice2.somafm.com/defcon-128-mp3'] },
+  darksynth: { name: 'Nightride Darksynth', sound: 'donkere, stuwende synths', urls: ['https://stream.nightride.fm/darksynth.mp3'] },
   kexp: { name: 'KEXP', sound: 'indie en alternatief', urls: ['https://kexp-mp3-128.streamguys1.com/kexp128.mp3', 'https://kexp.streamguys1.com/kexp160.aac'] },
   fipelectro: { name: 'FIP Electro', sound: 'elektronisch', urls: ['https://icecast.radiofrance.fr/fipelectro-midfi.mp3', 'https://icecast.radiofrance.fr/fipelectro-hifi.aac'] },
   fipjazz: { name: 'FIP Jazz', sound: 'jazz', urls: ['https://icecast.radiofrance.fr/fipjazz-midfi.mp3', 'https://icecast.radiofrance.fr/fipjazz-hifi.aac'] },
   fipworld: { name: 'FIP World', sound: 'wereldmuziek', urls: ['https://icecast.radiofrance.fr/fipworld-midfi.mp3', 'https://icecast.radiofrance.fr/fipworld-hifi.aac'] },
-  groovesalad: { name: 'SomaFM Groove Salad', sound: 'chill downtempo', urls: ['https://ice1.somafm.com/groovesalad-128-mp3', 'https://ice2.somafm.com/groovesalad-128-mp3'] },
+  chillsynth: { name: 'Nightride Chillsynth', sound: 'chill synthwave', urls: ['https://stream.nightride.fm/chillsynth.mp3'] },
   paradise: { name: 'Radio Paradise', sound: 'eclectisch, van rock tot elektronica', urls: ['https://stream.radioparadise.com/mp3-128', 'https://stream.radioparadise.com/aac-128'] },
 };
 const RADIO_ORDER = Object.keys(STATIONS);
-const RADIO_FOR = { polder: 'fipgroove', vulkaan: 'fiprock', kosmo: 'intergalactic', zen: 'defcon' };
+const RADIO_FOR = { polder: 'fipgroove', vulkaan: 'fiprock', kosmo: 'intergalactic', zen: 'darksynth' };
 let radio = null, radioTry = 0, radioSkips = 0, notice = () => {};
 const currentTrack = () => userTrack || (mode === 'club' ? CLUB_FOR[scene] || 'disco' : mode === 'radio' ? RADIO_FOR[scene] || 'fipgroove' : scene);
 // Speelt een zender af; lukt het niet, dan het reserve-adres en daarna de volgende zender.
