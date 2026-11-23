@@ -110,6 +110,7 @@ svg.jersey { height: 1.05em; width: auto; vertical-align: -0.15em; margin-right:
 #h-item.has { border-color: var(--gold); box-shadow: 0 0 24px rgba(255, 209, 102, .7); animation: pulse .7s infinite alternate; }
 #h-item-i { font-size: clamp(38px, 8vh, 62px); line-height: 1; } #h-item small { font-size: 11px; color: var(--dim); font-weight: 600; }
 @keyframes pulse { to { transform: scale(1.06); } }
+#h-item.tap { filter: brightness(1.9); border-color: #fff; } /* zichtbaar dat je tik is aangekomen */
 .h-bc { left: 50%; bottom: 8px; transform: translateX(-50%); width: min(600px, 62vw); height: 46px; }
 #h-prof { width: 100%; height: 100%; opacity: .85; } #h-dots { position: absolute; inset: 0; }
 #h-dots i { position: absolute; width: 10px; height: 10px; border-radius: 50%; margin: -5px; border: 2px solid #000; }
@@ -276,7 +277,8 @@ body.zen #zen-bg { display: block; }
 
 /* ---------- telefoon liggend: compacte HUD; TRAP linksonder, sturen en power-up rechtsonder ---------- */
 @media (max-height: 500px) and (orientation: landscape) {
-  #hud { --sl: max(12px, env(safe-area-inset-left, 0px)); --sr: max(12px, env(safe-area-inset-right, 0px)); }
+  /* --sb: weg van de onderrand; daar zit op een iPhone het veegstreepje dat tikken soms opslokt */
+  #hud { --sl: max(12px, env(safe-area-inset-left, 0px)); --sr: max(12px, env(safe-area-inset-right, 0px)); --sb: max(16px, calc(env(safe-area-inset-bottom, 0px) + 10px)); }
   .h-tl { top: 6px; left: var(--sl); }
   #h-pos { font-size: 34px; } #h-lap { font-size: 13px; }
   .h-tc { top: 4px; } #h-time { font-size: 22px; } #h-tot, #h-delta { font-size: 12px; }
@@ -285,19 +287,19 @@ body.zen #zen-bg { display: block; }
   #h-menu { right: var(--sr); } #h-music { right: calc(var(--sr) + 44px); } #h-fs { right: calc(var(--sr) + 112px); }
   .h-tr { top: 42px; right: var(--sr); font-size: 11px; }
   #h-rank div { padding: 0 6px; } #h-feed { margin-top: 4px; }
-  .h-bl { left: var(--sl); bottom: 10px; }
-  body.touchy #hud:has(#t-pedal.on) .h-bl { bottom: 104px; }
+  .h-bl { left: var(--sl); bottom: var(--sb); }
+  body.touchy #hud:has(#t-pedal.on) .h-bl { bottom: calc(var(--sb) + 94px); }
   #h-watt { font-size: 40px; } .h-sub { font-size: 12px; } #h-hr { font-size: 18px; } #h-gear { font-size: 15px; }
   #h-kom, #h-cass, #h-green, #h-rubber, #h-line, #h-draft { font-size: 12px; }
-  .h-br { right: var(--sr); bottom: 10px; gap: 4px; }
-  body.touchy #hud:has(#t-left.on) .h-br { bottom: 102px; }
+  .h-br { right: var(--sr); bottom: var(--sb); gap: 4px; }
+  body.touchy #hud:has(#t-left.on) .h-br { bottom: calc(var(--sb) + 92px); }
   #h-bolts { font-size: 17px; } #h-warn { font-size: 12px; padding: 2px 8px; }
-  #h-item { width: 70px; height: 70px; border-radius: 16px; border-width: 3px; } #h-item-i { font-size: 34px; } #h-item small { display: none; }
+  #h-item { width: 84px; height: 84px; border-radius: 18px; border-width: 3px; } #h-item-i { font-size: 40px; } #h-item small { display: none; }
   .h-bc { width: min(360px, 40vw); height: 34px; bottom: 6px; }
-  .touch { width: 84px; max-width: none; height: 84px; bottom: 10px; font-size: 26px; border-radius: 16px; }
+  .touch { width: 84px; max-width: none; height: 84px; bottom: var(--sb); font-size: 26px; border-radius: 16px; }
   /* links alleen TRAP; rechts sturen met de power-up erboven */
   #t-right { right: var(--sr); left: auto; } #t-left { right: calc(var(--sr) + 94px); left: auto; }
-  #t-pedal { left: var(--sl); right: auto; bottom: 10px; width: 118px; height: 84px; font-size: 18px; }
+  #t-pedal { left: var(--sl); right: auto; bottom: var(--sb); width: 118px; height: 84px; font-size: 18px; }
   #h-banner { top: 24%; font-size: 22px; }
   #h-dev { bottom: 48px; font-size: 12px; }
   #toast { bottom: 10px; font-size: 14px; padding: 8px 14px; }

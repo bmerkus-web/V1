@@ -1276,7 +1276,10 @@ bindTouch($('t-left'), 'left'); bindTouch($('t-right'), 'right'); bindTouch($('t
 $('t-left').classList.add('on'); $('t-right').classList.add('on');
 // Power-upknop op 'pointerdown': een 'click' komt op een tablet niet door zolang er al een andere vinger
 // op het scherm staat (bijv. op TRAP). De click alleen nog voor toetsenbordbediening (detail 0).
-$('h-item').addEventListener('pointerdown', (e) => { e.preventDefault(); input.trigger('item'); });
+// Op een telefoon direct op 'touchstart' (komt het betrouwbaarst door, ook met een tweede vinger); muis en pen via pointerdown.
+const fireItem = (e) => { e.preventDefault(); input.trigger('item'); const el = $('h-item'); el.classList.add('tap'); setTimeout(() => el.classList.remove('tap'), 140); };
+$('h-item').addEventListener('touchstart', fireItem, { passive: false });
+$('h-item').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') fireItem(e); });
 $('h-item').addEventListener('click', (e) => { if (e.detail === 0) input.trigger('item'); });
 $('h-menu').onclick = () => togglePause();
 window.addEventListener('pointerdown', () => audio.unlock(), { once: true });
