@@ -200,7 +200,7 @@ $('b-fs').onclick = $('h-fs').onclick = () => toggleFullscreen();
 // Een iPhone kan een webpagina niet zelf schermvullend maken; via het beginscherm wel.
 const CAN_FS = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
 // In Bluefy (iPhone mét Bluetooth) heeft de app zelf een volledig-schermmodus; in Safari via het beginscherm.
-const FS_TIP = IOS && bleSupported() ? 'Volledig scherm in Bluefy: zet de volledig-schermmodus van Bluefy zelf aan, via het menu of de instellingen van de app.'
+const FS_TIP = IOS && bleSupported() ? 'Volledig scherm in Bluefy: tik op de menuknop van Bluefy en scrol een stukje naar beneden naar de volledig-schermmodus.'
   : IOS ? 'Volledig scherm op een iPhone: tik in Safari op Deel → Zet op beginscherm en start Watt Blitz vanaf je beginscherm.' : 'Deze browser kan geen volledig scherm.';
 if (!CAN_FS) { $('h-fs').classList.add('hidden'); $('b-fs').onclick = () => toast(FS_TIP); }
 $('b-center').onclick = () => centerSteer();
