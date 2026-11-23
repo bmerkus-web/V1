@@ -148,6 +148,13 @@ async function roomTransport(code, isHost, cb) {
   };
 }
 
+// Losse verbinding met hetzelfde transport (voor de telefoon als stuur), apart van een race-kamer.
+// cb: { open, peer(id), data(from, msg), gone(from), error(msg), timeout }. Geeft { send(to|null, msg), close() }.
+export function openLink(code, isHost, cb) {
+  const make = window.claude?.use ? roomTransport : LOCAL ? bcTransport : peerTransport;
+  return Promise.resolve(make('r' + code, isHost, cb));
+}
+
 // Kamer: houdt de spelerslijst bij en routeert berichten.
 // Events: onRoster(players), onSettings(s), onStart(cfg), onGame(msg), onLobby(), onClosed(reden)
 export class Room {
