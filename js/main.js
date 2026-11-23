@@ -84,6 +84,12 @@ $('p-name').onchange = (e) => { P.name = e.target.value.trim().slice(0, 14) || '
 $('p-weight').onchange = (e) => { P.weight = clamp(Math.round(+e.target.value) || 75, 40, 150); e.target.value = P.weight; save(); };
 $('p-ftp').onchange = (e) => { P.ftp = clamp(Math.round(+e.target.value) || 200, 80, 500); e.target.value = P.ftp; save(); };
 
+// iPhone en iPad: geen Web Bluetooth in Safari of Chrome; wel in de app Bluefy. (iPad meldt zich soms als Mac.)
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const BLUEFY = 'https://apps.apple.com/app/id1492822055';
+const noBle = () => toast(IOS ? '📱 Op een iPhone of iPad werkt Bluetooth alleen in de app Bluefy. Open Watt Blitz daarin.' : 'Bluetooth werkt alleen in Chrome (Android / Mac) via https.');
+if (IOS && !bleSupported()) $('ios-note').classList.remove('hidden');
+$('b-ioslink').onclick = () => navigator.clipboard?.writeText(location.href.split('#')[0]).then(() => toast('Link gekopieerd – plak hem in Bluefy'), () => toast(location.href.split('#')[0]));
 function devStatus() {
   $('b-trainer').classList.toggle('on', trainer.connected);
   $('st-trainer').textContent = trainer.connected ? `${trainer.name} ✓${trainer.canControl ? ' · weerstand aan' : ''}` : trainer.device ? 'Verbinding kwijt…' : 'Niet verbonden';
@@ -99,7 +105,11 @@ function devStatus() {
   // Met een Sterzo of Zwift-knoppen zijn de stuurknoppen op het scherm niet nodig.
   const ownSteer = sterzo.connected || pads.some((p) => p.connected);
   $('t-left').classList.toggle('on', !ownSteer); $('t-right').classList.toggle('on', !ownSteer);
-  if (!bleSupported()) $('ble-note').textContent = 'Deze browser ondersteunt geen Bluetooth. Gebruik Chrome op Android of Mac (via https). Tot dan: demo-modus met ↑ / Shift / ←→.';
+  if (!bleSupported()) {
+    const demo = document.body.classList.contains('touchy') ? 'houd TRAP ingedrukt en stuur met ◀ ▶' : '↑ = trappen, Shift = sprint, ←/→ = sturen';
+    $('ble-note').innerHTML = IOS ? `Op een iPhone of iPad kan geen enkele browser Bluetooth, behalve de gratis app <a href="${BLUEFY}" target="_blank" rel="noopener">Bluefy</a>. Open Watt Blitz daarin om je apparaten te koppelen. Hier speel je in demo-modus: ${demo}.`
+      : `Deze browser ondersteunt geen Bluetooth. Gebruik Chrome op Android of Mac (via https). Tot dan speel je in demo-modus: ${demo}.`;
+  }
 }
 trainer.onstatus = sterzo.onstatus = hrm.onstatus = devStatus;
 // Meldingen als een apparaat onverwacht wegvalt en weer terugkomt.
@@ -144,7 +154,7 @@ $('b-diag').onclick = () => {
 async function connect(dev, label) {
   audio.unlock();
   if (dev.connected) { dev.disconnect(); dev.device = null; devStatus(); return; }
-  if (!bleSupported()) { toast('Bluetooth werkt alleen in Chrome (Android / Mac) via https.'); return; }
+  if (!bleSupported()) { noBle(); return; }
   try { await dev.connect(); toast(`${label} verbonden: ${dev.name}`); }
   catch (e) { if (e.name !== 'NotFoundError') toast(`${label}: ${e.message}`); dev.device = null; }
   devStatus();
@@ -154,7 +164,7 @@ $('b-sterzo').onclick = () => connect(sterzo, 'Sterzo');
 $('b-hr').onclick = () => connect(hrm, 'Hartslagmeter');
 $('b-pads').onclick = async () => {
   audio.unlock();
-  if (!bleSupported()) { toast('Bluetooth werkt alleen in Chrome (Android / Mac) via https.'); return; }
+  if (!bleSupported()) { noBle(); return; }
   const pad = new ZwiftPad();
   let was = {};
   pad.onpad = (raw) => {
@@ -183,6 +193,9 @@ $('b-pads').onclick = async () => {
   devStatus();
 };
 $('b-fs').onclick = $('h-fs').onclick = () => toggleFullscreen();
+// Een iPhone kan een webpagina niet zelf schermvullend maken; via het beginscherm wel.
+const CAN_FS = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+if (!CAN_FS) { $('h-fs').classList.add('hidden'); $('b-fs').onclick = () => toast(IOS ? 'Volledig scherm op een iPhone: tik in Safari op Deel → Zet op beginscherm en start Watt Blitz vanaf je beginscherm.' : 'Deze browser kan geen volledig scherm.'); }
 $('b-center').onclick = () => { sterzo.calibrate(); toast('Stuur staat nu recht'); };
 
 for (const b of document.querySelectorAll('[data-go]')) b.onclick = () => show(b.dataset.go);
@@ -708,6 +721,7 @@ function wkHud() {
 const getSteer = (dt) => (wk?.zen && race ? clamp(-race.me.x * 2.5, -1, 1) : clamp(input.steer(dt) + sterzo.steer, -1, 1));
 
 let profDots = {};
+const PHONE = matchMedia('(max-height: 500px) and (orientation: landscape)'); // zelfde grens als in styles.css
 function startRace(cfg) {
   rideShot = null; lobbyReady = false; rerenderResults = null;
   audio.clearUserTrack(); // elke race begint met het nummer van de baan
@@ -1141,7 +1155,9 @@ function hud(dt) {
     setText(z, `${a.zone.name} ${fmtTime(r.time - a.t0)}${a.pr ? ' · PR ' + fmtTime(a.pr) : ''}`);
     z.style.borderColor = a.zone.type === 'sprint' ? '#39ffb0' : '#ff7b1c';
   }
-  setHTML($('h-rank'), r.order.map((x) => {
+  // Op een telefoon: alleen de koploper en wie vlak voor en achter je rijdt.
+  const rows = PHONE.matches ? r.order.filter((x) => x.rank === 1 || Math.abs(x.rank - me.rank) <= 1) : r.order;
+  setHTML($('h-rank'), rows.map((x) => {
     const gap = x === me ? '' : x.finished ? ' 🏁' : ` ${x.dist > me.dist ? '+' : '−'}${Math.abs(x.dist - me.dist).toFixed(0)}m`;
     return `<div class="${x === me ? 'me' : ''}"><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${x.penalty ? ` ⚖️+${x.penalty}s` : ''}${gap}</div>`;
   }).join(''));
@@ -1212,14 +1228,19 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else document.documentElement.requestFullscreen?.().catch(() => {});
+  const el = document.documentElement;
+  if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+  else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+  else el.webkitRequestFullscreen?.();
 }
 // Formaatwijzigingen samenvoegen: bij fullscreen of in- en uitschuivende balken komen er vaak vele achter elkaar.
 let resizeT = 0;
 const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(() => renderer.resize(), 200); };
 window.addEventListener('resize', onResize);
 document.addEventListener('fullscreenchange', onResize);
+document.addEventListener('webkitfullscreenchange', onResize);
+// iPhone: geen knijp-zoom tijdens het spelen (Safari negeert user-scalable=no).
+document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && race) navigator.wakeLock?.request('screen').then((w) => { wake = w; }).catch(() => {});
 });
