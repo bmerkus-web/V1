@@ -37,6 +37,7 @@
         <button id="b-trainer" class="dev"><b>🚴 Trainer</b><span id="st-trainer">Niet verbonden</span></button>
         <button id="b-sterzo" class="dev"><b>🎮 Sterzo-stuur</b><span id="st-sterzo">Niet verbonden</span></button>
         <button id="b-gyro" class="dev hidden"><b>📱 Sturen met telefoon</b><span id="st-gyro">Uit</span></button>
+        <button id="b-remote" class="dev"><b>📲 Telefoon als stuur</b><span id="st-remote">Uit</span></button>
         <button id="b-hr" class="dev"><b>❤️ Hartslagmeter</b><span id="st-hr">Niet verbonden</span></button>
         <button id="b-pads" class="dev"><b>🎛️ Zwift-knoppen</b><span id="st-pads">Niet verbonden</span></button>
         <button id="b-diag" class="ghost">🩺 Diagnose verbindingen</button>
@@ -56,6 +57,7 @@
       <button id="b-help" class="ghost">❓ Uitleg</button>
       <button id="b-fs" class="ghost">⛶ Volledig scherm</button>
     </div>
+    <div class="menu"><button id="b-rc" class="ghost hidden">📲 Deze telefoon als stuur voor je tablet of laptop</button></div>
   </section>
 
   <section id="s-setup" class="screen hidden">
@@ -124,6 +126,16 @@
     <div class="menu"><button class="ghost" data-go="home">← Terug</button><button id="b-dojoin" class="big">Verbinden</button></div>
   </section>
 
+  <section id="s-remote" class="screen hidden">
+    <h2>📲 Telefoon als stuur</h2>
+    <div class="card">
+      <p class="small">Zet je telefoon vast op je stuur. Kies op je tablet of laptop bij Apparaten <b>📲 Telefoon als stuur</b> en tik hier de code in die daar staat (of scan de QR-code met je camera).</p>
+      <label>Code <input id="rc-code" maxlength="4" class="code" autocomplete="off" autocapitalize="characters"></label>
+      <p class="small" id="rc-msg"></p>
+    </div>
+    <div class="menu"><button class="ghost" data-go="home">← Terug</button><button id="rc-go" class="big">Verbinden</button></div>
+  </section>
+
   <section id="s-board" class="screen hidden">
     <h2>Klassement</h2>
     <p class="small">Beste ronde- en segmenttijden met een echte trainer. Tijden van anderen komen binnen zodra je samen in een kamer zit; iedereen geeft daarbij ook door wat hij van anderen weet. Bots tellen niet mee.</p>
@@ -166,6 +178,7 @@
       <p><b>Click v2 valt weg?</b> Zwift houdt de Click v2 op slot voor andere apps. Het rechter knopje (Y, B, Z, A, +) houdt Watt Blitz zelf in leven door hem elke minuut kort opnieuw te verbinden. Wil je ook het linker knopje gebruiken, verbind de Click v2 dan eerst even in Zwift en sluit Zwift weer af. Valt een apparaat weg, dan probeert het spel het steeds opnieuw; druk op een knop als hij in slaap is gevallen.</p>
       <p><b>Zwift-knoppen:</b> koppel elke knop apart (tik per knop opnieuw op <i>Zwift-knoppen</i>). <b>Click (twee knopjes):</b> links ←/→ = sturen, ↑ = power-up, ↓ = bel; rechts Z/A = sturen, Y = power-up, B = bel; − en + = power-up. <b>Play:</b> pijltjes ←/→ of de flippers = sturen, ↑ / A / Z / zijknop = power-up, ↓ / Y / B = bel. <b>Eerste Click:</b> − en + = sturen, beide tegelijk = power-up.</p>
       <p><b>Sturen met je telefoon:</b> zet je telefoon vast op je stuur en tik bij Apparaten op <i>Sturen met telefoon</i> (een iPhone vraagt eerst toestemming voor beweging). Draai je je stuur, dan stuur je in het spel, net als met een Sterzo. Bij de start is de stand van dat moment rechtdoor; rechtzetten kan altijd met C of via pauze. Bij Instellingen kies je hoe gevoelig het is.</p>
+      <p><b>Telefoon als stuur voor je tablet of laptop:</b> kies bij Apparaten <i>📲 Telefoon als stuur</i>. Je ziet een code en een QR-code. Scan die met je telefoon (of open Watt Blitz op je telefoon, tik op <i>📲 Deze telefoon als stuur</i> en vul de code in). Zet je telefoon vast op je stuur: draai je stuur en je stuurt in het spel. Op je telefoon zit een grote power-upknop waarop je ziet welke power-up je hebt, plus bel, rechtzetten, schakelen (of −5%/+5% in een workout), volgend nummer en pauze. Werkt ook als je met je maten in een kamer rijdt. Heb je al een Sterzo, zet dan op je telefoon 🧭 sturen uit en gebruik hem alleen als knoppen.</p>
       <p><b>iPhone en iPad:</b> daar kan geen enkele browser Bluetooth, behalve de gratis app Bluefy. Open Watt Blitz daarin om je trainer, stuur, hartslagmeter of Zwift-knoppen te koppelen. Zonder apparaten speel je in demo-modus: houd TRAP ingedrukt en stuur met ◀ ▶. Op een telefoon speel je liggend (TRAP links, sturen en power-up rechts; stuur je met je telefoon, een Sterzo of Zwift-knoppen, dan is de hele rechterhelft van het scherm de power-upknop); een Zen-workout kan ook rechtop; volledig scherm krijg je in Safari via Deel → Zet op beginscherm, en in Bluefy via de menuknop van de app (een stukje naar beneden scrollen).</p>
       <div id="help-items" class="items"></div>
       <p><b>Ideale lijn:</b> de binnenbocht is korter, de buitenbocht langer. Snijd bochten aan de binnenkant aan en je wint meters zonder harder te trappen – maar een bocht duwt je naar buiten, dus je moet ervoor sturen.</p>
@@ -237,6 +250,21 @@
   <div id="h-dev" class="hidden"></div>
   <button id="h-fs" aria-label="Volledig scherm">⛶</button>
   <button id="h-music" aria-label="Volgend nummer" title="Volgend nummer (T)">🎵 ⏭</button>
+</div>
+
+<!-- telefoon als afstandsbediening -->
+<div id="rc" class="hidden">
+  <div class="rc-top"><span id="rc-status">Verbonden</span><div class="rc-steer" title="stuuruitslag"><i id="rc-steer"></i></div><button id="rc-stop" class="ghost">Stoppen</button></div>
+  <button id="rc-item" class="rc-item"><span id="rc-item-i">⚡</span><small id="rc-item-n">power-up</small></button>
+  <div class="rc-row">
+    <button data-a="bell" aria-label="Bel">🔔</button>
+    <button id="rc-center" aria-label="Stuur recht zetten">🎯 recht</button>
+    <button id="rc-gyro" aria-label="Sturen met telefoon aan of uit">🧭 sturen</button>
+    <button data-a="gearDown" class="rc-gear" aria-label="Lichter">−</button>
+    <button data-a="gearUp" class="rc-gear" aria-label="Zwaarder">+</button>
+    <button data-a="track" aria-label="Volgend nummer">🎵</button>
+    <button data-a="pause" aria-label="Pauze">II</button>
+  </div>
 </div>
 
 <div id="rotate"><div class="rot-i">📱</div><b>Draai je telefoon een kwartslag</b><span>Watt Blitz speel je liggend. Alleen een Zen-workout kan ook rechtop.</span></div>

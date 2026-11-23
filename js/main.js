@@ -4,6 +4,7 @@ import { Race, ITEMS, BOT_NAMES, juryWhat } from './game.js';
 import { Renderer } from './render.js';
 import { Trainer, Sterzo, HeartRate, ZwiftPad, bleSupported, errText } from './ble.js';
 import { GyroSteer } from './gyro.js';
+import { RemoteHost, RemoteCtl } from './remote.js';
 import { input, bindTouch } from './input.js';
 import { audio } from './audio.js';
 import { store, save, COLORS, getTime, getGhost, levelOf } from './storage.js';
@@ -87,6 +88,8 @@ $('p-ftp').onchange = (e) => { P.ftp = clamp(Math.round(+e.target.value) || 200,
 
 // iPhone en iPad: geen Web Bluetooth in Safari of Chrome; wel in de app Bluefy. (iPad meldt zich soms als Mac.)
 const gyro = new GyroSteer();
+const remote = new RemoteHost(); // in de game: een telefoon als stuur
+const rc = new RemoteCtl(gyro); // op de telefoon: deze telefoon als stuur voor een andere game
 const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const BLUEFY = 'https://apps.apple.com/app/id1492822055';
 const noBle = () => toast(IOS ? '📱 Op een iPhone of iPad werkt Bluetooth alleen in de app Bluefy. Open Watt Blitz daarin.' : 'Bluetooth werkt alleen in Chrome (Android / Mac) via https.');
@@ -105,9 +108,11 @@ function devStatus() {
   $('b-gyro').classList.toggle('on', gyro.on);
   $('st-gyro').textContent = gyro.on ? (gyro.active ? 'Aan ✓ · rechtdoor = midden' : 'Aan · wacht op de sensor…') : 'Uit · tik om aan te zetten';
   $('b-center').classList.toggle('hidden', !sterzo.connected && !gyro.on);
+  $('b-remote').classList.toggle('on', remote.connected);
+  $('st-remote').textContent = remote.connected ? `telefoon van ${remote.ctlName || 'je'} ✓${remote.steering ? '' : ' · alleen knoppen'}` : remote.listening ? `wacht op je telefoon · code ${remote.code}` : 'Uit';
   $('t-pedal').classList.toggle('on', !trainer.connected);
   // Met een Sterzo of Zwift-knoppen zijn de stuurknoppen op het scherm niet nodig.
-  const ownSteer = sterzo.connected || gyro.on || pads.some((p) => p.connected);
+  const ownSteer = sterzo.connected || gyro.on || (remote.connected && remote.steering) || pads.some((p) => p.connected);
   $('t-left').classList.toggle('on', !ownSteer); $('t-right').classList.toggle('on', !ownSteer);
   $('t-zone').classList.toggle('on', ownSteer);
   if (!bleSupported()) {
@@ -219,6 +224,96 @@ gyro.range = P.gyroRange || 20;
 if (P.gyro && GyroSteer.available()) gyro.start().then(devStatus, devStatus); // lukt niet zonder tik (iPhone)? dan blijft hij uit
 setInterval(() => { if (gyro.on && !race) devStatus(); }, 1000); // status van de sensor bijwerken in het menu
 
+// ---------- telefoon als stuur: in de game ----------
+remote.onaction = (a) => input.trigger(a); // power-up, bel, schakelen, pauze, volgend nummer
+remote.onstatus = () => { devStatus(); const st = $('rm-st'); if (st) st.textContent = remote.connected ? '✓ verbonden' : 'Wacht op je telefoon…'; };
+remote.onconnect = () => { toast(`📲 ${remote.ctlName || 'Telefoon'} verbonden als stuur`); if ($('rm-st')) hideOverlay(); };
+remote.onlost = () => toast('📲 Telefoon-stuur: verbinding kwijt – hij verbindt vanzelf opnieuw');
+if (P.remoteOn && P.remoteCode) remote.start(P.remoteCode).then((c) => { P.remoteCode = c; save(); devStatus(); }, () => {});
+$('b-remote').onclick = async () => {
+  audio.unlock();
+  try { P.remoteCode = await remote.start(P.remoteCode); P.remoteOn = true; save(); devStatus(); }
+  catch (e) { toast('📲 ' + errText(e)); return; }
+  showRemoteInfo();
+};
+async function showRemoteInfo() {
+  const url = `${location.origin}${location.pathname}#remote-${remote.code}`;
+  overlay(`<h2>📲 Telefoon als stuur</h2>
+    <p class="small" style="text-align:center">${HOSTED ? 'Open deze pagina op je telefoon' : 'Scan de QR-code met de camera van je telefoon, of open Watt Blitz op je telefoon'}, tik op <b>📲 Deze telefoon als stuur</b> en vul de code in.</p>
+    ${HOSTED ? '' : '<div id="rm-qr" class="rm-qr"></div>'}<p style="text-align:center;margin:0"><b class="code">${remote.code}</b></p>
+    <p class="small" id="rm-st" style="text-align:center">${remote.connected ? '✓ verbonden' : 'Wacht op je telefoon…'}</p>
+    <div class="menu"><button class="ghost" id="rm-off">Uitzetten</button><button class="big" id="ov-close">Klaar</button></div>`);
+  $('ov-close').onclick = hideOverlay;
+  $('rm-off').onclick = () => { remote.stop(); P.remoteOn = false; save(); hideOverlay(); devStatus(); };
+  if (HOSTED) return;
+  try { const { qrcode } = await import('../vendor/qrcode.mjs'); const q = qrcode(0, 'M'); q.addData(url); q.make(); if ($('rm-qr')) $('rm-qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); }
+  catch { if ($('rm-qr')) $('rm-qr').remove(); }
+}
+// Wat de telefoon moet laten zien (welke power-up, schakelen of −5%/+5%).
+setInterval(() => {
+  if (!remote.connected) return;
+  const me = race?.me, it = me?.item ? ITEMS[me.item] : null;
+  remote.send({ t: 'st', it: it ? it.icon : '', n: it ? it.name : '', spin: (me?.roulette || 0) > 0, race: !!race && race.state === 'race' && !race.free, wk: !!wk, vs: !!P.vshift });
+}, 200);
+
+// ---------- telefoon als stuur: op de telefoon ----------
+let rcWake = null;
+$('b-rc').classList.toggle('hidden', !matchMedia('(pointer: coarse)').matches);
+$('b-rc').onclick = () => { audio.unlock(); $('rc-msg').textContent = ''; show('remote'); };
+$('rc-code').oninput = (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ''); };
+$('rc-go').onclick = async () => {
+  const code = $('rc-code').value.trim().toUpperCase();
+  if (!/^[A-Z]{4}$/.test(code)) { $('rc-msg').textContent = 'Vul de code van 4 letters in die op je tablet of laptop staat.'; return; }
+  let note = '';
+  // Eerst de bewegingssensor (een iPhone vraagt toestemming, en dat moet direct na de tik).
+  if (!gyro.on) { try { await gyro.start(); } catch (e) { note = ' Sturen werkt niet (' + errText(e) + '); de knoppen wel.'; rc.useGyro = false; } }
+  $('rc-msg').textContent = 'Verbinden…';
+  try { await rc.connect(code, P.name); } catch (e) { $('rc-msg').textContent = errText(e); return; }
+  gyro.calibrate();
+  $('rc').classList.remove('hidden');
+  navigator.wakeLock?.request('screen').then((w) => { rcWake = w; }).catch(() => {});
+  rcRender(); rcSteerLoop();
+  toast('📲 Verbonden! Zet je telefoon vast op je stuur; rechtdoor is het midden.' + note);
+};
+function rcRender() {
+  const st = rc.state || {}, ok = rc.connected;
+  $('rc-status').textContent = ok ? `✓ Verbonden · ${rc.code}` : 'Verbinding kwijt – opnieuw verbinden…';
+  $('rc-status').className = ok ? 'ok' : 'bad';
+  const b = $('rc-item');
+  $('rc-item-i').textContent = st.spin ? '🎲' : st.it || '⚡';
+  $('rc-item-n').textContent = st.spin ? 'draait…' : st.it ? st.n : st.race ? 'nog geen power-up' : 'power-up';
+  b.classList.toggle('has', !!st.it && !st.spin); b.classList.toggle('spin', !!st.spin);
+  const gear = !!(st.wk || st.vs);
+  for (const g of document.querySelectorAll('#rc .rc-gear')) g.classList.toggle('hidden', !gear);
+  document.querySelector('#rc [data-a=gearDown]').textContent = st.wk ? '−5%' : 'lichter';
+  document.querySelector('#rc [data-a=gearUp]').textContent = st.wk ? '+5%' : 'zwaarder';
+  $('rc-gyro').classList.toggle('off', !(rc.useGyro && gyro.on));
+  $('rc-gyro').textContent = rc.useGyro && gyro.on ? '🧭 sturen' : '🧭 uit';
+}
+rc.onstate = rc.onstatus = () => { if (!$('rc').classList.contains('hidden')) rcRender(); };
+function rcSteerLoop() {
+  if ($('rc').classList.contains('hidden')) return;
+  const on = rc.useGyro && gyro.on;
+  $('rc-steer').style.left = 50 + 46 * (on ? gyro.steer : 0) + '%';
+  $('rc-steer').parentElement.classList.toggle('off', !on);
+  requestAnimationFrame(rcSteerLoop);
+}
+// Knoppen op 'touchstart' (komt het betrouwbaarst door op een telefoon); muis via pointerdown.
+function rcButton(el, fn) {
+  const go = (e) => { e.preventDefault(); fn(); navigator.vibrate?.(15); el.classList.add('tap'); setTimeout(() => el.classList.remove('tap'), 140); };
+  el.addEventListener('touchstart', go, { passive: false });
+  el.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') go(e); });
+}
+rcButton($('rc-item'), () => rc.press('item'));
+for (const el of document.querySelectorAll('#rc [data-a]')) rcButton(el, () => rc.press(el.dataset.a));
+rcButton($('rc-center'), () => { gyro.calibrate(); toast('Stuur staat nu recht'); });
+rcButton($('rc-gyro'), async () => {
+  if (rc.useGyro && gyro.on) rc.useGyro = false;
+  else { rc.useGyro = true; if (!gyro.on) { try { await gyro.start(); gyro.calibrate(); } catch (e) { rc.useGyro = false; toast('📱 ' + errText(e)); } } }
+  rcRender();
+});
+$('rc-stop').onclick = () => { rc.stop(); $('rc').classList.add('hidden'); rcWake?.release?.(); rcWake = null; show('home'); };
+
 for (const b of document.querySelectorAll('[data-go]')) b.onclick = () => show(b.dataset.go);
 $('b-records').onclick = () => show('records');
 $('b-board').onclick = () => show('board');
@@ -313,7 +408,7 @@ function renderSetup() {
   $('o-assist-tr-l').classList.toggle('hidden', !(tr_ && !lobby));
   $('o-assist-wk').checked = $('o-assist-tr').checked = !!P.assist;
   const steers = !(wk_ && sel.wkMode === 'zen') && !(assistOk && P.assist);
-  const hasWheel = sterzo.connected || gyro.on || pads.some((d) => d.connected);
+  const hasWheel = sterzo.connected || gyro.on || (remote.connected && remote.steering) || pads.some((d) => d.connected);
   $('o-steer-note').textContent = steers && !hasWheel ? '🎮 Geen stuur gekoppeld: je stuurt met ← → of met de knoppen op het scherm. In bochten word je naar buiten geduwd als je niet stuurt.' : '';
   for (const b of $('wk-modes').children) { b.classList.toggle('sel', b.dataset.m === sel.wkMode); b.setAttribute('aria-checked', b.dataset.m === sel.wkMode); b.disabled = !canEdit || (lobby && b.dataset.m !== 'game'); }
   $('wk-mode-note').textContent = { zen: 'Zen: geen wereld, alleen je klok, wattages en grafiek.', ride: 'Ride: alleen op de baan, zonder bots en power-ups.',
@@ -748,13 +843,12 @@ function wkHud() {
   }
 }
 // Zen: je ziet de weg niet, dus de renner stuurt zelf netjes over het midden.
-const getSteer = (dt) => (wk?.zen && race ? clamp(-race.me.x * 2.5, -1, 1) : clamp(input.steer(dt) + sterzo.steer + gyro.steer, -1, 1));
+const getSteer = (dt) => (wk?.zen && race ? clamp(-race.me.x * 2.5, -1, 1) : clamp(input.steer(dt) + sterzo.steer + gyro.steer + remote.steer, -1, 1));
 
 let profDots = {};
 const PHONE = matchMedia('(max-height: 500px) and (orientation: landscape)'); // zelfde grens als in styles.css
 function startRace(cfg) {
   rideShot = null; lobbyReady = false; rerenderResults = null;
-  for (const k in tapStats) tapStats[k] = 0;
   audio.clearUserTrack(); // elke race begint met het nummer van de baan
   if (gyro.on) gyro.calibrate(); // telefoonstuur: zoals je hem nu houdt is rechtdoor
   wk = cfg.workout ? { w: cfg.workout, mode: cfg.wkMode || (cfg.zen ? 'zen' : cfg.wgame ? 'game' : 'ride'), bias: 0, erg: store.wkErg ?? true, zen: !!cfg.zen, game: !!cfg.wgame,
@@ -920,8 +1014,7 @@ function togglePause() {
     ${room ? '' : '<button class="ghost" id="ov-restart">Opnieuw</button>'}
     ${race.timed && (race.mode === 'cool' || race.mode === 'warm') && (race.mode === 'cool' || !room) ? `<button class="ghost" id="ov-skip">${race.mode === 'warm' ? 'Warming-up' : 'Cooling-down'} overslaan</button>` : ''}
     ${wk ? `${room ? '' : '<button class="ghost" id="ov-wkskip">⏭ Blok overslaan</button>'}<button class="ghost" id="ov-erg">ERG ${wk.erg ? 'uitzetten' : 'aanzetten'}</button><button class="ghost" id="ov-easy">−5%</button><button class="ghost" id="ov-hard">+5%</button>` : ''}
-    ${sterzo.connected || gyro.on ? '<button class="ghost" id="ov-center">🎯 Stuur recht zetten</button>' : ''}<button class="ghost" id="ov-quit">Stoppen</button></div><div class="menu">${canSave(race) ? SAVE_BTN : ''}${race.stats.secs.length > 5 ? SHOT_BTN : ''}</div>
-    ${document.body.classList.contains('touchy') ? `<p class="small">Power-upknop: ${tapStats.touch} tikken op de knop (van ${tapStats.screen} aanrakingen in totaal) · ${tapStats.used} gebruikt · ${tapStats.empty} zonder power-up · ${tapStats.roulette} tijdens het draaien${tapStats.blocked ? ` · ${tapStats.blocked} niet toegestaan` : ''}</p>` : ''}`);
+    ${sterzo.connected || gyro.on ? '<button class="ghost" id="ov-center">🎯 Stuur recht zetten</button>' : ''}<button class="ghost" id="ov-quit">Stoppen</button></div><div class="menu">${canSave(race) ? SAVE_BTN : ''}${race.stats.secs.length > 5 ? SHOT_BTN : ''}</div>`);
   wireSave(race);
   $('ov-resume').onclick = () => { paused = false; hideOverlay(); };
   if ($('ov-center')) $('ov-center').onclick = () => { centerSteer(); paused = false; hideOverlay(); };
@@ -1211,15 +1304,10 @@ function hud(dt) {
 }
 
 // Power-up: een tik terwijl de box nog draait stopt het draaien meteen (dan staat je power-up direct klaar).
-// tapStats houdt bij wat er met elke tik gebeurde; te zien in het pauzemenu (om haperende knoppen op te sporen).
-const tapStats = { screen: 0, touch: 0, used: 0, empty: 0, roulette: 0, blocked: 0 };
-document.addEventListener('touchstart', () => { tapStats.screen++; }, { passive: true, capture: true });
 function itemTap() {
   const me = race.me;
-  if (me.roulette > 0) { me.roulette = Math.min(me.roulette, 0.001); tapStats.roulette++; return; }
-  if (!me.item) { tapStats.empty++; return; }
+  if (me.roulette > 0) { me.roulette = Math.min(me.roulette, 0.001); return; }
   race.useItem();
-  tapStats[me.item ? 'blocked' : 'used']++;
 }
 
 // ---------- hoofdlus ----------
@@ -1295,7 +1383,7 @@ $('t-left').classList.add('on'); $('t-right').classList.add('on');
 // Power-upknop op 'pointerdown': een 'click' komt op een tablet niet door zolang er al een andere vinger
 // op het scherm staat (bijv. op TRAP). De click alleen nog voor toetsenbordbediening (detail 0).
 // Op een telefoon direct op 'touchstart' (komt het betrouwbaarst door, ook met een tweede vinger); muis en pen via pointerdown.
-const fireItem = (e) => { e.preventDefault(); if (e.type === 'touchstart') tapStats.touch++; input.trigger('item'); const el = $('h-item'); el.classList.add('tap'); setTimeout(() => el.classList.remove('tap'), 140); };
+const fireItem = (e) => { e.preventDefault(); input.trigger('item'); const el = $('h-item'); el.classList.add('tap'); setTimeout(() => el.classList.remove('tap'), 140); };
 $('h-item').addEventListener('touchstart', fireItem, { passive: false });
 $('t-zone').addEventListener('touchstart', fireItem, { passive: false });
 $('h-item').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') fireItem(e); });
@@ -1307,7 +1395,9 @@ window.addEventListener('keydown', () => audio.unlock(), { once: true });
 // Start
 show('home');
 const join = new URLSearchParams(location.search).get('join') || (/^#join-([a-z]{4})$/i.exec(location.hash) || [])[1];
+const rcCode = (/^#remote-([a-z]{4})$/i.exec(location.hash) || [])[1]; // QR-code van "telefoon als stuur"
+if (rcCode) { $('rc-code').value = rcCode.toUpperCase(); show('remote'); }
 if (join) { $('j-code').value = join.toUpperCase().slice(0, 4); show('join'); }
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 if (HOSTED) $('b-copy').textContent = 'Code kopiëren';
-window.__wb = { get race() { return race; }, sel, trainer, sterzo, hrm, gyro, renderer, store }; // voor testen/debuggen
+window.__wb = { get race() { return race; }, sel, trainer, sterzo, hrm, gyro, remote, rc, renderer, store }; // voor testen/debuggen
