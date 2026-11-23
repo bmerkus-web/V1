@@ -72,7 +72,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
-- 📲 WB-53 Telefoon als stuur voor je tablet of laptop: verbinden met code of QR-code (los van een race-kamer, dus ook in multiplayer), sturen met de gyroscoop, grote power-upknop die laat zien welke power-up je hebt, plus bel, rechtzetten, schakelen of −5%/+5%, volgend nummer en pauze; verbindt vanzelf opnieuw
+- 📲 WB-53 Remote stuur: je telefoon als stuur voor je tablet of laptop: verbinden met code of QR-code (los van een race-kamer, dus ook in multiplayer), sturen met de gyroscoop, grote power-upknop die laat zien welke power-up je hebt, plus bel, rechtzetten, schakelen of −5%/+5%, volgend nummer en pauze; verbindt vanzelf opnieuw
 - 📱 Sturen met je telefoon: telefoon vast op je stuur, de gyroscoop werkt als een Sterzo (zonder kompas, met verloopcorrectie); aan te zetten bij Apparaten, gevoeligheid bij Instellingen, rechtzetten met C of via pauze
 - 📱 Telefoonindeling: compacte HUD liggend, TRAP linksonder, sturen en power-up rechtsonder, rekening met de notch, klassement alleen met koploper en je directe concurrenten, draai-hint als je de telefoon rechtop houdt (Zen-workout werkt ook rechtop). Op iPhone/iPad een melding om Bluefy te gebruiken (met link kopiëren); demo-modus werkt in elke browser. Pictogram voor het beginscherm
 - 📻 Radio als derde soort muziek: tien zenders met elk een eigen sound, voorkeurszender per baan (Polder FIP Groove, Vulkaanpas FIP Rock, Kosmodroom Intergalactic FM, Zen Nightride Darksynth; de SomaFM-zenders vervangen door Nightride omdat SomaFM de streams weigerde), zappen met de 🎵-knop, automatisch door bij een zender die niet bereikbaar is
