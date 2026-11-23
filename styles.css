@@ -253,9 +253,28 @@ body.zen #zen-bg { display: block; }
 #rotate b { font-size: 22px; font-style: italic; } #rotate span { color: var(--dim); }
 .rot-i { font-size: 64px; animation: rot 2.4s ease-in-out infinite; }
 @keyframes rot { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
-@media (orientation: portrait) and (max-width: 600px) { #ui.ingame ~ #rotate { display: flex; } }
+@media (orientation: portrait) and (max-width: 600px) {
+  body:not(.zen) #ui.ingame ~ #rotate { display: flex; } /* Zen kan wel rechtop */
+  /* zen-workout rechtop: knoppen boven, klok en wattages onder elkaar in het midden, grafiek onderin */
+  #hud.zen { --st: max(10px, env(safe-area-inset-top, 0px)); }
+  #hud.zen #h-menu, #hud.zen #h-music, #hud.zen #h-fs { top: var(--st); left: auto; margin-left: 0; padding: 5px 10px; font-size: 15px; border-radius: 9px; }
+  #hud.zen #h-menu { right: 12px; } #hud.zen #h-music { right: 58px; } #hud.zen #h-fs { display: none; }
+  #hud.zen #wk-blk { font-size: 13px; white-space: normal; }
+  #hud.zen #wk-l { left: 12px; top: var(--st); max-width: 62vw; }
+  #hud.zen #wk-ctl button { min-width: 52px; height: 42px; padding: 0 8px; font-size: 15px; }
+  #hud.zen #wk-r { top: calc(var(--st) + 112px); left: 12px; right: 12px; text-align: center; }
+  #hud.zen #wk-next div { white-space: normal; }
+  #hud.zen #wk-c { top: 52%; }
+  #hud.zen #wk-cd { font-size: 88px; } #hud.zen .wk-bar { width: 78vw; }
+  #hud.zen .wk-pw { flex-direction: column; align-items: center; gap: 6px; margin-top: 14px; }
+  #hud.zen #wk-now { font-size: 116px; } #hud.zen #wk-tgt { font-size: 52px; }
+  #hud.zen .wk-gauge { width: 82vw; }
+  #hud.zen #wk-meta { font-size: 30px; }
+  #hud.zen #wk-chart { width: 94vw; height: 15vh; bottom: max(2vh, env(safe-area-inset-bottom, 0px)); }
+  #hud.zen #t-pedal { display: none !important; }
+}
 
-/* ---------- telefoon liggend: compacte HUD, duimknoppen in de onderhoeken ---------- */
+/* ---------- telefoon liggend: compacte HUD; TRAP linksonder, sturen en power-up rechtsonder ---------- */
 @media (max-height: 500px) and (orientation: landscape) {
   #hud { --sl: max(12px, env(safe-area-inset-left, 0px)); --sr: max(12px, env(safe-area-inset-right, 0px)); }
   .h-tl { top: 6px; left: var(--sl); }
@@ -267,17 +286,18 @@ body.zen #zen-bg { display: block; }
   .h-tr { top: 42px; right: var(--sr); font-size: 11px; }
   #h-rank div { padding: 0 6px; } #h-feed { margin-top: 4px; }
   .h-bl { left: var(--sl); bottom: 10px; }
-  body.touchy #hud:has(#t-left.on) .h-bl { bottom: 104px; }
+  body.touchy #hud:has(#t-pedal.on) .h-bl { bottom: 104px; }
   #h-watt { font-size: 40px; } .h-sub { font-size: 12px; } #h-hr { font-size: 18px; } #h-gear { font-size: 15px; }
   #h-kom, #h-cass, #h-green, #h-rubber, #h-line, #h-draft { font-size: 12px; }
   .h-br { right: var(--sr); bottom: 10px; gap: 4px; }
-  body.touchy #hud:has(#t-pedal.on) .h-br { bottom: 102px; }
+  body.touchy #hud:has(#t-left.on) .h-br { bottom: 102px; }
   #h-bolts { font-size: 17px; } #h-warn { font-size: 12px; padding: 2px 8px; }
   #h-item { width: 70px; height: 70px; border-radius: 16px; border-width: 3px; } #h-item-i { font-size: 34px; } #h-item small { display: none; }
   .h-bc { width: min(360px, 40vw); height: 34px; bottom: 6px; }
   .touch { width: 84px; max-width: none; height: 84px; bottom: 10px; font-size: 26px; border-radius: 16px; }
-  #t-left { left: var(--sl); } #t-right { left: calc(var(--sl) + 94px); right: auto; }
-  #t-pedal { right: var(--sr); bottom: 10px; width: 118px; height: 84px; font-size: 18px; }
+  /* links alleen TRAP; rechts sturen met de power-up erboven */
+  #t-right { right: var(--sr); left: auto; } #t-left { right: calc(var(--sr) + 94px); left: auto; }
+  #t-pedal { left: var(--sl); right: auto; bottom: 10px; width: 118px; height: 84px; font-size: 18px; }
   #h-banner { top: 24%; font-size: 22px; }
   #h-dev { bottom: 48px; font-size: 12px; }
   #toast { bottom: 10px; font-size: 14px; padding: 8px 14px; }
