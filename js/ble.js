@@ -1,6 +1,8 @@
 // Bluetooth: Wahoo KICKR (FTMS + Cycling Power) en Elite Sterzo Smart, via Web Bluetooth.
-const FTMS = 0x1826, CPS = 0x1818;
-const INDOOR_BIKE_DATA = 0x2ad2, FTMS_CONTROL = 0x2ad9, CP_MEASUREMENT = 0x2a63;
+// Standaard-UUID's voluit geschreven: niet elke Web Bluetooth-browser (bijv. Bluefy op iPhone) snapt de korte getallen.
+export const uuid16 = (n) => `0000${n.toString(16).padStart(4, '0')}-0000-1000-8000-00805f9b34fb`;
+const FTMS = uuid16(0x1826), CPS = uuid16(0x1818), HRS = uuid16(0x180d);
+const INDOOR_BIKE_DATA = uuid16(0x2ad2), FTMS_CONTROL = uuid16(0x2ad9), CP_MEASUREMENT = uuid16(0x2a63), HR_MEASUREMENT = uuid16(0x2a37);
 const STERZO_SVC = '347b0001-7635-408b-8918-8ff3949ce592';
 const STERZO_ANGLE = '347b0030-7635-408b-8918-8ff3949ce592';
 const STERZO_RX = '347b0031-7635-408b-8918-8ff3949ce592';
@@ -8,6 +10,18 @@ const STERZO_TX = '347b0032-7635-408b-8918-8ff3949ce592';
 
 export const bleSupported = () => typeof navigator !== 'undefined' && !!navigator.bluetooth;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Leesbare foutmelding, ook als een browser iets anders dan een Error gooit (Bluefy doet dat soms).
+export function errText(e) {
+  if (e == null) return 'onbekende fout';
+  if (typeof e === 'string') return e;
+  return e.message || e.name || (e.code != null ? 'foutcode ' + e.code : '') || String(e) || 'onbekende fout';
+}
+// Gooit opnieuw met de stap erbij ("verbinden: ..."), zodat we zien waar het misging. De naam blijft (NotFoundError = geannuleerd).
+function stepError(step, e) {
+  const err = new Error(`${step}: ${errText(e)}`);
+  err.name = (e && e.name) || 'Error';
+  return err;
+}
 
 // --- Parsers (los getest in tests/) ---
 export function parseIndoorBikeData(dv) {
@@ -82,20 +96,24 @@ class Device {
     if (this.log.length > 60) this.log.shift();
   }
   async _open(options) {
-    this.device = await navigator.bluetooth.requestDevice(options);
+    try { this.device = await navigator.bluetooth.requestDevice(options); }
+    catch (e) { if (e?.name !== 'NotFoundError') this._log('kiezen mislukt: ' + errText(e)); throw stepError('kiezen', e); }
     this.name = this.device.name || 'apparaat';
     this._wantConnected = true;
     this.device.addEventListener('gattserverdisconnected', () => this._onDisconnect());
-    await this._attach();
+    try { await this._attach(); }
+    catch (e) { this._wantConnected = false; this._log('mislukt: ' + errText(e)); throw e; }
     this._log('verbonden');
   }
   async _attach() {
+    let step = 'verbinden';
     try {
-      const server = await withTimeout(this.device.gatt.connect(), 10000, 'verbinden duurt te lang');
-      await withTimeout(this._setup(server), 10000, 'opstarten duurt te lang');
+      const server = await withTimeout(this.device.gatt.connect(), 10000, 'duurt te lang');
+      step = 'opstarten';
+      await withTimeout(this._setup(server), 10000, 'duurt te lang');
     } catch (e) {
       try { this.device.gatt.disconnect(); } catch (_) { /* negeer */ }
-      throw e;
+      throw stepError(step, e);
     }
     this.connected = true;
     this.onstatus();
@@ -121,7 +139,7 @@ class Device {
         this.onback();
         break;
       } catch (e) {
-        if (i < 5 || i % 12 === 0) this._log(`poging ${i + 1} mislukt: ${e.message}`);
+        if (i < 5 || i % 12 === 0) this._log(`poging ${i + 1} mislukt: ${errText(e)}`);
       }
     }
     this._reconnecting = false;
@@ -138,7 +156,7 @@ class Device {
       this._log('vernieuwd');
       this._refreshing = false;
     } catch (e) {
-      this._log('vernieuwen mislukt: ' + e.message);
+      this._log('vernieuwen mislukt: ' + errText(e));
       this._refreshing = false;
       this.connected = false;
       this.onstatus();
@@ -217,7 +235,7 @@ export class Trainer extends Device {
   }
   _write(data) {
     const cp = this._cp;
-    this._queue = this._queue.then(() => cp.writeValueWithResponse(data)).catch(() => {});
+    this._queue = this._queue.then(() => (cp.writeValueWithResponse ? cp.writeValueWithResponse(data) : cp.writeValue(data))).catch(() => {});
     return this._queue;
   }
   // Helling (%) naar de trainer; max 1x per seconde en alleen bij verandering.
@@ -259,11 +277,11 @@ export class HeartRate extends Device {
     this.lastData = 0;
   }
   async connect() {
-    await this._open({ filters: [{ services: [0x180d] }] });
+    await this._open({ filters: [{ services: [HRS] }] });
   }
   async _setup(server) {
-    const svc = await server.getPrimaryService(0x180d);
-    const ch = await svc.getCharacteristic(0x2a37);
+    const svc = await server.getPrimaryService(HRS);
+    const ch = await svc.getCharacteristic(HR_MEASUREMENT);
     ch.addEventListener('characteristicvaluechanged', (e) => {
       this.bpm = parseHeartRate(e.target.value);
       this.lastData = performance.now();
@@ -276,7 +294,7 @@ export class HeartRate extends Device {
 
 // --- Zwift-knoppen (Play, Click, Ride/Click v2) ---
 // Na het schrijven van "RideOn" sturen de knoppen hun toestand als protobuf-berichtje.
-const ZWIFT_SVC = '00000001-19ca-4651-86e5-fa29dcdd09d1', ZWIFT_SVC_RIDE = 0xfc82;
+const ZWIFT_SVC = '00000001-19ca-4651-86e5-fa29dcdd09d1', ZWIFT_SVC_RIDE = uuid16(0xfc82);
 const ZWIFT_ASYNC = '00000002-19ca-4651-86e5-fa29dcdd09d1';
 const ZWIFT_RX = '00000003-19ca-4651-86e5-fa29dcdd09d1';
 const ZWIFT_TX = '00000004-19ca-4651-86e5-fa29dcdd09d1';
@@ -404,12 +422,12 @@ export class ZwiftPad extends Device {
   async _setup(server) {
     let svc;
     try { svc = await server.getPrimaryService(ZWIFT_SVC_RIDE); } catch (e) { svc = await server.getPrimaryService(ZWIFT_SVC); }
-    const [async_, rx, tx] = await Promise.all([svc.getCharacteristic(ZWIFT_ASYNC), svc.getCharacteristic(ZWIFT_RX), svc.getCharacteristic(ZWIFT_TX)]);
+    const async_ = await svc.getCharacteristic(ZWIFT_ASYNC), rx = await svc.getCharacteristic(ZWIFT_RX), tx = await svc.getCharacteristic(ZWIFT_TX); // na elkaar: niet elke browser kan GATT-stappen tegelijk
     async_.addEventListener('characteristicvaluechanged', this._onData);
     tx.addEventListener('characteristicvaluechanged', this._onData);
     await async_.startNotifications();
     await tx.startNotifications().catch(() => {});
-    await rx.writeValueWithoutResponse(new TextEncoder().encode('RideOn'));
+    await (rx.writeValueWithoutResponse ? rx.writeValueWithoutResponse(new TextEncoder().encode('RideOn')) : rx.writeValue(new TextEncoder().encode('RideOn')));
     this.pressed = false;
     this._lastRefresh = performance.now();
   }
@@ -431,7 +449,7 @@ export class Sterzo extends Device {
   async _setup(server) {
     const codes = await loadCodes();
     const svc = await server.getPrimaryService(STERZO_SVC);
-    const [angle, rx, tx] = await Promise.all([svc.getCharacteristic(STERZO_ANGLE), svc.getCharacteristic(STERZO_RX), svc.getCharacteristic(STERZO_TX)]);
+    const angle = await svc.getCharacteristic(STERZO_ANGLE), rx = await svc.getCharacteristic(STERZO_RX), tx = await svc.getCharacteristic(STERZO_TX);
     const challenge = new Promise((resolve, reject) => {
       const h = (e) => {
         const v = e.target.value;

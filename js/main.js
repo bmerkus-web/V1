@@ -2,7 +2,7 @@
 import { TRACK_DEFS, getTrack } from './track.js';
 import { Race, ITEMS, BOT_NAMES, juryWhat } from './game.js';
 import { Renderer } from './render.js';
-import { Trainer, Sterzo, HeartRate, ZwiftPad, bleSupported } from './ble.js';
+import { Trainer, Sterzo, HeartRate, ZwiftPad, bleSupported, errText } from './ble.js';
 import { GyroSteer } from './gyro.js';
 import { input, bindTouch } from './input.js';
 import { audio } from './audio.js';
@@ -149,10 +149,10 @@ if (crashed) setTimeout(() => toast(crashText(crashed)), 800);
 
 $('b-diag').onclick = () => {
   const t = (ms) => new Date(ms).toLocaleTimeString('nl-NL');
-  const devs = [trainer, sterzo, hrm, ...pads].filter((d) => d.device);
-  const body = devs.length ? devs.map((d) => `<p><b>${esc(d.label)} – ${esc(d.name)}</b> ${d.connected ? '✓ verbonden' : d._wantConnected ? '⚠️ opnieuw verbinden…' : 'losgekoppeld'}</p><div class="diag">${d.log.map(([ms, ev]) => `${t(ms)}  ${esc(ev)}`).join('\n') || '–'}</div>`).join('')
+  const devs = [trainer, sterzo, hrm, ...pads].filter((d) => d.device || d.log.length); // ook mislukte pogingen
+  const body = devs.length ? devs.map((d) => `<p><b>${esc(d.label)}${d.name ? ' – ' + esc(d.name) : ''}</b> ${d.connected ? '✓ verbonden' : d._wantConnected ? '⚠️ opnieuw verbinden…' : d.device ? 'losgekoppeld' : 'niet verbonden'}</p><div class="diag">${d.log.map(([ms, ev]) => `${t(ms)}  ${esc(ev)}`).join('\n') || '–'}</div>`).join('')
     : '<p class="small">Nog geen apparaten gekoppeld.</p>';
-  overlay(`<h2>Verbindingen</h2>${crashed ? `<p class="small">⚠️ ${esc(crashText(crashed))}</p>` : ''}${body}<p class="small">Valt er iets weg, maak dan een schermafbeelding van dit scherm; dan zie ik wat er gebeurde.</p><div class="menu"><button class="big" id="ov-close">Sluiten</button></div>`);
+  overlay(`<h2>Verbindingen</h2>${crashed ? `<p class="small">⚠️ ${esc(crashText(crashed))}</p>` : ''}${body}<p class="small">Browser: ${esc(navigator.userAgent)}</p><p class="small">Valt er iets weg, maak dan een schermafbeelding van dit scherm; dan zie ik wat er gebeurde.</p><div class="menu"><button class="big" id="ov-close">Sluiten</button></div>`);
   $('ov-close').onclick = hideOverlay;
 };
 async function connect(dev, label) {
@@ -160,7 +160,7 @@ async function connect(dev, label) {
   if (dev.connected) { dev.disconnect(); dev.device = null; devStatus(); return; }
   if (!bleSupported()) { noBle(); return; }
   try { await dev.connect(); toast(`${label} verbonden: ${dev.name}`); }
-  catch (e) { if (e.name !== 'NotFoundError') toast(`${label}: ${e.message}`); dev.device = null; }
+  catch (e) { if (e?.name !== 'NotFoundError') toast(`${label}: ${errText(e)}`); dev.device = null; }
   devStatus();
 }
 $('b-trainer').onclick = () => connect(trainer, 'Trainer');
@@ -193,7 +193,7 @@ $('b-pads').onclick = async () => {
     if (pads.some((p) => p.device?.id === pad.device.id)) { toast('Deze knop was al gekoppeld'); return; }
     pads.push(pad);
     toast(`Zwift-knop verbonden: ${pad.name}. Druk op een knop om te testen.`);
-  } catch (e) { if (e.name !== 'NotFoundError') toast('Zwift-knoppen: ' + e.message); }
+  } catch (e) { if (e?.name !== 'NotFoundError') toast('Zwift-knoppen: ' + errText(e)); }
   devStatus();
 };
 $('b-fs').onclick = $('h-fs').onclick = () => toggleFullscreen();
