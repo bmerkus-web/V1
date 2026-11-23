@@ -5,7 +5,7 @@ const keys = new Set();
 const pressed = new Set(); // eenmalige acties sinds de vorige frame
 const touch = { left: false, right: false, pedal: false };
 const pads = new Map(); // externe knoppen (Zwift): bron -> { left, right }
-let kbSteer = 0;
+let kbSteer = 0, steerRate = 6; // hoe snel toetsen/knoppen naar volle uitslag gaan (stuurgevoeligheid)
 let demoPower = 0;
 
 const ACTIONS = {
@@ -36,6 +36,7 @@ export const input = {
   take(action) { return pressed.delete(action); },
   setPad(src, left, right) { if (left || right) pads.set(src, { left, right }); else pads.delete(src); },
   clear() { pressed.clear(); },
+  setSteerRate(r) { steerRate = r; },
   // Stuuruitslag -1..1 uit toetsen/touch (loopt soepel op).
   steer(dt) {
     const l = keys.has('ArrowLeft') || keys.has('KeyA') || touch.left;
@@ -43,7 +44,7 @@ export const input = {
     let target = (r ? 1 : 0) - (l ? 1 : 0);
     for (const p of pads.values()) target += p.right - p.left;
     target = clamp(target, -1, 1);
-    kbSteer += clamp(target - kbSteer, -dt * 6, dt * 6);
+    kbSteer += clamp(target - kbSteer, -dt * steerRate, dt * steerRate);
     return kbSteer;
   },
   // Demo-vermogen: pijl-omhoog/W = trappen, Shift = sprinten.

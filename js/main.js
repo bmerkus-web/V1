@@ -220,7 +220,18 @@ $('b-gyro').onclick = async () => {
   catch (e) { toast('📱 ' + e.message); }
   devStatus();
 };
-gyro.range = P.gyroRange || 20;
+// Stuurgevoeligheid: één schuif (1–10, 5 = standaard), per soort stuur onthouden.
+const SENS_KINDS = { remote: 'telefoon als stuur', sterzo: 'Sterzo', gyro: 'sturen met deze telefoon', buttons: 'toetsen en knoppen (←/→, ◀ ▶, Zwift-knoppen)' };
+P.sens ||= {};
+if (P.gyroRange && P.sens.gyro == null) P.sens.gyro = clamp(Math.round(5 + Math.log(20 / P.gyroRange) / Math.log(1 / 0.85)), 1, 10); // oude telefoonschuif overnemen
+const sensOf = (k) => P.sens[k] ?? 5;
+function steerKind() { return remote.connected && remote.steering ? 'remote' : sterzo.connected ? 'sterzo' : gyro.on ? 'gyro' : 'buttons'; }
+function applySens() {
+  const f = (k) => Math.pow(0.85, sensOf(k) - 5); // elke stap 15% minder ver draaien
+  sterzo.range = 24 * f('sterzo'); gyro.range = 20 * f('gyro'); remote.range = 20 * f('remote');
+  input.setSteerRate(6 * Math.pow(1.2, sensOf('buttons') - 5));
+}
+applySens();
 if (P.gyro && GyroSteer.available()) gyro.start().then(devStatus, devStatus); // lukt niet zonder tik (iPhone)? dan blijft hij uit
 setInterval(() => { if (gyro.on && !race) devStatus(); }, 1000); // status van de sensor bijwerken in het menu
 
@@ -320,8 +331,8 @@ $('b-board').onclick = () => show('board');
 $('b-help').onclick = () => show('help');
 $('b-settings').onclick = () => {
   $('p-feel').value = P.trainerFeel; $('p-feel-v').textContent = P.trainerFeel + '%';
-  $('p-gyro').value = P.gyroRange || 20; $('p-gyro-v').textContent = (P.gyroRange || 20) + '°';
-  $('p-gyro-l').classList.toggle('hidden', $('b-gyro').classList.contains('hidden')); $('p-gyro-n').classList.toggle('hidden', $('b-gyro').classList.contains('hidden'));
+  const sk = steerKind(); $('p-sens').value = sensOf(sk); $('p-sens-v').textContent = sensOf(sk);
+  $('p-sens-n').textContent = `Geldt nu voor: ${SENS_KINDS[sk]}. Wordt per stuur onthouden; koppel een ander stuur om dat in te stellen. Hoger = gevoeliger.`;
   $('p-mvol').value = P.musicVol ?? 100; $('p-mvol-v').textContent = (P.musicVol ?? 100) + '%';
   $('p-svol').value = P.sfxVol ?? 100; $('p-svol-v').textContent = (P.sfxVol ?? 100) + '%';
   $('p-vshift').checked = P.vshift; $('p-music').checked = P.music; $('p-sfx').checked = P.sfx; $('p-sound').value = P.sound || 'club';
@@ -332,7 +343,7 @@ applyVolumes();
 $('p-mvol').oninput = (e) => { P.musicVol = +e.target.value; $('p-mvol-v').textContent = P.musicVol + '%'; applyVolumes(); save(); };
 $('p-svol').oninput = (e) => { P.sfxVol = +e.target.value; $('p-svol-v').textContent = P.sfxVol + '%'; applyVolumes(); save(); };
 $('p-svol').onchange = () => { audio.unlock(); audio.sfx('bolt'); }; // even laten horen hoe hard het is
-$('p-gyro').oninput = (e) => { P.gyroRange = +e.target.value; gyro.range = P.gyroRange; $('p-gyro-v').textContent = P.gyroRange + '°'; save(); };
+$('p-sens').oninput = (e) => { P.sens[steerKind()] = +e.target.value; $('p-sens-v').textContent = e.target.value; applySens(); save(); };
 $('p-feel').oninput = (e) => { P.trainerFeel = +e.target.value; $('p-feel-v').textContent = P.trainerFeel + '%'; save(); };
 for (const k of ['vshift', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };
 audio.setOptions(P.music, P.sfx);
