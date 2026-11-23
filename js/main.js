@@ -221,7 +221,7 @@ $('b-gyro').onclick = async () => {
   devStatus();
 };
 // Stuurgevoeligheid: één schuif (1–10, 5 = standaard), per soort stuur onthouden.
-const SENS_KINDS = { remote: 'telefoon als stuur', sterzo: 'Sterzo', gyro: 'sturen met deze telefoon', buttons: 'toetsen en knoppen (←/→, ◀ ▶, Zwift-knoppen)' };
+const SENS_KINDS = { remote: 'remote stuur (telefoon voor je tablet of laptop)', sterzo: 'Sterzo', gyro: 'sturen met deze telefoon', buttons: 'toetsen en knoppen (←/→, ◀ ▶, Zwift-knoppen)' };
 P.sens ||= {};
 if (P.gyroRange && P.sens.gyro == null) P.sens.gyro = clamp(Math.round(5 + Math.log(20 / P.gyroRange) / Math.log(1 / 0.85)), 1, 10); // oude telefoonschuif overnemen
 const sensOf = (k) => P.sens[k] ?? 5;
@@ -235,11 +235,11 @@ applySens();
 if (P.gyro && GyroSteer.available()) gyro.start().then(devStatus, devStatus); // lukt niet zonder tik (iPhone)? dan blijft hij uit
 setInterval(() => { if (gyro.on && !race) devStatus(); }, 1000); // status van de sensor bijwerken in het menu
 
-// ---------- telefoon als stuur: in de game ----------
+// ---------- remote stuur (telefoon als stuur voor deze game) ----------
 remote.onaction = (a) => input.trigger(a); // power-up, bel, schakelen, pauze, volgend nummer
 remote.onstatus = () => { devStatus(); const st = $('rm-st'); if (st) st.textContent = remote.connected ? '✓ verbonden' : 'Wacht op je telefoon…'; };
-remote.onconnect = () => { toast(`📲 ${remote.ctlName || 'Telefoon'} verbonden als stuur`); if ($('rm-st')) hideOverlay(); };
-remote.onlost = () => toast('📲 Telefoon-stuur: verbinding kwijt – hij verbindt vanzelf opnieuw');
+remote.onconnect = () => { toast(`📲 Remote stuur verbonden (telefoon van ${remote.ctlName || 'je'})`); if ($('rm-st')) hideOverlay(); };
+remote.onlost = () => toast('📲 Remote stuur: verbinding kwijt – hij verbindt vanzelf opnieuw');
 if (P.remoteOn && P.remoteCode) remote.start(P.remoteCode).then((c) => { P.remoteCode = c; save(); devStatus(); }, () => {});
 $('b-remote').onclick = async () => {
   audio.unlock();
@@ -249,8 +249,8 @@ $('b-remote').onclick = async () => {
 };
 async function showRemoteInfo() {
   const url = `${location.origin}${location.pathname}#remote-${remote.code}`;
-  overlay(`<h2>📲 Telefoon als stuur</h2>
-    <p class="small" style="text-align:center">${HOSTED ? 'Open deze pagina op je telefoon' : 'Scan de QR-code met de camera van je telefoon, of open Watt Blitz op je telefoon'}, tik op <b>📲 Deze telefoon als stuur</b> en vul de code in.</p>
+  overlay(`<h2>📲 Remote stuur</h2>
+    <p class="small" style="text-align:center">${HOSTED ? 'Open deze pagina op je telefoon' : 'Scan de QR-code met de camera van je telefoon, of open Watt Blitz op je telefoon'}, tik op <b>📲 Deze telefoon als remote stuur</b> en vul de code in.</p>
     ${HOSTED ? '' : '<div id="rm-qr" class="rm-qr"></div>'}<p style="text-align:center;margin:0"><b class="code">${remote.code}</b></p>
     <p class="small" id="rm-st" style="text-align:center">${remote.connected ? '✓ verbonden' : 'Wacht op je telefoon…'}</p>
     <div class="menu"><button class="ghost" id="rm-off">Uitzetten</button><button class="big" id="ov-close">Klaar</button></div>`);
@@ -267,7 +267,7 @@ setInterval(() => {
   remote.send({ t: 'st', it: it ? it.icon : '', n: it ? it.name : '', spin: (me?.roulette || 0) > 0, race: !!race && race.state === 'race' && !race.free, wk: !!wk, vs: !!P.vshift });
 }, 200);
 
-// ---------- telefoon als stuur: op de telefoon ----------
+// ---------- remote stuur: op de telefoon ----------
 let rcWake = null;
 $('b-rc').classList.toggle('hidden', !matchMedia('(pointer: coarse)').matches);
 $('b-rc').onclick = () => { audio.unlock(); $('rc-msg').textContent = ''; show('remote'); };
@@ -284,11 +284,11 @@ $('rc-go').onclick = async () => {
   $('rc').classList.remove('hidden');
   navigator.wakeLock?.request('screen').then((w) => { rcWake = w; }).catch(() => {});
   rcRender(); rcSteerLoop();
-  toast('📲 Verbonden! Zet je telefoon vast op je stuur; rechtdoor is het midden.' + note);
+  toast('📲 Remote stuur verbonden! Zet je telefoon vast op je stuur; rechtdoor is het midden.' + note);
 };
 function rcRender() {
   const st = rc.state || {}, ok = rc.connected;
-  $('rc-status').textContent = ok ? `✓ Verbonden · ${rc.code}` : 'Verbinding kwijt – opnieuw verbinden…';
+  $('rc-status').textContent = ok ? `✓ Remote stuur · ${rc.code}` : 'Verbinding kwijt – opnieuw verbinden…';
   $('rc-status').className = ok ? 'ok' : 'bad';
   const b = $('rc-item');
   $('rc-item-i').textContent = st.spin ? '🎲' : st.it || '⚡';
