@@ -188,7 +188,13 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   c.fillStyle = '#15152a'; c.fillRect(-0.19 * u, -0.98 * u, 0.38 * u, 0.1 * u);
   // armen + stuur
   c.strokeStyle = opts.team && (opts.green || opts.polka) ? opts.team : jersey; c.lineWidth = 0.09 * u; // mouwen in de ploegkleur
-  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 0.22 * u, -1.4 * u); c.lineTo(s * 0.31 * u, -1.1 * u); c.stroke(); }
+  c.lineJoin = 'round';
+  const elb = r.elbow > 0 ? Math.min(1, r.elbow * 3, (1.6 - r.elbow) * 6) : 0; // elleboogje: linkerarm naar buiten, wapperend
+  for (const s of [-1, 1]) {
+    c.beginPath(); c.moveTo(s * 0.22 * u, -1.4 * u);
+    if (s < 0 && elb > 0) { const w = Math.sin(t * 18) * 0.03 * elb; c.lineTo((-0.31 - 0.24 * elb + w) * u, (-1.27 - 0.03 * elb) * u); } // elleboog uit
+    c.lineTo(s * 0.31 * u, -1.1 * u); c.stroke();
+  }
   // helm
   c.fillStyle = shade(r.color, 1.35); c.beginPath(); c.ellipse(0, -1.62 * u, 0.15 * u, 0.16 * u, 0, 0, 7); c.fill();
   c.fillStyle = 'rgba(0,0,0,.35)'; for (const s of [-1, 0, 1]) c.fillRect(s * 0.07 * u - 0.015 * u, -1.74 * u, 0.03 * u, 0.16 * u);
@@ -204,7 +210,7 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     for (let i = 0; i < 4; i++) { const x = (-0.3 + i * 0.2) * u, y = (-1.95 + ((t * 2 + i * 0.3) % 0.3)) * u; c.beginPath(); c.moveTo(x, y); c.lineTo(x - 0.04 * u, y + 0.1 * u); c.stroke(); }
   }
   if (m & 16) { c.font = `${0.4 * u}px sans-serif`; c.textAlign = 'center'; c.fillText('🧲', 0, -2.0 * u); }
-  if (r.bell > 0) { c.font = `${0.45 * u}px sans-serif`; c.textAlign = 'center'; c.fillText('🔔', 0.4 * u, -1.9 * u); }
+
   if (r.kwakAt != null && t - r.kwakAt < 0.9) { // kwak: sterretjes, en het blitzje dat wegvliegt
     const k = (t - r.kwakAt) / 0.9;
     c.fillStyle = '#fff36b';
@@ -216,6 +222,17 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     for (let i = 0; i < 6; i++) { const a = i * 1.05 + k * 3; c.beginPath(); c.arc(Math.cos(a) * k * 1.2 * u, -0.9 * u + Math.sin(a) * k * 1.2 * u, 0.07 * u, 0, 7); c.fill(); }
   }
   c.restore();
+  if (r.elbow > 0 && u > 5 && !opts.ghost) { // tekstballon "OVERNEMEN!"
+    const fs = Math.max(9, Math.min(17, u * 0.28)), txt = 'OVERNEMEN!';
+    c.font = `900 italic ${fs}px system-ui, sans-serif`;
+    const w = c.measureText(txt).width + fs * 0.9, h = fs * 1.5, bx = X - u * 0.55 - w, by = Y - 2.2 * u - h;
+    c.globalAlpha = Math.min(1, r.elbow * 3);
+    c.fillStyle = '#ffd166'; c.strokeStyle = '#1a1030'; c.lineWidth = 2;
+    c.beginPath(); c.roundRect ? c.roundRect(bx, by, w, h, h / 2) : c.rect(bx, by, w, h); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(bx + w - h * 0.6, by + h - 1); c.lineTo(X - u * 0.35, Y - 1.45 * u); c.lineTo(bx + w - h * 0.15, by + h - 1); c.fill();
+    c.fillStyle = '#1a1030'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, bx + w / 2, by + h / 2 + 1); c.textBaseline = 'alphabetic';
+    c.globalAlpha = 1;
+  }
   if (opts.label && u > 7) {
     c.font = `700 ${Math.max(10, Math.min(18, u * 0.3))}px system-ui, sans-serif`;
     c.textAlign = 'center';

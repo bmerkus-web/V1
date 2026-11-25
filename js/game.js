@@ -30,6 +30,7 @@ const BERM_COST = 0.4; // in de berm kom je meteen 40% minder snel vooruit
 const SPRINT_BONUS = 0.05, SPRINT_SECS = 30; // groene trui: 5% sneller, 30 seconden
 const ROCKET_ARM = 1.0; // een vuurpijl hangt eerst even stil: tijd om je schild te pakken
 const STORM_DELAY = 1.5; // tegenwind komt na een korte waarschuwing
+const ELBOW_SECS = 1.6, TAKEOVER_SECS = 8; // elleboogje: zo lang zie je het gebaar; zo lang komt een bot over
 const TEAM_DNF = 30; // ploegenklassement: wie uitvalt krijgt de tijd van de laatste renner + 30 s
 // Jury: [kans, tijdstraf in s]. Afgestemd zodat het gemiddeld ongeveer quitte speelt met wat het oplevert:
 // plakbidon ≈ 1,4 s winst, vuile kwak (de berm in) ≈ 0,9 s, gewone kwak ≈ 0,05 s plus een blitzje.
@@ -138,7 +139,7 @@ export class Race {
       fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0, kom: 0, scooter: 0, tow: 0, flat: 0, wheel: 0, antilek: 0 },
       bermWear: 0, penalty: 0, pens: [],
       kwakCd: 0, kwakSafe: 0, bumpCd: 0,
-      finished: false, finishTime: null, rank: i + 1, bell: 0, net: null,
+      finished: false, finishTime: null, rank: i + 1, elbow: 0, net: null,
     };
     if (r.kind === 'bot') {
       const ref = this.profile.fair ? REF_FTP : (this.profile.ftp * REF_KG) / (this.profile.weight || REF_KG);
@@ -246,7 +247,7 @@ export class Race {
   _stepLocal(r, power, steer, dt, auto) {
     const e = r.fx;
     for (const k in e) if (e[k] > 0) e[k] = Math.max(0, e[k] - dt);
-    if (r.bell > 0) r.bell -= dt;
+    if (r.elbow > 0) r.elbow -= dt;
     if (r.kwakCd > 0) r.kwakCd -= dt;
     if (r.kwakSafe > 0) r.kwakSafe -= dt;
     if (r.bumpCd > 0) r.bumpCd -= dt;
@@ -888,10 +889,27 @@ export class Race {
     this.rockets = this.rockets.filter((p) => !p.done);
   }
 
-  bell() {
-    this.me.bell = 1;
-    this.emit('sfx', 'bell');
-    this.room?.send({ t: 'bell', id: this.me.id });
+  // Elleboogje uitsteken: "neem over!". Een bot die in je wiel zit komt naar voren (een ploeggenoot altijd, een tegenstander soms).
+  elbow(r = this.me) {
+    if (r.elbow > 0 || r.finished) return;
+    r.elbow = ELBOW_SECS;
+    if (this.local(r)) this.room?.send({ t: 'elbow', id: r.id });
+    this._elbowFx(r);
+  }
+  _elbowFx(r) {
+    const me = this.me;
+    if (r === me || Math.abs(r.dist - me.dist) < 40) this.emit('sfx', 'elbow');
+    this.say(`💪 ${r.name}: overnemen!`);
+    const gap = r.dist - me.dist;
+    if (r !== me && gap > 0.8 && gap < 14 && Math.abs(r.x - me.x) < 0.4) this.emit('banner', { text: `💪 ${r.name}: NEEM OVER!`, sub: 'jij zit in het wiel', color: '#ffd166' });
+    // bots die in het wiel zitten (alleen waar de bots rijden)
+    for (const b of this.riders) {
+      if (b.kind !== 'bot' || b === r || b.finished) continue;
+      const g = r.dist - b.dist;
+      if (g > 0.8 && g < 14 && Math.abs(b.x - r.x) < 0.4 && (this.mate(b, r) || this.rng() < 0.35)) {
+        b.ai.takeover = TAKEOVER_SECS; b.ai.takeoverOf = r.id; b.ai.passSide = r.x > 0.4 ? -1 : r.x < -0.4 ? 1 : -1;
+      }
+    }
   }
 
   // ---------- bots ----------
@@ -911,6 +929,11 @@ export class Race {
       const tg = this._wkTarget(), ftp = Math.max(80, this.profile.ftp);
       const comply = { makkelijk: 0.94, normaal: 0.97, zwaar: 0.99, beul: 1.01 }[this.difficulty] ?? 0.97;
       p = REF_FTP * (tg != null ? tg / ftp : 0.6) * Math.min(1.03, comply + 0.03 * (ai.skill - 0.5) + 0.01 * Math.sin(this.time * 0.31 + ai.ph));
+    }
+    if (ai.takeover > 0) { // overnemen na een elleboogje: even aanzetten tot hij voorbij is
+      ai.takeover -= dt;
+      const L = this.byId(ai.takeoverOf);
+      if (L && !L.finished && r.dist < L.dist + 6) p *= r.dist < L.dist ? 1.4 : 1.15; else ai.takeover = 0;
     }
     r.power = p;
     r.cadence = 85 + 10 * Math.sin(this.time * 0.2 + ai.ph);
@@ -947,6 +970,11 @@ export class Race {
       // Niet achterop een tragere renner rijden: eromheen sturen.
       const blk = this.riders.find((q) => q !== r && q.dist - r.dist > 0 && q.dist - r.dist < 8 && Math.abs(q.x - tx) < 0.2 && q.v < r.v + 0.3);
       if (blk && !(ai.kwakT > 0)) tx = blk.x + (r.x >= blk.x ? 0.34 : -0.34);
+      if (ai.takeover > 0) { const L = this.byId(ai.takeoverOf); if (L) tx = r.dist < L.dist + 2 ? L.x + ai.passSide * 0.34 : L.x; } // ernaast en dan ervoor
+      // Lang op kop met iemand in het wiel? Dan zelf een elleboogje.
+      const wheel = !this.free && !r.finished && this.riders.some((o) => o !== r && r.dist - o.dist > 0.8 && r.dist - o.dist < 10 && Math.abs(o.x - r.x) < 0.28);
+      ai.leadT = wheel ? (ai.leadT || 0) + 0.35 : 0;
+      if (ai.leadT > 10 && this.rng() < 0.08) { ai.leadT = 0; this.elbow(r); }
       const wAhead = this.track.wAt(r.dist + 12);
       if (this.track.segAt(r.dist + 12).cobble) tx = ai.skill > 0.35 ? (Math.sign(r.x) || (ai.ph > 5 ? 1 : -1)) * (wAhead - GUTTER / 2) : clamp(tx, -(wAhead - 0.2), wAhead - 0.2); // goede bots zoeken het gootje
       ai.tx = clamp(tx, -Math.min(0.85, wAhead - 0.05), Math.min(0.85, wAhead - 0.05));
@@ -1003,7 +1031,7 @@ export class Race {
 
   // ---------- netwerk ----------
   _remote(r, dt) {
-    if (r.bell > 0) r.bell -= dt;
+    if (r.elbow > 0) r.elbow -= dt;
     if (r.kwakSafe > 0) r.kwakSafe -= dt;
     for (const k of ['scooter', 'tow']) if (r.fx[k] > 0) r.fx[k] = Math.max(0, r.fx[k] - dt);
     const n = r.net;
@@ -1090,7 +1118,7 @@ export class Race {
         if (r && !r.finished) { r.finished = true; r.finishTime = msg.time; this.say(`🏁 ${r.name}`); }
         break;
       }
-      case 'bell': { const r = this.byId(msg.id); if (r) { r.bell = 1; this.emit('sfx', 'bell'); } break; }
+      case 'elbow': { const r = this.byId(msg.id); if (r && !(r.elbow > 0)) { r.elbow = ELBOW_SECS; this._elbowFx(r); } break; }
       case 'left': {
         const r = this.byId(msg.id);
         if (r && r.finished) { r.left = true; break; } // al binnen: blijft gewoon in de uitslag
