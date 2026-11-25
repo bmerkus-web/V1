@@ -889,7 +889,7 @@ export class Race {
     this.rockets = this.rockets.filter((p) => !p.done);
   }
 
-  // Elleboogje uitsteken: "neem over!". Een bot die in je wiel zit komt naar voren (een ploeggenoot altijd, een tegenstander soms).
+  // Elleboogje uitsteken: "neem over!". Een bot-ploeggenoot die in je wiel zit komt naar voren.
   elbow(r = this.me) {
     if (r.elbow > 0 || r.finished) return;
     r.elbow = ELBOW_SECS;
@@ -899,14 +899,11 @@ export class Race {
   _elbowFx(r) {
     const me = this.me;
     if (r === me || Math.abs(r.dist - me.dist) < 40) this.emit('sfx', 'elbow');
-    this.say(`💪 ${r.name}: overnemen!`);
-    const gap = r.dist - me.dist;
-    if (r !== me && gap > 0.8 && gap < 14 && Math.abs(r.x - me.x) < 0.4) this.emit('banner', { text: `💪 ${r.name}: NEEM OVER!`, sub: 'jij zit in het wiel', color: '#ffd166' });
-    // bots die in het wiel zitten (alleen waar de bots rijden)
+    // bot-ploeggenoten die in het wiel zitten (alleen waar de bots rijden)
     for (const b of this.riders) {
       if (b.kind !== 'bot' || b === r || b.finished) continue;
       const g = r.dist - b.dist;
-      if (g > 0.8 && g < 14 && Math.abs(b.x - r.x) < 0.4 && (this.mate(b, r) || this.rng() < 0.35)) {
+      if (g > 0.8 && g < 14 && Math.abs(b.x - r.x) < 0.4 && this.mate(b, r)) {
         b.ai.takeover = TAKEOVER_SECS; b.ai.takeoverOf = r.id; b.ai.passSide = r.x > 0.4 ? -1 : r.x < -0.4 ? 1 : -1;
       }
     }

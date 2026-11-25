@@ -75,7 +75,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
-- 💪 Bel vervangen door het elleboogje (overnemen!): gebaar met tekstballon, een bot-ploeggenoot in je wiel neemt de kop over (een tegenstander soms), bots die lang op kop rijden doen het zelf ook; B, ↓/B op de Zwift-knoppen en 💪 op het remote stuur
+- 💪 Bel vervangen door het elleboogje (overnemen!): alleen het gebaar (geen teksten), een bot-ploeggenoot in je wiel neemt de kop over, bots die lang op kop rijden doen het zelf ook; B, ↓/B op de Zwift-knoppen en 💪 op het remote stuur
 - 👥 WB-55 Ploegen: 2×2, 2×3 of 3×2 bij een race, zelf kiezen of eerlijk verdelen, bots vullen aan; trui in de ploegkleur met rugnummers (geel voor de leidende ploeg), groene trui en bolletjestrui met mouwen en rand in de ploegkleur; geen kwak en geen last van power-ups van ploeggenoten, extra slipstream achter een ploeggenoot; live ploegenklassement (verschil met de leidende ploeg), ploegenklassement in de uitslag (alle renners opgeteld, uitvaller = laatste + 30 s) en ploegtijden in het klassement
 - 📲 WB-53 Remote stuur: je telefoon als stuur voor je tablet of laptop: verbinden met code of QR-code (los van een race-kamer, dus ook in multiplayer), sturen met de gyroscoop, grote power-upknop die laat zien welke power-up je hebt, plus bel, rechtzetten, schakelen of −5%/+5%, volgend nummer en pauze; verbindt vanzelf opnieuw
 - 📱 Sturen met je telefoon: telefoon vast op je stuur, de gyroscoop werkt als een Sterzo (zonder kompas, met verloopcorrectie); aan te zetten bij Apparaten, gevoeligheid bij Instellingen, rechtzetten met C of via pauze
