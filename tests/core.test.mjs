@@ -989,7 +989,7 @@ test('Ploegen: geen kwak of power-ups tegen ploeggenoten, extra slipstream, ploe
   assert.equal(st[0].id, 't0');
 });
 
-test('Elleboogje: een bot-ploeggenoot in je wiel neemt over, het gebaar gaat over het netwerk', async () => {
+test('Elleboogje: een bot-ploeggenoot in je wiel neemt over (een tegenstander niet), het gebaar gaat over het netwerk', async () => {
   const { Race } = await import('../js/game.js');
   const sent = [];
   const teams = [{ id: 't0', name: 'Neon', color: '#ff3fa4' }, { id: 't1', name: 'Bliksem', color: '#22d3ff' }];
@@ -1000,8 +1000,10 @@ test('Elleboogje: een bot-ploeggenoot in je wiel neemt over, het gebaar gaat ove
     getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
   g.countdown = 0; g.update(0.04); g.time = 20;
   const [me, mate, riv] = g.riders;
-  me.dist = 300; me.x = 0; me.v = 10; mate.dist = 295; mate.x = 0.05; mate.v = 10; riv.dist = 900;
+  me.dist = 300; me.x = 0; me.v = 10; mate.dist = 295; mate.x = 0.05; mate.v = 10; riv.dist = 296; riv.x = -0.05;
   g.elbow();
+  assert.ok(!(riv.ai.takeover > 0), 'een tegenstander neemt niet over');
+  riv.dist = 900;
   assert.ok(me.elbow > 0 && sent.some((m) => m.t === 'elbow' && m.id === 'p0'));
   assert.ok(mate.ai.takeover > 0 && mate.ai.takeoverOf === 'p0', 'ploeggenoot komt over');
   g.elbow(); // nog bezig: niet opnieuw
