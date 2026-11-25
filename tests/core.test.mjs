@@ -937,3 +937,54 @@ test('Bluetooth: volledige UUID-teksten en leesbare foutmeldingen (Bluefy)', asy
   assert.equal(errText({ code: 19 }), 'foutcode 19');
   assert.equal(errText(undefined), 'onbekende fout');
 });
+
+test('Ploegen: geen kwak of power-ups tegen ploeggenoten, extra slipstream, ploegenklassement opgeteld', async () => {
+  const { Race } = await import('../js/game.js');
+  const teams = [{ id: 't0', name: 'Neon', color: '#ff3fa4' }, { id: 't1', name: 'Bliksem', color: '#22d3ff' }];
+  const mk = (steer = 0) => new Race({ track: getTrack('polder'), laps: 1, seed: 2, room: null, isHost: true, ns: 'demo', teams,
+    riders: [
+      { id: 'p0', name: 'Ik', color: '#fff', kind: 'me', team: 't0', bib: 11 },
+      { id: 'm1', name: 'Maat', color: '#aaa', kind: 'remote', team: 't0', bib: 12 },
+      { id: 'r1', name: 'Rivaal', color: '#000', kind: 'remote', team: 't1', bib: 21 },
+      { id: 'r2', name: 'Rivaal2', color: '#111', kind: 'remote', team: 't1', bib: 22 },
+    ],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => steer, emit: () => {} });
+  const g = mk();
+  g.countdown = 0; g.update(0.04); g.time = 10;
+  const [me, mate, r1, r2] = g.riders;
+  assert.ok(g.mate(me, mate) && g.mate(me, 'm1') && !g.mate(me, r1) && !g.mate(me, me));
+  // vuurpijl: ploeggenoot direct voor me wordt overgeslagen
+  me.dist = 100; mate.dist = 110; r1.dist = 140; r2.dist = 50; g.rank();
+  assert.equal(g.rivalAhead(me), r1);
+  me.item = 'rocket'; g.useItem();
+  assert.equal(g.rockets[0].to, 'r1');
+  // punaises van een ploeggenoot raken me niet, die van een tegenstander wel
+  g.hazards.push({ type: 'tacks', id: 'h1', d: me.dist + 0.5, x: me.x, owner: 'm1', age: 5, life: 20, hitBy: [] });
+  me.fx.antilek = 0; me.fx.flat = 0;
+  g._stepLocal(me, 200, 0, 0.05, false);
+  assert.ok(!(me.fx.flat > 0), 'geen lek van punaises van een ploeggenoot');
+  // kwak: naast een ploeggenoot sturen doet niets
+  const k = mk(1);
+  k.countdown = 0; k.update(0.04); k.time = 10;
+  const [kme, kmate, kr1] = k.riders;
+  kme.dist = 200; kme.x = 0; kmate.dist = 200.5; kmate.x = 0.2; kr1.dist = 400; k.rank();
+  k._stepLocal(kme, 200, 1, 0.05, false);
+  assert.ok(!(kmate.kwakSafe > 0), 'geen kwak tegen een ploeggenoot');
+  kr1.dist = 200.5; kr1.x = 0.2; kmate.dist = 400; kme.kwakCd = 0;
+  k._stepLocal(kme, 200, 1, 0.05, false);
+  assert.ok(kr1.kwakSafe > 0, 'wel een kwak tegen een tegenstander');
+  // slipstream achter een ploeggenoot
+  kme.x = 0; kmate.dist = kme.dist + 4; kmate.x = 0; kr1.dist = 900;
+  k._stepLocal(kme, 200, 0, 0.05, false);
+  assert.ok(kme.draft && kme.draftTeam);
+  // ploegenklassement: alle renners opgeteld; uitvaller = laatste + 30 s
+  const t = mk();
+  for (const [r, ft] of t.riders.map((r, i) => [r, [100, 130, 110, 115][i]])) { r.finished = true; r.finishTime = ft; }
+  let st = t.teamStandings();
+  assert.deepEqual(st.map((x) => [x.id, x.total, x.gap]), [['t0', 230, 0], ['t1', 225, -5]].sort((a, b) => a[1] - b[1]).map((x, i, arr) => [x[0], x[1], x[1] - arr[0][1]]));
+  const gone = t.riders.pop(); gone.finished = false; (t.gone ||= []).push(gone); // Rivaal2 valt uit
+  st = t.teamStandings();
+  assert.equal(st.find((x) => x.id === 't1').total, 110 + 130 + 30);
+  assert.equal(st[0].id, 't0');
+});

@@ -23,7 +23,7 @@ export function stepSpeed(r, power, gradePct, dt, magnetPull = false) {
   let crr = CRR;
   if (e.boost > 0) { p += 320; cda *= 0.55; }
   if (magnetPull) p += 380;
-  if (r.draft) cda *= 0.7;
+  if (r.draft) cda *= r.draftTeam ? 0.6 : 0.7; // achter een ploeggenoot nog wat meer uit de wind
   if (e.scooter > 0 && r.inScooter) cda *= 0.5; // recht achter de scooter
   if (e.storm > 0) cda *= 2.3;
   if (e.slow > 0) { cda *= 3.5; crr *= 12; }

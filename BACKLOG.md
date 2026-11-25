@@ -24,7 +24,6 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
-| WB-55 | Ploegen: ploegen kiezen of eerlijk laten verdelen (bots vullen aan), trui in de ploegkleur, ploeggenoten niet te kwakken (geen jurystraf) en geen last van elkaars power-ups, extra slipstream achter een ploeggenoot, ploegenklassement = alle renners van een ploeg opgeteld, gele rugnummers voor de leidende ploeg, ploegen-tabblad in het klassement. | zelf | M |
 | WB-56 | Ploegentijdrit: ploegen starten tegelijk maar zien elkaar als spoken; ploegtijd = tijd van de 2e van 3 (3e van 4) renner; power-ups standaard uit. Na WB-55. | zelf | M |
 | WB-57 | Veldritbaan: korte rondes op tijd met bel voor de laatste ronde, lint als baanrand, gras/modder (met snel spoor)/zand, balken springen op het goede moment, trap met afstappen en lopen, vliegbrug, materiaalpost met modder op je fiets, Zandkoning-trui; later Modderspat en een kermis-hardstyle Clubsound. In stappen bouwen. | zelf | L |
 | WB-10 | Lichte weergave voor oude tablets: minder decor en minder ver vooruit tekenen. | zelf (zorg over oude tablet) | S |
@@ -76,6 +75,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- 👥 WB-55 Ploegen: 2×2, 2×3 of 3×2 bij een race, zelf kiezen of eerlijk verdelen, bots vullen aan; trui in de ploegkleur met rugnummers (geel voor de leidende ploeg), groene trui en bolletjestrui met mouwen en rand in de ploegkleur; geen kwak en geen last van power-ups van ploeggenoten, extra slipstream achter een ploeggenoot; live ploegenklassement (verschil met de leidende ploeg), ploegenklassement in de uitslag (alle renners opgeteld, uitvaller = laatste + 30 s) en ploegtijden in het klassement
 - 📲 WB-53 Remote stuur: je telefoon als stuur voor je tablet of laptop: verbinden met code of QR-code (los van een race-kamer, dus ook in multiplayer), sturen met de gyroscoop, grote power-upknop die laat zien welke power-up je hebt, plus bel, rechtzetten, schakelen of −5%/+5%, volgend nummer en pauze; verbindt vanzelf opnieuw
 - 📱 Sturen met je telefoon: telefoon vast op je stuur, de gyroscoop werkt als een Sterzo (zonder kompas, met verloopcorrectie); aan te zetten bij Apparaten, gevoeligheid bij Instellingen, rechtzetten met C of via pauze
 - 📱 Telefoonindeling: compacte HUD liggend, TRAP linksonder, sturen en power-up rechtsonder, rekening met de notch, klassement alleen met koploper en je directe concurrenten, draai-hint als je de telefoon rechtop houdt (Zen-workout werkt ook rechtop). Op iPhone/iPad een melding om Bluefy te gebruiken (met link kopiëren); demo-modus werkt in elke browser. Pictogram voor het beginscherm

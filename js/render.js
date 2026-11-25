@@ -243,7 +243,9 @@ export class Renderer {
           else {
             const r = o.rider, p = this._pt(seg, o.t, r.x);
             if (s.z1 + (s.z2 - s.z1) * o.t < NEAR) continue;
-            drawRider(c, p.X, p.Y, p.u * 1.2, r, t, { ghost: o.ghost, green: !o.ghost && r.id === race.greenId, polka: !o.ghost && r.id === race.komId && r.id !== race.greenId, cass: !o.ghost && r.id === race.cassId, tire: (th.cobble || COBBLE_LOOK).joint, label: r === me ? null : r.name });
+            const tm = !o.ghost && race.teams && r.team != null ? race.teams.find((x) => x.id === r.team) : null; // ploegtrui en rugnummer
+            drawRider(c, p.X, p.Y, p.u * 1.2, r, t, { ghost: o.ghost, green: !o.ghost && r.id === race.greenId, polka: !o.ghost && r.id === race.komId && r.id !== race.greenId, cass: !o.ghost && r.id === race.cassId, tire: (th.cobble || COBBLE_LOOK).joint, label: r === me ? null : r.name,
+              team: tm?.color, bib: tm ? r.bib : null, leadBib: !!tm && race.teamLead === r.team });
             if (r === me) this.meScr = p;
           }
         }

@@ -36,6 +36,9 @@ let training = null; // lopende training: { stages, idx, courseLen, gone }
 // Workouts: ingebouwd + zelf geïmporteerd. wk = de lopende workout.
 let myWorkouts = loadWorkouts();
 const allWorkouts = () => [...BUILTIN, ...myWorkouts];
+// Ploegen (alleen bij een race): '0' = uit, of 'NxM' = N ploegen van M renners. Lege plekken worden bots.
+const TEAM_DEFS = [{ name: 'Neon', color: '#ff3fa4' }, { name: 'Bliksem', color: '#22d3ff' }, { name: 'Lava', color: '#ff8a1c' }, { name: 'Kosmos', color: '#9b5cff' }];
+Object.assign(sel, { teams: store.teams || '0', teamOf: {}, teamNames: store.teamNames || TEAM_DEFS.map((t) => t.name) });
 Object.assign(sel, { wk: store.wkSel || 'b-kennis', erg: store.wkErg ?? true, wkMode: store.wkMode || (store.wkZen ? 'zen' : 'ride'), wkObj: null });
 let wk = null; // { w, bias, erg, log: [{t,p,tgt,hr,cad}], sec, bi, p3, chartAt }
 const clock = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = String(sec % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
@@ -405,9 +408,11 @@ function renderSetup() {
   for (const o of $('o-bots').options) o.disabled = +o.value > maxBots;
   const game = wk_ && sel.wkMode === 'game';
   const botsShown = wk_ ? game : $('o-botson').checked; // bij een workout horen bots bij de Game-modus
-  $('o-botson').parentElement.classList.toggle('hidden', wk_);
-  $('o-bots-l').classList.toggle('hidden', !botsShown);
-  $('o-diff-l').classList.toggle('hidden', !botsShown);
+  const teamsOn = !!teamShape(); // met ploegen vullen bots vanzelf de lege plekken
+  $('o-botson').parentElement.classList.toggle('hidden', wk_ || teamsOn);
+  $('o-bots-l').classList.toggle('hidden', !botsShown || teamsOn);
+  $('o-diff-l').classList.toggle('hidden', !botsShown && !teamsOn);
+  renderTeams(canEdit);
   $('o-fair').parentElement.classList.toggle('hidden', wk_); // een workout-game is altijd eerlijk (t.o.v. FTP)
   $('o-rubber').parentElement.classList.toggle('hidden', wk_ && !game);
   $('o-fair-note').classList.toggle('hidden', wk_);
@@ -436,6 +441,81 @@ function renderSetup() {
   $('b-start').classList.toggle('hidden', !canEdit);
   $('b-back').textContent = lobby ? '← Kamer verlaten' : '← Terug';
 }
+// ---------- ploegen ----------
+const teamShape = () => { const m = /^(\d)x(\d)$/.exec(sel.teams || ''); return m && sel.mode === 'race' ? { n: +m[1], size: +m[2] } : null; };
+const humans = () => (room ? room.players : [{ id: 'p0', name: P.name, color: P.color, ftp: P.ftp, kg: P.weight, lvl: levelOf(store.stats.xp) }]);
+// Wie zit in welke ploeg: gekozen ploeg als daar plek is, anders de kleinste ploeg. Iedereen even groot (bots vullen aan).
+function teamPlan(players) {
+  const sh = teamShape();
+  if (!sh) return null;
+  const size = Math.max(sh.size, Math.ceil(players.length / sh.n));
+  const mem = Array.from({ length: sh.n }, () => []), rest = [];
+  for (const p of players) { const t = sel.teamOf?.[p.id]; if (t >= 0 && t < sh.n && mem[t].length < size) mem[t].push(p); else rest.push(p); }
+  for (const p of rest) mem.reduce((a, m) => (m.length < a.length ? m : a)).push(p);
+  const teams = mem.map((_, i) => ({ id: 't' + i, name: String(sel.teamNames?.[i] || TEAM_DEFS[i].name).slice(0, 16), color: TEAM_DEFS[i].color }));
+  return { teams, mem, size };
+}
+function renderTeams(canEdit) {
+  const race_ = sel.mode === 'race';
+  $('team-box').classList.toggle('hidden', !race_);
+  if (!race_) return;
+  $('o-teams').value = sel.teams || '0'; $('o-teams').disabled = !canEdit;
+  const plan = teamPlan(humans());
+  $('teams').classList.toggle('hidden', !plan); $('team-tools').classList.toggle('hidden', !plan);
+  if (!plan) return;
+  const myId = room ? room.me.id : 'p0';
+  $('teams').innerHTML = plan.mem.map((m, i) => {
+    const t = plan.teams[i], mine = m.some((p) => p.id === myId);
+    const rows = [...m.map((p, k) => `<div class="mem${canEdit && plan.teams.length > 1 ? ' mv' : ''}" data-p="${esc(p.id)}"${canEdit ? ' title="Tik om naar de volgende ploeg te verplaatsen"' : ''}><i style="background:${esc(p.color)}"></i><span class="nm">${esc(p.name)}${p.id === myId ? ' (jij)' : ''}</span><span class="bibn">#${(i + 1) * 10 + k + 1}</span></div>`),
+      ...Array.from({ length: plan.size - m.length }, (_, k) => `<div class="mem bot">🤖 bot<span class="bibn">#${(i + 1) * 10 + m.length + k + 1}</span></div>`)];
+    return `<div class="team" style="--tc:${t.color}"><input data-tn="${i}" value="${esc(t.name)}" maxlength="16" aria-label="Naam ploeg ${i + 1}"${canEdit ? '' : ' disabled'}>${rows.join('')}${mine ? '' : `<button class="ghost" data-join="${i}">Bij deze ploeg</button>`}</div>`;
+  }).join('');
+  $('t-fair').classList.toggle('hidden', !canEdit || humans().length < 2);
+  $('team-note').textContent = `Lege plekken worden bots. Ploegenklassement: alle renners van een ploeg opgeteld.${canEdit && humans().length > 1 ? ' Tik op een naam om die renner te verplaatsen.' : ''}`;
+}
+// Renner naar een ploeg; is die vol, dan ruilt de laatste daar van plek.
+function setTeam(id, t) {
+  const plan = teamPlan(humans());
+  if (!plan || t < 0 || t >= plan.teams.length) return;
+  const of = { ...(sel.teamOf || {}) };
+  plan.mem.forEach((m, i) => m.forEach((p) => { of[p.id] = i; }));
+  const cur = of[id];
+  if (cur === t) return;
+  if (plan.mem[t].length >= plan.size) { const swap = [...plan.mem[t]].reverse().find((p) => p.id !== id); if (swap) of[swap.id] = cur; }
+  of[id] = t;
+  sel.teamOf = of;
+  pushSettings();
+}
+function pickTeam(t) { const id = room ? room.me.id : 'p0'; if (!room || room.isHost) setTeam(id, t); else room.send({ t: 'teampick', id, team: t }); }
+$('o-teams').onchange = (e) => { sel.teams = e.target.value; if (!room) { store.teams = sel.teams; save(); } pushSettings(); };
+$('teams').onchange = (e) => {
+  const i = e.target.dataset.tn;
+  if (i == null) return;
+  sel.teamNames = [...(sel.teamNames || TEAM_DEFS.map((t) => t.name))];
+  sel.teamNames[+i] = e.target.value.trim().slice(0, 16) || TEAM_DEFS[+i].name;
+  store.teamNames = sel.teamNames; save(); pushSettings();
+};
+$('teams').onclick = (e) => {
+  const j = e.target.closest('[data-join]'), mv = e.target.closest('.mem.mv');
+  if (j) { pickTeam(+j.dataset.join); return; }
+  if (mv && (!room || room.isHost)) {
+    const plan = teamPlan(humans()), id = mv.dataset.p, cur = plan.mem.findIndex((m) => m.some((p) => p.id === id));
+    setTeam(id, (cur + 1) % plan.teams.length);
+  }
+};
+// Eerlijk verdelen: sterkste eerst, in slangvolgorde over de ploegen (1-2-3-3-2-1…).
+// Met "eerlijk" (t.o.v. FTP) telt het level, anders watt per kilo.
+$('t-fair').onclick = () => {
+  const sh = teamShape();
+  if (!sh) return;
+  const str = (p) => (sel.fair ? (p.lvl || 1) + Math.random() * 0.5 : (p.ftp || 200) / (p.kg || 75));
+  const of = {};
+  [...humans()].sort((a, b) => str(b) - str(a)).forEach((p, i) => { const row = Math.floor(i / sh.n), c = i % sh.n; of[p.id] = row % 2 ? sh.n - 1 - c : c; });
+  sel.teamOf = of;
+  pushSettings();
+  toast('⚖️ Ploegen eerlijk verdeeld');
+};
+
 function renderPlan(canEdit) {
   const dis = canEdit ? '' : ' disabled';
   $('plan').innerHTML = sel.plan.map((st, i) => `<div class="stage"><b>Etappe ${i + 1}</b>
@@ -579,6 +659,18 @@ $('b-start').onclick = () => {
     skill: nb > 1 ? i / (nb - 1) : 0.6,
   }));
   const cfg = { track: sel.track, laps: sel.laps, diff: sel.diff, fair: sel.fair, rubber: !!sel.rubber, seed: (Math.random() * 1e9) | 0, roster, bots };
+  const plan = teamPlan(humans());
+  if (plan) { // ploegen: rugnummers (11, 12… 21, 22…) en bots tot iedereen even groot is
+    cfg.bots = []; cfg.teams = plan.teams;
+    plan.mem.forEach((m, t) => {
+      m.forEach((p, k) => { const r = roster.find((x) => x.id === p.id); if (r) Object.assign(r, { team: 't' + t, bib: (t + 1) * 10 + k + 1 }); });
+      for (let k = m.length; k < plan.size; k++) {
+        const i = cfg.bots.length;
+        cfg.bots.push({ id: 'b' + i, name: BOT_NAMES[(off + i) % BOT_NAMES.length], color: free[i % Math.max(1, free.length)] || COLORS[i % COLORS.length],
+          skill: plan.size > 1 ? 0.35 + (0.4 * k) / (plan.size - 1) : 0.55, team: 't' + t, bib: (t + 1) * 10 + k + 1 }); // per plek even sterk in elke ploeg
+      }
+    });
+  }
   if (sel.mode === 'training') Object.assign(cfg, { plan: sel.plan.map((s) => ({ track: s.track, laps: s.laps })), warm: sel.warm, cool: sel.cool });
   if (sel.mode === 'workout') {
     const w = allWorkouts().find((x) => x.id === sel.wk) || BUILTIN[0], mode = room ? 'game' : sel.wkMode;
@@ -597,7 +689,8 @@ function wireRoom() {
   room.onRoster = () => { if (!race) renderSetup(); shareBoard(); };
   room.onSettings = (s) => { Object.assign(sel, s); if (!race) renderSetup(); };
   room.onStart = (cfg) => startRace(cfg);
-  room.onGame = (m) => { if (m.t === 'board') { mergeEntry(m.e); return; } if (m.t === 'left') training?.gone.add(m.id); race?.onNet(m); };
+  room.onGame = (m) => { if (m.t === 'board') { mergeEntry(m.e); return; }
+    if (m.t === 'teampick') { if (room.isHost && room.players.some((p) => p.id === m.id) && Number.isInteger(m.team)) setTeam(m.id, m.team); return; } if (m.t === 'left') training?.gone.add(m.id); race?.onNet(m); };
   // De host gaat terug naar de kamer: wie nog rijdt rijdt uit, wie de uitslag bekijkt houdt die in beeld.
   room.onLobby = () => {
     if (race && !race.free) {
@@ -623,7 +716,7 @@ function wireRoom() {
 $('b-host').onclick = async () => {
   audio.unlock();
   $('b-host').disabled = true;
-  room = new Room(makeCode(), true, { name: P.name, color: P.color });
+  room = new Room(makeCode(), true, { name: P.name, color: P.color, ftp: P.ftp, kg: P.weight, lvl: levelOf(store.stats.xp) });
   try {
     await room.open();
     wireRoom();
@@ -638,7 +731,7 @@ $('b-dojoin').onclick = async () => {
   if (code.length !== 4) { $('j-msg').textContent = 'Vul de 4 letters van de kamercode in.'; return; }
   $('j-msg').textContent = 'Verbinden…';
   $('b-dojoin').disabled = true;
-  room = new Room(code, false, { name: P.name, color: P.color });
+  room = new Room(code, false, { name: P.name, color: P.color, ftp: P.ftp, kg: P.weight, lvl: levelOf(store.stats.xp) });
   wireRoom();
   const r = room;
   r.onClosed = () => {};
@@ -667,12 +760,32 @@ function shareBoard() {
     room.send({ t: 'board', e });
   }, 450);
 }
+// Ploegrecords (lokaal; iedereen in de kamer slaat dezelfde uitslag op): beste totaaltijd per baan, rondes en ploeggrootte.
+function saveTeamRecords(r, ts) {
+  if (r._teamSaved || r.rubber || r.training || r.wk) return;
+  r._teamSaved = true;
+  const size = ts[0].riders.length, key = `${r.track.id}|${r.laps}|${size}`;
+  const book = (store.teamRecords ||= {}), list = (book[key] ||= []);
+  for (const t of ts) {
+    if (t.riders.some((x) => x.dnf)) continue;
+    const names = t.riders.map((x) => (r.byId(x.id)?.kind === 'bot' ? '🤖 ' : '') + x.name);
+    list.push({ team: t.name, color: t.color, riders: names, total: Math.round(t.total * 10) / 10, at: Date.now(), ns: r.ns });
+  }
+  list.sort((a, b) => a.total - b.total).splice(5);
+  save();
+}
 function renderBoard() {
   const keys = boardKeys();
   $('board').innerHTML = TRACK_DEFS.map((d) => `<div class="card board"><h2>${d.name}</h2>${keys.filter((k) => k.track === d.id).map((k) => {
     const rows = boardRows(k.key).slice(0, 8);
     return `<h3>${esc(k.label)}</h3>` + (rows.length ? '<table>' + rows.map((r, i) => `<tr class="${r.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(r.name)}${r.me ? ' (jij)' : ''}</td><td>${fmtTime(r.t, 2)}</td></tr>`).join('') + '</table>' : '<p class="small">Nog geen tijden.</p>');
   }).join('')}</div>`).join('');
+  // 👥 Ploegen: beste ploegtijden (alle renners opgeteld)
+  const tb = store.teamRecords || {}, tk = Object.keys(tb).filter((k) => tb[k].length).sort();
+  $('board').insertAdjacentHTML('beforeend', `<div class="card board"><h2>👥 Ploegen</h2>${tk.length ? tk.map((k) => {
+    const [tid, laps, size] = k.split('|'), d = TRACK_DEFS.find((x) => x.id === tid);
+    return `<h3>${esc(d ? d.name : tid)} · ${laps} ronde${laps > 1 ? 's' : ''} · ploegen van ${size}</h3><table>${tb[k].map((e, i) => `<tr><td>${i + 1}</td><td><span class="tdot" style="background:${esc(e.color)}"></span><b>${esc(e.team)}</b><br><small>${e.riders.map(esc).join(', ')}${e.ns === 'demo' ? ' · demo' : ''}</small></td><td>${fmtTime(e.total, 1)}</td></tr>`).join('')}</table>`;
+  }).join('') : '<p class="small">Nog geen ploegtijden. Rijd een race met ploegen (bij de start: 👥 Ploegen).</p>'}</div>`);
 }
 
 // ---------- records ----------
@@ -927,6 +1040,7 @@ function launch(cfg, carry) {
     if (carry) { renderer.flash = { color: '#ffffff', a: 1.4 }; audio.sfx('boost'); }
   }
   race = new Race({
+    teams: training || cfg.workout ? null : cfg.teams || null,
     track, laps: st.laps, seed: cfg.seed + (training ? training.idx : 0), riders, room, isHost: iRunBots, ns: n,
     profile: { ...P, fair: cfg.fair, assist: !!P.assist && ((cfg.workout && cfg.wkMode === 'ride') || (!!cfg.plan && !room)) /* stuurhulp alleen bij Ride en solo training */ }, difficulty: cfg.diff, rubber: !!cfg.rubber, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
   });
@@ -1155,10 +1269,15 @@ function showResults(jump) {
       const icons = (id) => (cl.green?.id === id ? JERSEY_SVG : '') + (cl.kom?.id === id ? POLKA_SVG : '') + (cl.cass?.id === id ? CASS_SVG : '');
       const rows = res.map((x, i) => {
         const mv = x.finished && preRank.get(x.id) != null ? preRank.get(x.id) - x.rank : 0;
-        return `<tr class="rv-row${x.me ? ' me' : ''}" style="animation-delay:${(res.length - 1 - i) * 0.25}s"><td>${x.rank ?? '–'}</td><td>${dot(x)} ${esc(x.name)} ${icons(x.id)}</td>
+        return `<tr class="rv-row${x.me ? ' me' : ''}" style="animation-delay:${(res.length - 1 - i) * 0.25}s"><td>${x.rank ?? '–'}</td><td>${dot(x)} ${x.bib ? `<small>#${x.bib}</small> ` : ''}${esc(x.name)} ${icons(x.id)}</td>
           <td>${x.dnf ? 'gestopt' : fmt(x.time)}${x.penalty ? ` <small class="pen">⚖️ +${x.penalty} s</small>` : ''}</td><td class="mv ${mv > 0 ? 'up' : mv < 0 ? 'down' : ''}">${mv > 0 ? '▲' + mv : mv < 0 ? '▼' + -mv : ''}</td></tr>`;
       }).join('');
       const win = me.rank === 1 && res.length > 1;
+      const ts = r.teamStandings(); // ploegenklassement (alle renners opgeteld), of null
+      if (ts && !pending) saveTeamRecords(r, ts);
+      const teamBlock = ts ? `<p><b>👥 Ploegenklassement</b>${ts.some((t) => !t.done) ? ' <small>· voorlopig, nog niet iedereen is binnen</small>' : ''}</p><table class="rv-table">${ts.map((t, i) => `<tr class="rv-row${t.id === me.team ? ' me' : ''}" style="animation-delay:${res.length * 0.25 + (ts.length - 1 - i) * 0.35}s"><td>${i ? i + 1 : '🏆'}</td>
+        <td><span class="tdot" style="background:${esc(t.color)}"></span><b>${esc(t.name)}</b><br><small>${t.riders.map((x) => `#${x.bib} ${esc(x.name)}${x.dnf ? ' (gestopt: +30 s)' : ''}`).join(' · ')}</small></td><td>${fmtTime(t.total, 1)}</td><td>${i ? fmtDelta(t.gap) : ''}</td></tr>`).join('')}</table>
+        ${ts[0].id === me.team && ts.length > 1 && !ts.some((t) => !t.done) ? `<p class="small">🏆 Je ploeg ${esc(ts[0].name)} wint het ploegenklassement!</p>` : ''}` : '';
       const ico = { sprint: '⚡', climb: '⛰️', cobble: '🪨' };
       const segs = cl.segs.map((g) => `<li>${ico[g.type]} ${esc(g.zone)}: <b>${esc(g.name)}</b> ${g.type === 'sprint' ? `(${g.wins}× gewonnen)` : fmtTime(g.t, 1)}</li>`).join('');
       const jer = [[cl.green, JERSEY_SVG, 'Groene trui', (n) => `${n} sprint${n > 1 ? 's' : ''}`], [cl.kom, POLKA_SVG, 'Bolletjestrui', (n) => `${n} klim${n > 1 ? 'men' : ''}`], [cl.cass, CASS_SVG, 'Gouden Kassei', (n) => `${n} strook${n > 1 ? 'en' : ''}`]]
@@ -1170,7 +1289,7 @@ function showResults(jump) {
       const myPens = res.find((x) => x.me)?.pens.length ? `<p class="small">⚖️ Jouw straffen: ${penList(res.find((x) => x.me))}</p>` : '';
       body = `<h2>${win ? '🥇 GEWONNEN!' : me.rank + 'e plaats'}</h2><p class="rv-sub">Definitieve uitslag${judged.length ? '' : ' · de jury zag niets bijzonders ✓'}${pending ? ' · nog niet iedereen is binnen' : ''}</p>
         ${r.training ? `<p class="small">Training: ${training ? training.count : ''} etappe(s) · ${(r.courseLen / 1000).toFixed(1)} km. De tijd is die van de etappes samen, zonder in- en uitrijden.</p>` : ''}
-        <table class="rv-table">${rows}</table>${myPens}
+        <table class="rv-table">${rows}</table>${myPens}${teamBlock}
         ${jer ? `<p><b>Eindtruien</b></p><div class="jers">${jer}</div>` : ''}
         ${segs ? `<p><b>Segmenten</b></p><ul class="segs">${segs}</ul>` : ''}
         ${prs.length ? `<p><b>🏆 Nieuwe records</b></p><ul class="prlist">${prs.join('')}</ul>` : ''}
@@ -1294,10 +1413,14 @@ function hud(dt) {
   }
   // Op een telefoon: alleen de koploper en wie vlak voor en achter je rijdt.
   const rows = PHONE.matches ? r.order.filter((x) => x.rank === 1 || Math.abs(x.rank - me.rank) <= 1) : r.order;
+  const tcol = (x) => r.teams?.find((t) => t.id === x.team)?.color;
   setHTML($('h-rank'), rows.map((x) => {
     const gap = x === me ? '' : x.finished ? ' 🏁' : ` ${x.dist > me.dist ? '+' : '−'}${Math.abs(x.dist - me.dist).toFixed(0)}m`;
-    return `<div class="${x === me ? 'me' : ''}"><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${x.penalty ? ` ⚖️+${x.penalty}s` : ''}${gap}</div>`;
+    return `<div class="${x === me ? 'me' : ''}"${r.teams ? ` style="border-right:4px solid ${esc(tcol(x) || 'transparent')}"` : ''}><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${x.penalty ? ` ⚖️+${x.penalty}s` : ''}${gap}</div>`;
   }).join(''));
+  // Ploegenklassement live: alleen het tijdsverschil met de leidende ploeg.
+  $('h-teams').classList.toggle('hidden', !r.teamTable);
+  if (r.teamTable) setHTML($('h-teams'), '<div class="th">PLOEGEN</div>' + r.teamTable.map((t, i) => `<div class="t${t.id === me.team ? ' me' : ''}"><i style="background:${esc(t.color)}"></i>${esc(t.name)} <b>${i ? fmtDelta(t.gap) : '—'}</b></div>`).join(''));
   setHTML($('h-feed'), r.feed.filter((f) => r.clock - f.at < 6).map((f) => `<div>${f.icon ? ICONS[f.icon] || '' : ''}${esc(f.text)}</div>`).join(''));
   // stippen op het profiel
   const dots = $('h-dots');
