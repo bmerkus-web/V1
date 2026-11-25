@@ -148,7 +148,8 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   // stuur (achter de romp, zodat alleen de uiteinden naast het lichaam te zien zijn)
   c.strokeStyle = '#23233a'; c.lineWidth = 0.05 * u; c.beginPath(); c.moveTo(-0.34 * u, -1.08 * u); c.lineTo(0.34 * u, -1.08 * u); c.stroke();
   // romp
-  const jersey = opts.green ? GREEN_DARK : opts.polka ? '#fbfbff' : r.color;
+  // Ploegen: trui in de ploegkleur; de groene trui en bolletjestrui houden hun patroon, met mouwen en rand in de ploegkleur.
+  const jersey = opts.green ? GREEN_DARK : opts.polka ? '#fbfbff' : opts.team || r.color;
   c.fillStyle = jersey;
   c.beginPath(); c.moveTo(-0.19 * u, -0.92 * u); c.quadraticCurveTo(-0.3 * u, -1.25 * u, -0.22 * u, -1.45 * u);
   c.lineTo(0.22 * u, -1.45 * u); c.quadraticCurveTo(0.3 * u, -1.25 * u, 0.19 * u, -0.92 * u); c.fill();
@@ -171,10 +172,22 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     c.beginPath(); c.moveTo(0.05 * u, -1.38 * u); c.lineTo(-0.08 * u, -1.17 * u); c.lineTo(-0.005 * u, -1.17 * u);
     c.lineTo(-0.05 * u, -0.99 * u); c.lineTo(0.09 * u, -1.22 * u); c.lineTo(0.015 * u, -1.22 * u); c.closePath(); c.fill(); c.stroke();
     c.restore();
-  } else { c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(-0.035 * u, -1.44 * u, 0.07 * u, 0.5 * u); }
+  } else if (!opts.team) { c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(-0.035 * u, -1.44 * u, 0.07 * u, 0.5 * u); }
+  if (opts.team && (opts.green || opts.polka)) { // rand in de ploegkleur
+    c.beginPath(); c.moveTo(-0.19 * u, -0.92 * u); c.quadraticCurveTo(-0.3 * u, -1.25 * u, -0.22 * u, -1.45 * u);
+    c.lineTo(0.22 * u, -1.45 * u); c.quadraticCurveTo(0.3 * u, -1.25 * u, 0.19 * u, -0.92 * u);
+    c.strokeStyle = opts.team; c.lineWidth = Math.max(1.5, 0.045 * u); c.stroke();
+  }
+  if (opts.bib != null) { // rugnummers: links en rechts onderop de rug (geel voor de leidende ploeg)
+    for (const sx of [-1, 1]) {
+      const bx = sx * 0.115 * u - 0.075 * u, by = -1.16 * u, bw = 0.15 * u, bh = 0.13 * u;
+      c.fillStyle = opts.leadBib ? '#ffd166' : '#f7f7fb'; c.fillRect(bx, by, bw, bh);
+      if (u > 16) { c.fillStyle = '#111'; c.font = `800 ${0.095 * u}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(opts.bib), bx + bw / 2, by + bh / 2 + 0.005 * u); c.textBaseline = 'alphabetic'; }
+    }
+  }
   c.fillStyle = '#15152a'; c.fillRect(-0.19 * u, -0.98 * u, 0.38 * u, 0.1 * u);
   // armen + stuur
-  c.strokeStyle = jersey; c.lineWidth = 0.09 * u;
+  c.strokeStyle = opts.team && (opts.green || opts.polka) ? opts.team : jersey; c.lineWidth = 0.09 * u; // mouwen in de ploegkleur
   for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 0.22 * u, -1.4 * u); c.lineTo(s * 0.31 * u, -1.1 * u); c.stroke(); }
   // helm
   c.fillStyle = shade(r.color, 1.35); c.beginPath(); c.ellipse(0, -1.62 * u, 0.15 * u, 0.16 * u, 0, 0, 7); c.fill();

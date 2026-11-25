@@ -177,7 +177,7 @@ export class Room {
       const cb = {
         open: () => {
           if (this.isHost) { done = true; resolve(); }
-          else this.t.send(null, { t: 'hello', name: this.me.name, color: this.me.color });
+          else this.t.send(null, { t: 'hello', name: this.me.name, color: this.me.color, ftp: this.me.ftp, kg: this.me.kg, lvl: this.me.lvl });
         },
         peer: () => {},
         data: (from, msg) => {
@@ -213,7 +213,7 @@ export class Room {
         if (this.players.length >= 6 || this.inRace) { this.t.send(from, { t: 'full', why: this.inRace ? 'De race is al bezig' : 'De kamer is vol' }); return; }
         const id = 'p' + this._nextId++;
         this._ids.set(from, id);
-        this.players.push({ id, name: String(msg.name).slice(0, 14), color: msg.color });
+        this.players.push({ id, name: String(msg.name).slice(0, 14), color: msg.color, ftp: +msg.ftp || 0, kg: +msg.kg || 0, lvl: +msg.lvl || 1 }); // ftp/kg/lvl: om ploegen eerlijk te verdelen
         this.t.send(from, { t: 'welcome', id });
         if (this.settings) this.t.send(from, { t: 'settings', s: this.settings });
         this._roster();

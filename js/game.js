@@ -30,6 +30,7 @@ const BERM_COST = 0.4; // in de berm kom je meteen 40% minder snel vooruit
 const SPRINT_BONUS = 0.05, SPRINT_SECS = 30; // groene trui: 5% sneller, 30 seconden
 const ROCKET_ARM = 1.0; // een vuurpijl hangt eerst even stil: tijd om je schild te pakken
 const STORM_DELAY = 1.5; // tegenwind komt na een korte waarschuwing
+const TEAM_DNF = 30; // ploegenklassement: wie uitvalt krijgt de tijd van de laatste renner + 30 s
 // Jury: [kans, tijdstraf in s]. Afgestemd zodat het gemiddeld ongeveer quitte speelt met wat het oplevert:
 // plakbidon ≈ 1,4 s winst, vuile kwak (de berm in) ≈ 0,9 s, gewone kwak ≈ 0,05 s plus een blitzje.
 export const JURY = { bottle: [0.2, 7], dirty: [0.2, 5], kwak: [1 / 15, 1] };
@@ -80,6 +81,9 @@ export class Race {
     this.clock = 0; // loopt altijd (animaties)
     this.countdown = 5;
     this.state = 'countdown';
+    // Ploegen: [{ id, name, color }] of null. Ploeggenoten kwakken elkaar niet en hebben geen last van elkaars power-ups.
+    this.teams = cfg.teams?.length ? cfg.teams : null;
+    this.teamById = new Map(cfg.riders.map((r) => [r.id, r.team ?? null]));
     this.riders = cfg.riders.map((r, i) => this._mkRider(r, i));
     this.me = this.riders.find((r) => r.kind === 'me');
     this.hazards = [];
@@ -128,7 +132,7 @@ export class Race {
   _mkRider(r, i) {
     const row = Math.floor(i / 3), col = i % 3;
     const rider = {
-      id: r.id, name: r.name, color: r.color, kind: r.kind,
+      id: r.id, name: r.name, color: r.color, kind: r.kind, team: r.team ?? null, bib: r.bib ?? null,
       dist: -3 - row * 4, x: [-0.5, 0, 0.5][col], v: 0, power: 0, cadence: 0, steer: 0,
       item: null, roulette: 0, bolts: 0, draft: false, mask: 0,
       fx: { boost: 0, slow: 0, shield: 0, storm: 0, magnet: 0, spin: 0, kwak: 0, bump: 0, sprint: 0, kom: 0, scooter: 0, tow: 0, flat: 0, wheel: 0, antilek: 0 },
@@ -148,6 +152,18 @@ export class Race {
   }
 
   byId(id) { return this.riders.find((r) => r.id === id); }
+  // Ploeggenoten? (b mag een renner of een id zijn)
+  mate(a, b) {
+    if (!this.teams || !a || b == null) return false;
+    const tb = typeof b === 'object' ? b.team : this.teamById.get(b);
+    return a.team != null && a.team === tb && (typeof b === 'object' ? a !== b : a.id !== b);
+  }
+  // De eerste tegenstander (geen ploeggenoot) vóór r in de stand.
+  rivalAhead(r) {
+    const i = this.order.indexOf(r);
+    for (let k = i - 1; k >= 0; k--) if (!this.mate(r, this.order[k])) return this.order[k];
+    return null;
+  }
   local(r) { return r.kind === 'me' || r.kind === 'bot'; }
   say(text, icon = null) { this.feed.push({ text, icon, at: this.clock }); if (this.feed.length > 4) this.feed.shift(); }
 
@@ -217,6 +233,7 @@ export class Race {
     for (const h of this.hazards) h.age += dt;
     this.hazards = this.hazards.filter((h) => h.age < (h.life || 45));
     this.rank();
+    if (this.teams && (this._teamT = (this._teamT || 0) - dt) <= 0) { this._teamT = 0.5; this.teamTable = this.teamStandings(); this.teamLead = this.teamTable[0]?.id; } // live ploegenklassement
     this._ghost(dt);
     this._ghosts();
 
@@ -280,16 +297,16 @@ export class Race {
     }
 
     // Slipstream en magneet
-    r.draft = false;
+    r.draft = false; r.draftTeam = false;
     let pull = false;
     for (const o of this.riders) {
       if (o === r) continue;
       const gap = o.dist - r.dist;
-      if (gap > 0.8 && gap < 10 && Math.abs(o.x - r.x) < 0.28) r.draft = true;
+      if (gap > 0.8 && gap < 10 && Math.abs(o.x - r.x) < 0.28) { r.draft = true; if (this.mate(r, o)) r.draftTeam = true; } // achter een ploeggenoot: extra slipstream
       if (e.magnet > 0 && gap > 3 && gap < 160) pull = true;
       // Kwak: rijd vlak naast iemand en stuur naar hem toe.
       const side = o.x - r.x;
-      if (!this.free && r.kwakCd <= 0 && (!r.ai || r.ai.kwakT > 0) && !(o.kwakSafe > 0) && this.time > 3 && !r.finished && !o.finished &&
+      if (!this.free && r.kwakCd <= 0 && (!r.ai || r.ai.kwakT > 0) && !(o.kwakSafe > 0) && this.time > 3 && !r.finished && !o.finished && !this.mate(r, o) &&
         Math.abs(gap) < 1.8 && Math.abs(side) > 0.04 && Math.abs(side) < 0.32 && steer * Math.sign(side) > 0.4) this._kwak(r, o, Math.sign(side));
       // Botsing: wie achterop iemand rijdt wijkt uit, en verliest snelheid als hij harder ging.
       // (Een gestuurde kwak van opzij is iets anders: die kost de ander iets, niet jou.)
@@ -379,6 +396,7 @@ export class Race {
     for (const h of this.hazards) {
       const type = h.type || 'glue';
       if (h.gone || (h.owner === r.id && h.age < 1.2 && !h.front)) continue; // eigen muur ervoor raakt je wel
+      if (this.mate(r, h.owner)) continue; // van een ploeggenoot heb je geen last
       const dd = mod(r.dist - h.d + this.L / 2, this.L) - this.L / 2;
       const hw = type === 'glue' ? 0.2 : (type === 'wall' ? WALL_W : TACKS_W) + 0.05;
       if (Math.abs(dd) >= 1.8 || Math.abs(h.x - r.x) >= hw) continue;
@@ -612,7 +630,7 @@ export class Race {
         if (isMe) this.emit('sfx', 'drop');
         break;
       case 'rocket': {
-        const target = this.order[r.rank - 2];
+        const target = this.rivalAhead(r); // ploeggenoten worden overgeslagen
         if (!target || target.finished) { r.fx.boost = 2; if (isMe) this.emit('sfx', 'boost'); break; }
         msg.to = target.id;
         this.rockets.push({ from: r.id, to: target.id, d: r.dist + 1, x: r.x, age: 0 });
@@ -630,7 +648,7 @@ export class Race {
         this._jury(r, 'bottle');
         break;
       case 'wall': {
-        const target = r.rank > 1 ? this.order[r.rank - 2] : null;
+        const target = r.rank > 1 ? this.rivalAhead(r) : null;
         const front = !!target && !target.finished;
         msg.h = front
           ? { type: 'wall', front: true, life: 10, d: mod(target.dist + 30, this.L), x: clamp(target.x, -0.5, 0.5) }
@@ -654,7 +672,7 @@ export class Race {
     const me = this.me;
     this.say(`🌪️ ${src.name} ontketent tegenwind`);
     (this.storms ||= []).push({ src: src.id, d: src.dist, at: this.time + STORM_DELAY });
-    if (me !== src && me.dist > src.dist && !me.finished) { this.warn = { text: '🌪️ TEGENWIND OP KOMST', until: this.time + STORM_DELAY }; this.emit('sfx', 'alarm'); }
+    if (me !== src && !this.mate(me, src) && me.dist > src.dist && !me.finished) { this.warn = { text: '🌪️ TEGENWIND OP KOMST', until: this.time + STORM_DELAY }; this.emit('sfx', 'alarm'); }
   }
 
   _storms() {
@@ -665,7 +683,7 @@ export class Race {
       const src = this.byId(s.src);
       this.emit('sfx', 'storm');
       this.stormFlash = 1;
-      for (const o of this.riders) if (this.local(o) && o.id !== s.src && o.dist > (src ? src.dist : s.d) && !o.finished) this.hit(o, 'storm', s.src);
+      for (const o of this.riders) if (this.local(o) && o.id !== s.src && !this.mate(o, s.src) && o.dist > (src ? src.dist : s.d) && !o.finished) this.hit(o, 'storm', s.src);
     }
     this.storms = this.storms.filter((s) => !s.done);
   }
@@ -923,7 +941,7 @@ export class Race {
       }
       // Af en toe bewust een kwak uitdelen aan wie vlak naast hem rijdt.
       if (r.kwakCd <= 0 && this.rng() < 0.05) {
-        const o = this.riders.find((q) => q !== r && !q.finished && Math.abs(q.dist - r.dist) < 1.6 && Math.abs(q.x - r.x) > 0.08 && Math.abs(q.x - r.x) < 0.3);
+        const o = this.riders.find((q) => q !== r && !q.finished && !this.mate(r, q) && Math.abs(q.dist - r.dist) < 1.6 && Math.abs(q.x - r.x) > 0.08 && Math.abs(q.x - r.x) < 0.3);
         if (o) { tx = o.x; ai.kwakT = 0.8; }
       }
       // Niet achterop een tragere renner rijden: eromheen sturen.
@@ -951,10 +969,10 @@ export class Race {
 
     if (r.item) {
       ai.itemT += dt;
-      const ahead = this.order[r.rank - 2];
+      const ahead = this.rivalAhead(r);
       const gap = ahead ? ahead.dist - r.dist : 1e9;
       const ready = ai.itemT > 1.5 + (ai.ph % 3);
-      const behind = this.riders.some((o) => o !== r && r.dist - o.dist > 2 && r.dist - o.dist < 40);
+      const behind = this.riders.some((o) => o !== r && !this.mate(r, o) && r.dist - o.dist > 2 && r.dist - o.dist < 40);
       const ok = r.item === 'rocket' || r.item === 'magnet' ? gap < 150 || ai.itemT > 12 :
         r.item === 'glue' || r.item === 'tacks' ? behind || ai.itemT > 10 :
         r.item === 'wall' ? (r.rank === 1 ? behind : gap < 120) || ai.itemT > 10 : true;
@@ -1084,9 +1102,29 @@ export class Race {
 
   results() {
     this.rank();
-    const row = (r) => ({ id: r.id, name: r.name, color: r.color, rank: r.rank, time: r.finishTime, penalty: r.penalty || 0, pens: r.pens || [],
+    const row = (r) => ({ id: r.id, name: r.name, color: r.color, team: r.team, bib: r.bib, rank: r.rank, time: r.finishTime, penalty: r.penalty || 0, pens: r.pens || [],
       raw: r.finished ? r.finishTime - (r.penalty || 0) : null, finished: r.finished, me: r === this.me, kind: r.kind });
     return [...this.order.map(row), ...(this.gone || []).map((r) => ({ ...row(r), rank: null, dnf: true }))];
+  }
+
+  // Ploegenklassement: alle renners van een ploeg opgeteld (incl. tijdstraffen).
+  // Wie nog rijdt telt mee met een geschatte eindtijd (resterende afstand tegen het gemiddelde tempo van het veld);
+  // wie is uitgevallen krijgt de tijd van de laatste renner + 30 s. Geeft [{ id, name, color, total, gap, done, riders }].
+  teamStandings() {
+    if (!this.teams) return null;
+    const el = Math.max(1, this.time - this.t0), act = this.riders.filter((r) => !r.finished);
+    const vref = Math.max(5, act.length ? act.reduce((a, r) => a + Math.max(0, r.dist), 0) / act.length / el : 8);
+    const est = (r) => (r.finished ? r.finishTime : this.time + Math.max(0, this.total - r.dist) / vref + (r.penalty || 0));
+    const all = this.riders.map((r) => [r, est(r)]);
+    const worst = all.reduce((m, [, t]) => Math.max(m, t), 0) + TEAM_DNF;
+    for (const g of this.gone || []) all.push([g, g.finished ? g.finishTime : worst]);
+    const rows = this.teams.map((t) => {
+      const mem = all.filter(([r]) => r.team === t.id);
+      return { id: t.id, name: t.name, color: t.color, total: mem.reduce((a, [, x]) => a + x, 0), done: mem.every(([r]) => r.finished || (this.gone || []).includes(r)),
+        riders: mem.map(([r, x]) => ({ id: r.id, name: r.name, bib: r.bib, time: x, finished: r.finished, dnf: (this.gone || []).includes(r) && !r.finished })) };
+    }).filter((t) => t.riders.length).sort((a, b) => a.total - b.total);
+    rows.forEach((t) => { t.gap = t.total - rows[0].total; });
+    return rows;
   }
 
   // Segmentwinnaars en eindtruien voor de uitslag.
