@@ -1,11 +1,11 @@
 // Telefoon als stuur en afstandsbediening voor de tablet of laptop.
 // De game (tablet/laptop) luistert met een code; de telefoon verbindt, stuurt met zijn gyroscoop en
-// stuurt knoppen door (power-up, bel, schakelen, pauze). De game stuurt terug wat er op de telefoon
+// stuurt knoppen door (power-up, elleboogje, schakelen, pauze). De game stuurt terug wat er op de telefoon
 // te zien moet zijn (welke power-up je hebt). Los van een race-kamer, dus het werkt ook in multiplayer.
 import { openLink, makeCode } from './net.js';
 
 // Acties die de telefoon mag sturen (de rest negeren we).
-export const REMOTE_ACTIONS = ['item', 'bell', 'gearUp', 'gearDown', 'pause', 'track'];
+export const REMOTE_ACTIONS = ['item', 'elbow', 'gearUp', 'gearDown', 'pause', 'track'];
 
 // ---------- in de game ----------
 export class RemoteHost {

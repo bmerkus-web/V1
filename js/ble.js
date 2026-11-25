@@ -324,7 +324,7 @@ function pbFields(bytes) {
 const zigzag = (v) => (v % 2 ? -(v + 1) / 2 : v / 2);
 
 // Vertaalt een knoppenbericht naar spelacties, of null:
-// { kind, left, right (0..1), item, bell, up, down }. up/down = de schakelknoppen (zwaarder/lichter);
+// { kind, left, right (0..1), item, elbow, up, down }. up/down = de schakelknoppen (zwaarder/lichter);
 // wat die doen (schakelen of power-up) bepaalt main.js aan de hand van de instelling.
 export function parseZwiftPad(bytes) {
   const type = bytes[0];
@@ -332,20 +332,20 @@ export function parseZwiftPad(bytes) {
   const fields = pbFields(bytes.subarray(1));
   const m = new Map(fields.filter(([, v]) => typeof v === 'number'));
   const on = (f) => (m.get(f) ?? 0) === 0; // 0 (of weggelaten, de protobuf-standaard) = ingedrukt
-  const out = { kind: type === 0x07 ? 'play' : type === 0x37 ? 'click' : 'ride', left: 0, right: 0, item: false, bell: false, up: false, down: false };
+  const out = { kind: type === 0x07 ? 'play' : type === 0x37 ? 'click' : 'ride', left: 0, right: 0, item: false, elbow: false, up: false, down: false };
   if (type === 0x07) { // Zwift Play
     const rightPad = on(1), paddle = Math.min(1, Math.abs(zigzag(m.get(8) || 0)) / 100);
     if (rightPad) {
       out.item = on(4) || on(3) || on(6); // A, Z, aan/uit-knop
       out.up = on(7); // zijknop rechts = zwaarder
-      out.bell = on(2) || on(5); // Y, B
+      out.elbow = on(2) || on(5); // Y, B
       out.right = paddle;
     } else {
       out.left = on(3) ? 1 : paddle; // pijl links of flipper
       out.right = on(4) ? 1 : 0;
       out.item = on(2) || on(6); // pijl omhoog, aan/uit-knop
       out.down = on(7); // zijknop links = lichter
-      out.bell = on(5);
+      out.elbow = on(5);
     }
   } else if (type === 0x37) { // Zwift Click: + en -
     const plus = on(1), minus = on(2);
@@ -353,15 +353,15 @@ export function parseZwiftPad(bytes) {
     else { out.right = plus ? 1 : 0; out.left = minus ? 1 : 0; out.up = plus; out.down = minus; }
   } else { // Zwift Ride / Click v2: bitmasker, 0 = ingedrukt
     if (!m.has(1)) return null;
-    // Elk knopje werkt ook los: links ←/→ sturen, ↑ power-up, ↓ bel;
-    // rechts Z/A sturen, Y power-up, B bel. De schakelknoppen: links = lichter, rechts = zwaarder.
+    // Elk knopje werkt ook los: links ←/→ sturen, ↑ power-up, ↓ elleboogje;
+    // rechts Z/A sturen, Y power-up, B elleboogje. De schakelknoppen: links = lichter, rechts = zwaarder.
     const map = m.get(1), p = (k) => (map & RIDE_BITS[k]) === 0;
     out.left = p('left') || p('z') ? 1 : 0;
     out.right = p('right') || p('a') ? 1 : 0;
     out.item = p('up') || p('y') || p('powerL') || p('powerR');
     out.down = p('shiftUpL') || p('shiftDnL');
     out.up = p('shiftUpR') || p('shiftDnR');
-    out.bell = p('down') || p('b');
+    out.elbow = p('down') || p('b');
     for (const [f, v] of fields) {
       if (f !== 3 || typeof v === 'number') continue;
       const pm = new Map(pbFields(v)), val = Math.min(1, Math.abs(zigzag(pm.get(2) || 0)) / 100);
@@ -391,7 +391,7 @@ export class ZwiftPad extends Device {
       const a = parseZwiftPad(bytes);
       if (!a) return;
       this.kind = a.kind;
-      this.pressed = a.left > 0 || a.right > 0 || a.item || a.bell || a.up || a.down;
+      this.pressed = a.left > 0 || a.right > 0 || a.item || a.elbow || a.up || a.down;
       this.lastData = performance.now();
       this.onpad(a);
     };

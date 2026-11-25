@@ -190,7 +190,7 @@ $('b-pads').onclick = async () => {
     } else a.up = a.down = false;
     input.setPad(pad, a.left, a.right);
     if (a.item && !was.item) input.trigger('item');
-    if (a.bell && !was.bell) input.trigger('bell');
+    if (a.elbow && !was.elbow) input.trigger('elbow');
     if (a.up && !was.up) input.trigger('gearUp');
     if (a.down && !was.down) input.trigger('gearDown');
     was = a;
@@ -239,7 +239,7 @@ if (P.gyro && GyroSteer.available()) gyro.start().then(devStatus, devStatus); //
 setInterval(() => { if (gyro.on && !race) devStatus(); }, 1000); // status van de sensor bijwerken in het menu
 
 // ---------- remote stuur (telefoon als stuur voor deze game) ----------
-remote.onaction = (a) => input.trigger(a); // power-up, bel, schakelen, pauze, volgend nummer
+remote.onaction = (a) => input.trigger(a); // power-up, elleboogje, schakelen, pauze, volgend nummer
 remote.onstatus = () => { devStatus(); const st = $('rm-st'); if (st) st.textContent = remote.connected ? '✓ verbonden' : 'Wacht op je telefoon…'; };
 remote.onconnect = () => { toast(`📲 Remote stuur verbonden (telefoon van ${remote.ctlName || 'je'})`); if ($('rm-st')) hideOverlay(); };
 remote.onlost = () => toast('📲 Remote stuur: verbinding kwijt – hij verbindt vanzelf opnieuw');
@@ -1456,7 +1456,7 @@ function frame(now) {
   if (!race) { input.clear(); return; }
   if (input.take('pause')) togglePause();
   if (input.take('item')) itemTap();
-  if (input.take('bell')) race.bell();
+  if (input.take('elbow')) race.elbow();
   const gu = input.take('gearUp'), gd = input.take('gearDown');
   if (input.take('skip')) wkSkip();
   if (input.take('track')) nextTrack();

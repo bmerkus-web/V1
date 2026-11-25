@@ -10,7 +10,7 @@ let demoPower = 0;
 
 const ACTIONS = {
   Space: 'item', Enter: 'item', Digit1: 'item', KeyX: 'item',
-  KeyB: 'bell', Digit2: 'bell',
+  KeyB: 'elbow', Digit2: 'elbow', // elleboogje: overnemen!
   KeyE: 'gearUp', KeyQ: 'gearDown',
   KeyC: 'center', KeyM: 'music', KeyN: 'skip', KeyR: 'erg', KeyT: 'track', Escape: 'pause', KeyP: 'pause', KeyF: 'fullscreen',
 };

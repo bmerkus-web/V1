@@ -103,12 +103,12 @@ test('Zwift-knoppen: Play, Click en Ride', async () => {
   const { parseZwiftPad } = await import('../js/ble.js');
   const u = (...b) => Uint8Array.from(b);
   // Play links (veld 1 = 1), pijl links ingedrukt (veld 3 = 0), rest los
-  const idle = { left: 0, right: 0, item: false, bell: false, up: false, down: false };
+  const idle = { left: 0, right: 0, item: false, elbow: false, up: false, down: false };
   let a = parseZwiftPad(u(0x07, 0x08, 1, 0x10, 1, 0x18, 0, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 1));
   assert.deepEqual(a, { ...idle, kind: 'play', left: 1 });
   // Play rechts (veld 1 = 0), A ingedrukt (veld 4 = 0), flipper half (zigzag 100 = 50)
   a = parseZwiftPad(u(0x07, 0x08, 0, 0x10, 1, 0x18, 1, 0x20, 0, 0x28, 1, 0x30, 1, 0x38, 1, 0x40, 100));
-  assert.equal(a.item, true); assert.equal(a.bell, false); assert.equal(a.right, 0.5);
+  assert.equal(a.item, true); assert.equal(a.elbow, false); assert.equal(a.right, 0.5);
   // Alles los
   a = parseZwiftPad(u(0x07, 0x08, 0, 0x10, 1, 0x18, 1, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 1));
   assert.deepEqual(a, { ...idle, kind: 'play' });
@@ -129,7 +129,7 @@ test('Zwift-knoppen: Play, Click en Ride', async () => {
   a = parseZwiftPad(u(0x23, 0x08, 0xff, 0xfd, 0x0f)); // − links (0x100)
   assert.ok(a.down && !a.up && !a.item);
   assert.equal(parseZwiftPad(u(0x23, 0x08, 0xff, 0xf7, 0x0f)).item, true); // power-up-knop links (0x400)
-  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xdf, 0xff, 0x0f)).bell, true); // B (0x20)
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xdf, 0xff, 0x0f)).elbow, true); // B (0x20)
   // Onbekend type (bv. batterij) wordt genegeerd
   assert.equal(parseZwiftPad(u(0x19, 0x10, 80)), null);
 });
@@ -987,4 +987,28 @@ test('Ploegen: geen kwak of power-ups tegen ploeggenoten, extra slipstream, ploe
   st = t.teamStandings();
   assert.equal(st.find((x) => x.id === 't1').total, 110 + 130 + 30);
   assert.equal(st[0].id, 't0');
+});
+
+test('Elleboogje: een bot-ploeggenoot in je wiel neemt over, het gebaar gaat over het netwerk', async () => {
+  const { Race } = await import('../js/game.js');
+  const sent = [];
+  const teams = [{ id: 't0', name: 'Neon', color: '#ff3fa4' }, { id: 't1', name: 'Bliksem', color: '#22d3ff' }];
+  const g = new Race({ track: getTrack('polder'), laps: 2, seed: 4, room: { send: (m) => sent.push(m) }, isHost: true, ns: 'demo', teams,
+    riders: [{ id: 'p0', name: 'Ik', color: '#fff', kind: 'me', team: 't0', bib: 11 }, { id: 'b0', name: 'Maatje', color: '#aaa', kind: 'bot', skill: 0.5, team: 't0', bib: 12 },
+      { id: 'b1', name: 'Rivaal', color: '#000', kind: 'bot', skill: 0.5, team: 't1', bib: 21 }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  g.countdown = 0; g.update(0.04); g.time = 20;
+  const [me, mate, riv] = g.riders;
+  me.dist = 300; me.x = 0; me.v = 10; mate.dist = 295; mate.x = 0.05; mate.v = 10; riv.dist = 900;
+  g.elbow();
+  assert.ok(me.elbow > 0 && sent.some((m) => m.t === 'elbow' && m.id === 'p0'));
+  assert.ok(mate.ai.takeover > 0 && mate.ai.takeoverOf === 'p0', 'ploeggenoot komt over');
+  g.elbow(); // nog bezig: niet opnieuw
+  assert.equal(sent.filter((m) => m.t === 'elbow').length, 1);
+  for (let i = 0; i < 25 * 6; i++) { g.update(0.04); me.v = Math.min(me.v, 9); }
+  assert.ok(mate.dist > me.dist, `ploeggenoot is voorbij (${mate.dist.toFixed(1)} vs ${me.dist.toFixed(1)})`);
+  // een elleboogje van een ander via het netwerk: gebaar zichtbaar
+  riv.elbow = 0; g.onNet({ t: 'elbow', id: 'b1' });
+  assert.ok(riv.elbow > 0);
 });
