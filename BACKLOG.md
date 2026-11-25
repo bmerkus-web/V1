@@ -24,6 +24,9 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
+| WB-55 | Ploegen: ploegen kiezen of eerlijk laten verdelen (bots vullen aan), trui in de ploegkleur, ploeggenoten niet te kwakken (geen jurystraf) en geen last van elkaars power-ups, extra slipstream achter een ploeggenoot, ploegenklassement = alle renners van een ploeg opgeteld, gele rugnummers voor de leidende ploeg, ploegen-tabblad in het klassement. | zelf | M |
+| WB-56 | Ploegentijdrit: ploegen starten tegelijk maar zien elkaar als spoken; ploegtijd = tijd van de 2e van 3 (3e van 4) renner; power-ups standaard uit. Na WB-55. | zelf | M |
+| WB-57 | Veldritbaan: korte rondes op tijd met bel voor de laatste ronde, lint als baanrand, gras/modder (met snel spoor)/zand, balken springen op het goede moment, trap met afstappen en lopen, vliegbrug, materiaalpost met modder op je fiets, Zandkoning-trui; later Modderspat en een kermis-hardstyle Clubsound. In stappen bouwen. | zelf | L |
 | WB-10 | Lichte weergave voor oude tablets: minder decor en minder ver vooruit tekenen. | zelf (zorg over oude tablet) | S |
 | WB-11 | Bluetooth-presentatieklikker als power-up-knop (PageUp/PageDown en pijltjes koppelen). | idee | S |
 | WB-12 | Apparaten onthouden, zodat ze na verversen vanzelf terugkomen zonder keuzelijst (eerst nakijken of Chrome dat toestaat). | idee | M |
