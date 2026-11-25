@@ -168,6 +168,21 @@ export class Race {
   local(r) { return r.kind === 'me' || r.kind === 'bot'; }
   say(text, icon = null) { this.feed.push({ text, icon, at: this.clock }); if (this.feed.length > 4) this.feed.shift(); }
 
+  // Achterstand op de leider in seconden: hoe lang geleden kwam de kop van de race waar r nu is.
+  // Binnen: verschil in eindtijd met de winnaar.
+  gapToLeader(r) {
+    const lead = this.order?.[0];
+    if (!lead || r === lead) return 0;
+    if (r.finished) return lead.finished ? r.finishTime - lead.finishTime : 0;
+    const ft = this.frontTrace;
+    if (!ft?.length || r.dist <= ft[0][0]) return r.dist > 0 && ft?.length ? 0 : Math.max(0, lead.dist - r.dist) / Math.max(5, lead.v || 5);
+    let lo = 0, hi = ft.length - 1;
+    if (r.dist >= ft[hi][0]) return lead.finished ? this.time - lead.finishTime : 0;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (ft[mid][0] <= r.dist) lo = mid; else hi = mid; }
+    const [d0, t0] = ft[lo], [d1, t1] = ft[hi];
+    return Math.max(0, this.time - (t0 + ((r.dist - d0) / Math.max(0.001, d1 - d0)) * (t1 - t0)));
+  }
+
   rank() {
     const s = [...this.riders].sort((a, b) =>
       a.finished && b.finished ? a.finishTime - b.finishTime : a.finished ? -1 : b.finished ? 1 : b.dist - a.dist);
@@ -234,6 +249,10 @@ export class Race {
     for (const h of this.hazards) h.age += dt;
     this.hazards = this.hazards.filter((h) => h.age < (h.life || 45));
     this.rank();
+    // Kop van de race: wanneer bereikte de voorste renner welke afstand? Daarmee is elk verschil een tijd (zoals bij een tijdcontrole).
+    const front = this.riders.reduce((m, r) => (r.finished ? m : Math.max(m, r.dist)), -Infinity);
+    const ft = (this.frontTrace ||= []);
+    if (front > 0 && (!ft.length || front > ft[ft.length - 1][0] + 1)) ft.push([front, this.time]);
     if (this.teams && (this._teamT = (this._teamT || 0) - dt) <= 0) { this._teamT = 0.5; this.teamTable = this.teamStandings(); this.teamLead = this.teamTable[0]?.id; } // live ploegenklassement
     this._ghost(dt);
     this._ghosts();
