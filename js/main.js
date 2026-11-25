@@ -1415,7 +1415,7 @@ function hud(dt) {
   const rows = PHONE.matches ? r.order.filter((x) => x.rank === 1 || Math.abs(x.rank - me.rank) <= 1) : r.order;
   const tcol = (x) => r.teams?.find((t) => t.id === x.team)?.color;
   setHTML($('h-rank'), rows.map((x) => {
-    const gap = x === me ? '' : x.finished ? ' 🏁' : ` ${x.dist > me.dist ? '+' : '−'}${Math.abs(x.dist - me.dist).toFixed(0)}m`;
+    const g = r.gapToLeader(x), gap = (x.finished ? ' 🏁' : '') + (x.rank === 1 ? '' : ` ${fmtDelta(g)}`); // achterstand op de leider in tijd
     return `<div class="${x === me ? 'me' : ''}"${r.teams ? ` style="border-right:4px solid ${esc(tcol(x) || 'transparent')}"` : ''}><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${x.penalty ? ` ⚖️+${x.penalty}s` : ''}${gap}</div>`;
   }).join(''));
   // Ploegenklassement live: alleen het tijdsverschil met de leidende ploeg.

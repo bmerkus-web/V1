@@ -1014,3 +1014,19 @@ test('Elleboogje: een bot-ploeggenoot in je wiel neemt over (een tegenstander ni
   riv.elbow = 0; g.onNet({ t: 'elbow', id: 'b1' });
   assert.ok(riv.elbow > 0);
 });
+
+test('Verschil met de leider in tijd: hoe lang geleden de kop van de race op jouw plek was', async () => {
+  const { Race } = await import('../js/game.js');
+  const g = new Race({ track: getTrack('polder'), laps: 1, seed: 5, room: null, isHost: true, ns: 'demo',
+    riders: [{ id: 'p0', name: 'Ik', color: '#fff', kind: 'me' }, { id: 'r1', name: 'Kop', color: '#000', kind: 'remote' }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  g.countdown = 0; g.update(0.04);
+  const [me, kop] = g.riders;
+  // de kop rijdt 10 m/s, ik 10 m/s maar 50 m erachter: 5 s achterstand
+  for (let i = 0; i < 200; i++) { g.time += 0.05; kop.dist = 100 + g.time * 10; me.dist = 50 + g.time * 10; g.update(0); }
+  g.rank();
+  assert.equal(g.order[0], kop);
+  assert.ok(Math.abs(g.gapToLeader(me) - 5) < 0.2, `achterstand ${g.gapToLeader(me).toFixed(2)} s`);
+  assert.equal(g.gapToLeader(kop), 0);
+});
