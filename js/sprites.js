@@ -101,14 +101,14 @@ const P = {
     c.fillStyle = '#111'; c.fillRect(w * 0.4, h * 0.3, w * 0.2, h * 0.14); c.fillRect(w * 0.3, h * 0.44, w * 0.4, h * 0.04);
   } },
   // Veldrit
-  crowd: { w: 6, h: 2.6, draw(c, w, h) { // publiek achter het lint, met vlaggetjes
+  crowd: { w: 3, h: 2.6, draw(c, w, h) { // publiek achter het lint (groepje van drie), met een vlaggetje
     const cols = ['#ff3fa4', '#7df9ff', '#ffd166', '#39ffb0', '#f5f5ff', '#ff8a1c'];
-    for (let i = 0; i < 6; i++) {
-      const x = (i + 0.5) * w / 6 + (((i * 37) % 7) - 3) * w * 0.01, y = h * (0.45 + (i % 3) * 0.06);
-      c.fillStyle = cols[i % cols.length]; c.fillRect(x - w * 0.03, y, w * 0.06, h - y);
-      c.fillStyle = '#e8b58f'; c.beginPath(); c.arc(x, y - h * 0.06, w * 0.022, 0, 7); c.fill();
-      if (i % 3 === 1) { c.fillStyle = '#ffd400'; c.fillRect(x, y - h * 0.42, w * 0.07, h * 0.18); c.fillStyle = '#111'; c.fillRect(x + w * 0.02, y - h * 0.38, w * 0.025, h * 0.1); c.fillStyle = '#ddd'; c.fillRect(x - 1, y - h * 0.42, 2, h * 0.36); }
-      if (i % 4 === 2) { c.fillStyle = '#e8b58f'; c.fillRect(x - w * 0.04, y - h * 0.18, w * 0.015, h * 0.16); }
+    for (let i = 0; i < 3; i++) {
+      const x = (i + 0.5) * w / 3, y = h * (0.45 + (i % 3) * 0.06), u = w / 3;
+      c.fillStyle = cols[(i * 2 + 1) % cols.length]; c.fillRect(x - u * 0.18, y, u * 0.36, h - y);
+      c.fillStyle = '#e8b58f'; c.beginPath(); c.arc(x, y - h * 0.06, u * 0.13, 0, 7); c.fill();
+      if (i === 1) { c.fillStyle = '#ffd400'; c.fillRect(x, y - h * 0.42, u * 0.42, h * 0.18); c.fillStyle = '#111'; c.fillRect(x + u * 0.12, y - h * 0.38, u * 0.15, h * 0.1); c.fillStyle = '#ddd'; c.fillRect(x - 1, y - h * 0.42, 2, h * 0.36); }
+      if (i === 2) { c.fillStyle = '#e8b58f'; c.fillRect(x - u * 0.24, y - h * 0.18, u * 0.09, h * 0.16); }
     }
   } },
   frites: { w: 6, h: 4.2, draw(c, w, h) { // frietkot

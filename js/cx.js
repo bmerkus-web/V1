@@ -189,11 +189,16 @@ export function buildCx(def) {
   // Decor op de kaart: alleen waar het niet op (of vlak naast) het parcours staat
   const clear = (x, yy, m) => segs.every((s) => Math.hypot(s.wx - x, s.wy - yy) > s.wA * ROAD_W + m);
   const free = [];
-  const near = (k, side, gap, sp) => { const s = segs[k % n], o = side * (s.wA * ROAD_W + gap), x = s.wx + Math.cos(s.hd) * o, yy = s.wy - Math.sin(s.hd) * o; if (s.y1 < 0.2 && clear(x, yy, gap - 0.3)) free.push({ k: sp, x, y: yy }); };
+  // Plaatjes draaien altijd naar je toe: houd de hele breedte (plus wat ruimte) vrij van élk stuk parcours.
+  const SIZE = { crowd: 3, billboard: 9, frites: 6 };
+  const near = (k, side, sp, extra = 0) => {
+    const s = segs[k % n], half = SIZE[sp] / 2, o = side * (s.wA * ROAD_W + 0.9 + half + extra), x = s.wx + Math.cos(s.hd) * o, yy = s.wy - Math.sin(s.hd) * o;
+    if (s.y1 < 0.2 && clear(x, yy, half + 0.7)) free.push({ k: sp, x, y: yy });
+  };
   const legK = (leg, m) => Math.floor(legD(leg, m) / SEG);
-  for (let m = 6; m < 125; m += 7) { near(legK(0, m), -1, 2, 'crowd'); if (m % 14 === 6) near(legK(0, m), 1, m % 28 === 6 ? 4 : 2, m % 28 === 6 ? 'billboard' : 'crowd'); }
-  for (const [leg, a, b] of [[1, 8, 30], [14, 2, 28], [7, 6, 22], [3, 4, 30], [11, 4, 50]]) for (let m = a; m < b; m += 6) near(legK(leg, m), leg % 2 ? 1 : -1, 1.8, 'crowd');
-  near(legK(0, 30), 1, 6, 'frites'); near(legK(23, 70), -1, 5, 'frites');
+  for (let m = 4; m < 125; m += 4) { near(legK(0, m), -1, 'crowd'); if (m % 8 === 4) near(legK(0, m), 1, m % 32 === 4 ? 'billboard' : 'crowd'); }
+  for (const [leg, a, b] of [[1, 6, 30], [14, 2, 28], [7, 4, 22], [3, 4, 30], [11, 4, 50], [9, 6, 60], [16, 4, 46]]) for (let m = a; m < b; m += 4) near(legK(leg, m), leg % 2 ? 1 : -1, 'crowd');
+  near(legK(0, 30), 1, 'frites', 3); near(legK(23, 70), -1, 'frites', 2);
   for (let i = 0; i < 260; i++) { // bomen en lichtmasten verspreid over het veld en eromheen
     const x = -40 + rng() * 225, yy = -30 + rng() * 165, k = rng() < 0.12 ? 'lamp' : 'oak';
     if (clear(x, yy, 6)) free.push({ k, x, y: yy });
