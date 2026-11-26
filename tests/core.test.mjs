@@ -1133,3 +1133,29 @@ test('Individuele tijdrit: iedereen naast elkaar, anderen zijn spoken, eigen box
   me.item = 'bottle'; me.pens = []; g.useItem();
   assert.ok(!me.pens.length, 'geen jury bij de plakbidon');
 });
+
+test('Botsing: ook voorwiel tegen achterwiel als je naar iemand toe stuurt; naast een ploeggenoot word je opzij geschoven', async () => {
+  const { Race } = await import('../js/game.js');
+  const teams = [{ id: 't0', name: 'Neon', color: '#ff3fa4' }, { id: 't1', name: 'Bliksem', color: '#22d3ff' }];
+  const mk = (steer) => new Race({ track: getTrack('polder'), laps: 1, seed: 9, room: null, isHost: true, ns: 'demo', teams,
+    riders: [{ id: 'a', name: 'A', color: '#fff', kind: 'me', team: 't0' }, { id: 'b', name: 'B', color: '#aaa', kind: 'remote', team: 't0' }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => steer, emit: () => {} });
+  // schuin achter een ploeggenoot, naar hem toe sturen, even hard: botsing
+  let g = mk(1); g.countdown = 0; g.update(0.04); g.time = 10;
+  let [a, b] = g.riders;
+  a.dist = 300; a.x = 0; a.v = 10; b.dist = 301.2; b.x = 0.2; b.v = 10;
+  g._stepLocal(a, 200, 1, 0.01, false);
+  assert.ok(a.fx.bump > 0 && a.v <= 10, 'voorwiel tegen achterwiel = botsing');
+  assert.ok(!(b.fx.bump > 0), 'de voorste merkt niets');
+  // zonder naar hem toe te sturen: niets
+  g = mk(0); g.countdown = 0; g.update(0.04); g.time = 10; [a, b] = g.riders;
+  a.dist = 300; a.x = 0; a.v = 10; b.dist = 301.2; b.x = 0.2; b.v = 10;
+  g._stepLocal(a, 200, 0, 0.01, false);
+  assert.ok(!(a.fx.bump > 0));
+  // naast elkaar door elkaar heen: rustig opzij
+  a.dist = 300; b.dist = 300.2; a.x = 0; b.x = 0.05;
+  g._stepLocal(a, 200, 0, 0.1, false);
+  assert.ok(a.x < 0, `opzij geschoven: ${a.x}`);
+  assert.ok(!(a.fx.bump > 0), 'zonder straf');
+});
