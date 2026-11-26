@@ -1259,7 +1259,8 @@ function showResults(jump) {
     // fases doorlopen
     if (rv.phase === 'wait' && (!pending || (performance.now() - rv.mine) / 1000 > WAIT_MAX)) go('pre');
     const judged = done.filter((x) => x.penalty > 0).sort((a, b) => a.raw - b.raw);
-    if (rv.phase === 'pre' && secs() > PRE_SECS) go(judged.length ? 'jury' : 'final');
+    const jury = !r.ttt; // in een tijdrit is er geen jury: meteen de uitslag
+    if (rv.phase === 'pre' && (secs() > PRE_SECS || !jury)) go(judged.length && jury ? 'jury' : 'final');
     if (rv.phase === 'jury') {
       const n = Math.min(judged.length, Math.floor(secs() / JURY_STEP) + 1);
       if (n > rv.shown) { rv.shown = n; audio.sfx('whistle'); }
@@ -1270,7 +1271,7 @@ function showResults(jump) {
     if (rv.phase === 'wait' || rv.phase === 'pre') {
       const rows = [...res].sort((a, b) => (a.finished && b.finished ? a.raw - b.raw : a.finished ? -1 : b.finished ? 1 : 0))
         .map((x) => `<tr class="${x.me ? 'me' : ''}"><td>${x.finished ? preRank.get(x.id) : x.dnf ? '–' : ''}</td><td>${dot(x)} ${esc(x.name)}</td><td>${x.finished ? fmt(x.raw) : x.dnf ? 'gestopt' : 'nog onderweg…'}</td></tr>`).join('');
-      body = `<h2>🏁 Binnen!</h2><p class="rv-sub">${rv.phase === 'wait' ? 'Voorlopige uitslag · wachten op de rest van het veld…' : 'Voorlopige uitslag · de jury beraadt zich… ⚖️'}</p>
+      body = `<h2>🏁 Binnen!</h2><p class="rv-sub">${rv.phase === 'wait' ? 'Voorlopige uitslag · wachten op de rest van het veld…' : (jury ? 'Voorlopige uitslag · de jury beraadt zich… ⚖️' : 'Voorlopige uitslag')}</p>
         <table class="rv-table">${rows}</table>
         <div class="menu"><button class="ghost" id="ov-skip">${rv.phase === 'wait' ? 'Uitslag nu' : 'Overslaan'} ⏭</button></div>`;
     } else if (rv.phase === 'jury') {
@@ -1302,7 +1303,7 @@ function showResults(jump) {
       const myPens = res.find((x) => x.me)?.pens.length ? `<p class="small">⚖️ Jouw straffen: ${penList(res.find((x) => x.me))}</p>` : '';
       const tPlace = ts ? ts.findIndex((t) => t.id === me.team) + 1 : 0;
       const title = r.ttt && ts ? (tPlace === 1 && !ts.some((t) => !t.done) ? '🏆 PLOEG WINT!' : `Je ploeg: ${tPlace}e`) : win ? '🥇 GEWONNEN!' : me.rank + 'e plaats';
-      body = `<h2>${title}</h2><p class="rv-sub">${r.ttt ? (r.teams ? 'Ploegentijdrit · ' : 'Tijdrit · ') : ''}Definitieve uitslag${judged.length ? '' : ' · de jury zag niets bijzonders ✓'}${pending ? ' · nog niet iedereen is binnen' : ''}</p>
+      body = `<h2>${title}</h2><p class="rv-sub">${r.ttt ? (r.teams ? 'Ploegentijdrit · ' : 'Tijdrit · ') : ''}Definitieve uitslag${judged.length || !jury ? '' : ' · de jury zag niets bijzonders ✓'}${pending ? ' · nog niet iedereen is binnen' : ''}</p>
         ${r.training ? `<p class="small">Training: ${training ? training.count : ''} etappe(s) · ${(r.courseLen / 1000).toFixed(1)} km. De tijd is die van de etappes samen, zonder in- en uitrijden.</p>` : ''}
         ${r.ttt ? teamBlock : ''}<table class="rv-table">${rows}</table>${myPens}${r.ttt ? '' : teamBlock}
         ${jer ? `<p><b>Eindtruien</b></p><div class="jers">${jer}</div>` : ''}
