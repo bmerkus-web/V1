@@ -55,20 +55,20 @@ export const DIFFICULTY = { makkelijk: 0.7, normaal: 0.82, zwaar: 0.93, beul: 1.
 
 // Ploegentijdrit met power-ups: alleen wat iets voor jezelf of je ploeg doet.
 const TEAM_ITEMS = { turbo: 3, magnet: 2, scooter: 2, bottle: 1.5 };
-function pickTeamItem(rng, solo) { // individuele tijdrit: geen magneet (niemand om naartoe te trekken)
-  const list = Object.entries(TEAM_ITEMS).filter(([k]) => !(solo && k === 'magnet'));
+function pickTeamItem(rng, solo, cx) { // individuele tijdrit: geen magneet (niemand om naartoe te trekken); veldrit: geen plakbidon
+  const list = Object.entries(TEAM_ITEMS).filter(([k]) => !(solo && k === 'magnet') && !(cx && k === 'bottle'));
   let r = rng() * list.reduce((a, [, w]) => a + w, 0);
   for (const [k, w] of list) { r -= w; if (r <= 0) return k; }
   return 'turbo';
 }
-function pickItem(rng, rank, total) {
+function pickItem(rng, rank, total, cx) {
   if (total <= 1) return rng() < 0.7 ? 'turbo' : 'shield';
   const f = (rank - 1) / (total - 1);
   const first = rank === 1;
   const w = {
     turbo: 2 + 2 * f, shield: 3 - 1.5 * f, glue: 2 - 1.5 * f, tacks: 2 - 1.5 * f, wall: 1.5 - 0.5 * f,
     rocket: first ? 0 : 1 + 3 * f, magnet: first ? 0 : 0.5 + 2.5 * f, storm: f > 0.45 ? 2.2 * f : 0,
-    scooter: 0.5 + 2 * f, bottle: 0.5 + 1.5 * f,
+    scooter: 0.5 + 2 * f, bottle: cx ? 0 : 0.5 + 1.5 * f, // veldrit: geen ploegwagen naast het lint
   };
   let sum = 0;
   for (const k in w) sum += w[k];
@@ -354,7 +354,7 @@ export class Race {
       if (r.berm && !wasBerm) r.bermWear += 1;
       if (r.berm) {
         r.bermWear += 1.5 * dt;
-        if (this.rng() < Math.min(0.5, 0.02 * r.bermWear) * dt) this._flat(r, 'berm');
+        if (this.rng() < Math.min(0.5, 0.02 * r.bermWear) * (this.track.m7 ? 0.3 : 1) * dt) this._flat(r, 'berm'); // veldrit: tubes, minder snel lek
       }
       r.bermWear = Math.max(0, r.bermWear - 0.02 * dt);
     }
@@ -444,7 +444,7 @@ export class Race {
     if (r.roulette > 0) {
       r.roulette -= dt;
       if (r.roulette <= 0) {
-        r.item = this.ttt ? pickTeamItem(this.rng, this.ttt.solo) : pickItem(this.rng, r.rank, this.riders.length);
+        r.item = this.ttt ? pickTeamItem(this.rng, this.ttt.solo, this.track.m7) : pickItem(this.rng, r.rank, this.riders.length, this.track.m7);
         if (r === this.me) this.emit('sfx', 'item');
       }
     }
@@ -873,12 +873,12 @@ export class Race {
   _flat(r, why) {
     if (r.fx.flat > 0 || r.fx.wheel > 0 || r.fx.antilek > 0) return; // antilekband: geen lek
     r.bermWear = 0;
-    const wheel = this.rng() < 0.25;
+    const wheel = !this.track.m7 && this.rng() < 0.25; // veldrit: geen ploegwagen (later: de materiaalpost)
     if (wheel) r.fx.wheel = WHEEL_SECS; else r.fx.flat = FLAT_SECS;
     if (r === this.me) {
       this.emit('sfx', 'psst'); this.emit('shake', 4);
       this.emit('banner', wheel ? { text: '🔧 LEK – te groot voor de sealant', sub: 'de ploegwagen brengt een nieuw wiel', color: '#ff6b6b' }
-        : { text: '💥 LEK!', sub: `${{ berm: 'te vaak door de berm', kasseien: 'de kasseien', punaises: 'punaises' }[why] || why} · de sealant dicht hem in ${FLAT_SECS} s`, color: '#ff6b6b' });
+        : { text: '💥 LEK!', sub: `${{ berm: 'te vaak door de berm', kasseien: 'de kasseien', punaises: 'punaises' }[why] || why} · ${this.track.m7 ? `even doorbijten op een zachte tube (${FLAT_SECS} s)` : `de sealant dicht hem in ${FLAT_SECS} s`}`, color: '#ff6b6b' });
     } else if (why !== 'punaises') this.say(`💥 ${r.name} rijdt lek`);
   }
 
@@ -1085,6 +1085,7 @@ export class Race {
         const o = this.track.segs[(s0 + k) % this.track.n].obs;
         if (!o || !o.block) continue;
         const lo = o.x - o.w - 0.22, hi = o.x + o.w + 0.22, lim = Math.min(0.85, wAhead - 0.05);
+        tx = clamp(tx, -lim, lim); // eerst binnen de weg houden, anders zet het afkappen hem straks alsnog op het obstakel
         if ((tx > lo && tx < hi) || (r.x < o.x) !== (tx < o.x)) tx = (Math.abs(lo - r.x) <= Math.abs(hi - r.x) && lo > -lim) || hi > lim ? lo : hi; // in de weg, of je zou erdoorheen sturen
         break;
       }

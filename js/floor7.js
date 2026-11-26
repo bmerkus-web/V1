@@ -63,10 +63,14 @@ export const M7 = {
     if (!this.t7 || this.t7.tr !== tr) { this._tex7(tr); this.yaw7 = null; }
     const T = this.t7, f = (W / 2) * DEPTH, hz0 = this.bg.hz;
     const back = (CAM_H * f) / (H * 0.85 - hz0);
-    // Achtervolgcamera: altijd recht achter de renner, kijkend naar een punt een stukje verderop.
-    const rp = tr.world(me.dist, me.x), aim = tr.world(me.dist + 9, me.x * 0.4);
-    const ty = Math.atan2(aim.x - rp.x, aim.y - rp.y);
-    this.yaw7 = this.yaw7 == null ? ty : this.yaw7 + wrap(ty - this.yaw7) * Math.min(1, dt * 5);
+    // Achtervolgcamera: recht achter de renner, in de richting waarin hij écht rijdt. Dat is de richting van het
+    // parcours waar hij nú is (een klein stukje vooruitkijken), plus de hoek van zijn eigen zijwaartse beweging:
+    // stuur je naar binnen of buiten, dan draait het beeld mee.
+    const rp = tr.world(me.dist, me.x), ahead = tr.world(me.dist + 4, me.x);
+    const lv = (me.steer || 0) * 1.15 * clamp(me.v / 4, 0.25, 1) * ROAD_W; // zijwaartse snelheid door jouw sturen (niet het wiebelen op zand)
+    this.lv7 = (this.lv7 || 0) + (lv - (this.lv7 || 0)) * Math.min(1, dt * 6);
+    const ty = rp.h + wrap(ahead.h - rp.h) * 0.5 + Math.atan2(this.lv7, Math.max(2.5, me.v));
+    this.yaw7 = this.yaw7 == null ? ty : this.yaw7 + wrap(ty - this.yaw7) * Math.min(1, dt * 6);
     const yaw = this.yaw7, fx = Math.sin(yaw), fy = Math.cos(yaw);
     this.camZ7 = this.camZ7 == null ? rp.z : this.camZ7 + (rp.z - this.camZ7) * Math.min(1, dt * 6);
     const g = tr.segAt(me.dist + 4).grade;
@@ -153,11 +157,13 @@ export const M7 = {
         this._poly7([[a.x, a.y, a.z], [b.x, b.y, b.z], [c2.x, c2.y, 0], [d.x, d.y, 0]], sd < 0 ? '#1f4a2a' : '#173a20');
       }
       const a = W(d0, -w0), b = W(d0, w0), c2 = W(d1 + 0.3, w1), d = W(d1 + 0.3, -w1);
-      this._poly7([[a.x, a.y, a.z], [b.x, b.y, b.z], [c2.x, c2.y, c2.z], [d.x, d.y, d.z]], seg.open ? '#3a2416' : '#24461f');
+      this._poly7([[a.x, a.y, a.z], [b.x, b.y, b.z], [c2.x, c2.y, c2.z], [d.x, d.y, d.z]], seg.open ? (this.cam7.h < a.z ? '#21140c' : '#3a2416') : '#24461f');
+      if (this.cam7.h > Math.max(a.z, c2.z) + 0.05) { // van onderen zie je alleen de onderkant van de brug
       const a2 = W(d0, -seg.wA), b2 = W(d0, seg.wA), c3 = W(d1 + 0.3, seg.wB), d3 = W(d1 + 0.3, -seg.wB);
       this._poly7([[a2.x, a2.y, a2.z + 0.01], [b2.x, b2.y, b2.z + 0.01], [c3.x, c3.y, c3.z + 0.01], [d3.x, d3.y, d3.z + 0.01]], th.surf[seg.surf] || th.road[0]);
       if (seg.stairs) for (let q = 0; q < 4; q++) { const s0 = d0 + q * 1.25, p = W(s0, -seg.wA), r = W(s0, seg.wA), p2 = W(s0 + 0.25, seg.wA), r2 = W(s0 + 0.25, -seg.wA); this._poly7([[p.x, p.y, p.z + 0.02], [r.x, r.y, r.z + 0.02], [p2.x, p2.y, p2.z + 0.02], [r2.x, r2.y, r2.z + 0.02]], '#e8e0cc'); }
       if (seg.open && seg.i % 2 === 0) for (let q = 0; q < 5; q++) { const s0 = d0 + q, p = W(s0, -seg.wA), r = W(s0, seg.wA), p2 = W(s0 + 0.12, seg.wA), r2 = W(s0 + 0.12, -seg.wA); this._poly7([[p.x, p.y, p.z + 0.02], [r.x, r.y, r.z + 0.02], [p2.x, p2.y, p2.z + 0.02], [r2.x, r2.y, r2.z + 0.02]], 'rgba(0,0,0,.25)'); }
+      }
     }
     // linten (op de finishstraat en de brug: hekken)
     if (z < 95) {

@@ -66,7 +66,7 @@ export const CX_DEF = {
   // Hoogte: per been (vanaf de uitgang van de bocht), stukken [van, tot, hoogte aan het eind]. open = brug (je kunt eronderdoor).
   heights: [
     { leg: 1, pts: [[13, 0], [21, 2.6], [29, 2.6], [43, 0]], name: 'Trappenmuur' },
-    { leg: 14, pts: [[0, 0], [12, 2.7], [20, 2.7], [30, 0]], open: [12, 20], name: 'De Brug' },
+    { leg: 14, pts: [[0, 0], [11, 4.2], [21, 4.2], [30, 0]], open: [11, 21], name: 'De Brug' }, // hoog genoeg om eronderdoor te kijken
   ],
   // Obstakels per been: at = meter vanaf de uitgang van de bocht; x en w in halve wegbreedtes.
   obs: [
@@ -79,10 +79,11 @@ export const CX_DEF = {
     { leg: 16, at: 12, len: 2.5, type: 'tyres', x: -0.2, w: 0.16 }, { leg: 16, at: 22, len: 2.5, type: 'tyres', x: 0.2, w: 0.16 }, { leg: 16, at: 32, len: 2.5, type: 'tyres', x: -0.2, w: 0.16 },
     { leg: 23, at: 30, len: 4, type: 'bale', x: 0.18, w: 0.14 }, { leg: 23, at: 55, type: 'plank' },
   ],
-  boxes: [[0, 40], [9, 28], [16, 42], [23, 14]],
+  boxes: [[0, 92], [9, 28], [16, 42], [23, 14]],
   bolts: [[0, 75], [17, 4], [23, 64]],
   pads: [[0, 58, 0], [9, 54, 0.15], [23, 78, 0]],
-  sprint: { leg: 0, from: 20, to: 112, name: 'Finishstraat' },
+  start: 45,
+  sprint: { leg: 0, from: 55, to: 125, name: 'Finishstraat' },
 };
 
 // Hoekpunten met afgeronde bochten → stukken (rechte lijnen en bogen).
@@ -123,10 +124,11 @@ export function buildCx(def) {
   const legStart = [];
   { let s = 0; for (const p of pcs) { if (p.kind === 'line' && legStart[p.leg] == null) legStart[p.leg] = s; s += p.len; } }
   const toD = (s) => (s * SEG) / step; // wereldmeters → afstand in het spel
-  const legD = (leg, m) => toD(legStart[leg] + m);
+  const off = def.start || 0; // de start/finishlijn ligt zoveel meter na het begin van been 0 (dan staat het startvak op het rechte stuk)
+  const legD = (leg, m) => mod(toD(legStart[leg] - off + m), total);
   // Monsterpunten
   const pts = [];
-  { let pi = 0, acc = 0; for (let k = 0; k <= n; k++) { const s = Math.min(L - 1e-6, k * step); while (s > acc + pcs[pi].len) { acc += pcs[pi].len; pi++; } pts.push({ ...at(pcs[pi], s - acc), leg: pcs[pi].leg }); } }
+  for (let k = 0; k <= n; k++) { const s = mod(k * step + off, L); let pi = 0, acc = 0; while (pi < pcs.length - 1 && s > acc + pcs[pi].len) { acc += pcs[pi].len; pi++; } pts.push({ ...at(pcs[pi], Math.min(pcs[pi].len, s - acc)), leg: pcs[pi].leg }); }
   // Ondergrond en breedte per been (geldt tot de volgende instelling)
   const legProps = []; let cur = { s: 'grass', w: 0.4 };
   for (let i = 0; i < def.wp.length; i++) { if (def.wp[i][3]) cur = { ...cur, ...def.wp[i][3] }; legProps[i] = cur; }
@@ -140,7 +142,7 @@ export function buildCx(def) {
       const [s0, h0] = hf.pts[j - 1], [s1, h1] = hf.pts[j], d0 = legD(hf.leg, s0), d1 = legD(hf.leg, s1);
       for (let k = Math.floor(d0 / SEG); k <= Math.ceil(d1 / SEG); k++) { const d = k * SEG; if (d < d0 || d > d1) continue; y[k % n] = h0 + (h1 - h0) * smooth((d - d0) / (d1 - d0)); }
     }
-    if (hf.open) for (let k = Math.ceil(legD(hf.leg, hf.open[0]) / SEG); k < Math.floor(legD(hf.leg, hf.open[1]) / SEG); k++) open[k % n] = 1;
+    if (hf.open) for (let k = Math.floor(legD(hf.leg, hf.open[0]) / SEG); k < Math.ceil(legD(hf.leg, hf.open[1]) / SEG); k++) open[k % n] = 1; // elk segment dat (deels) boven het lagere stuk ligt
   }
   y[n] = y[0];
   const segs = [];
