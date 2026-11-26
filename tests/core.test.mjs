@@ -1030,3 +1030,42 @@ test('Verschil met de leider in tijd: hoe lang geleden de kop van de race op jou
   assert.ok(Math.abs(g.gapToLeader(me) - 5) < 0.2, `achterstand ${g.gapToLeader(me).toFixed(2)} s`);
   assert.equal(g.gapToLeader(kop), 0);
 });
+
+test('Ploegentijdrit: andere ploegen zijn spoken, eigen boxen per ploeg, alleen ploeg-power-ups, de laatste renner telt', async () => {
+  const { Race } = await import('../js/game.js');
+  const teams = [{ id: 't0', name: 'Neon', color: '#ff3fa4' }, { id: 't1', name: 'Bliksem', color: '#22d3ff' }];
+  const mk = (items) => new Race({ track: getTrack('polder'), laps: 1, seed: 6, room: null, isHost: true, ns: 'demo', teams, ttt: { items },
+    riders: [{ id: 'p0', name: 'Ik', color: '#fff', kind: 'me', team: 't0', bib: 11 }, { id: 'm1', name: 'Maat', color: '#aaa', kind: 'remote', team: 't0', bib: 12 },
+      { id: 'r1', name: 'Rivaal', color: '#000', kind: 'remote', team: 't1', bib: 21 }, { id: 'r2', name: 'Rivaal2', color: '#111', kind: 'remote', team: 't1', bib: 22 }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  const g = mk('team');
+  assert.ok(g.ttt && !g.noItems && g.rubber === false);
+  // startopstelling: elke ploeg in een eigen strook
+  const [me, mate, r1, r2] = g.riders;
+  assert.equal(me.x, mate.x); assert.notEqual(me.x, r1.x);
+  g.countdown = 0; g.update(0.04); g.time = 10;
+  // slipstream alleen achter een ploeggenoot; een tegenstander is een spook
+  me.dist = 200; me.x = 0; r1.dist = 204; r1.x = 0; mate.dist = 600; r2.dist = 700;
+  g._stepLocal(me, 200, 0, 0.05, false);
+  assert.ok(!me.draft, 'geen slipstream achter een andere ploeg');
+  mate.dist = 204.2; mate.x = 0;
+  g._stepLocal(me, 200, 0, 0.05, false);
+  assert.ok(me.draft && me.draftTeam);
+  // boxen en blitzjes per ploeg
+  const box = g.track.objects.find((o) => o.type === 'box');
+  g._took(box, 5, r1);
+  assert.ok(g.coolFor(r1)[box.id] > g.time && !(g.coolFor(me)[box.id] > g.time), 'een box van een andere ploeg blijft voor jou staan');
+  // alleen ploeg-power-ups
+  const got = new Set();
+  for (let i = 0; i < 200; i++) { me.item = null; me.roulette = 0.001; g._stepLocal(me, 200, 0, 0.01, false); if (me.item) got.add(me.item); }
+  assert.ok([...got].every((k) => ['turbo', 'magnet', 'scooter', 'bottle'].includes(k)), [...got].join(','));
+  // ploegtijd = de laatste renner
+  for (const [r, ft] of [[me, 100], [mate, 140], [r1, 120], [r2, 125]]) { r.finished = true; r.finishTime = ft; }
+  const st = g.teamStandings();
+  assert.deepEqual(st.map((t) => [t.id, t.total]), [['t1', 125], ['t0', 140]]);
+  assert.ok(st.every((t) => t.done), 'iedereen binnen: geen voorlopige uitslag');
+  // zonder power-ups: geen boxen te pakken
+  const n = mk('off');
+  assert.ok(n.noItems);
+});

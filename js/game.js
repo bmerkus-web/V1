@@ -46,6 +46,13 @@ const CUT_BONUS = 0.12; // extra voortgang op het short-cut-pad
 
 export const DIFFICULTY = { makkelijk: 0.7, normaal: 0.82, zwaar: 0.93, beul: 1.05 };
 
+// Ploegentijdrit met power-ups: alleen wat iets voor jezelf of je ploeg doet.
+const TEAM_ITEMS = { turbo: 3, magnet: 2, scooter: 2, bottle: 1.5 };
+function pickTeamItem(rng) {
+  let r = rng() * Object.values(TEAM_ITEMS).reduce((a, w) => a + w, 0);
+  for (const [k, w] of Object.entries(TEAM_ITEMS)) { r -= w; if (r <= 0) return k; }
+  return 'turbo';
+}
 function pickItem(rng, rank, total) {
   if (total <= 1) return rng() < 0.7 ? 'turbo' : 'shield';
   const f = (rank - 1) / (total - 1);
@@ -85,7 +92,19 @@ export class Race {
     // Ploegen: [{ id, name, color }] of null. Ploeggenoten kwakken elkaar niet en hebben geen last van elkaars power-ups.
     this.teams = cfg.teams?.length ? cfg.teams : null;
     this.teamById = new Map(cfg.riders.map((r) => [r.id, r.team ?? null]));
+    // Ploegentijdrit: andere ploegen zijn spoken (geen botsing, slipstream of kwak); ploegtijd = de laatste renner.
+    this.ttt = cfg.ttt && this.teams ? { items: cfg.ttt.items === 'team' ? 'team' : 'off' } : null;
+    this.noItems = !!this.ttt && this.ttt.items === 'off';
+    if (this.ttt) this.rubber = false;
+    this.teamCool = {}; // ploegentijdrit: elke ploeg zijn eigen boxen en blitzjes
     this.riders = cfg.riders.map((r, i) => this._mkRider(r, i));
+    if (this.ttt) { // startopstelling: elke ploeg achter elkaar in een eigen strook
+      const n = this.teams.length, seen = {};
+      for (const r of this.riders) {
+        const k = this.teams.findIndex((t) => t.id === r.team), m = (seen[r.team] = (seen[r.team] ?? -1) + 1);
+        r.x = (k - (n - 1) / 2) * (n > 2 ? 0.55 : 0.6); r.dist = -3 - m * 3;
+      }
+    }
     this.me = this.riders.find((r) => r.kind === 'me');
     this.hazards = [];
     this.rockets = [];
@@ -153,6 +172,8 @@ export class Race {
   }
 
   byId(id) { return this.riders.find((r) => r.id === id); }
+  // Wanneer komen boxen en blitzjes terug: voor iedereen, of in de ploegentijdrit per ploeg.
+  coolFor(r) { return this.ttt && r?.team != null ? (this.teamCool[r.team] ||= new Float32Array(this.track.objects.length)) : this.objCool; }
   // Ploeggenoten? (b mag een renner of een id zijn)
   mate(a, b) {
     if (!this.teams || !a || b == null) return false;
@@ -320,7 +341,7 @@ export class Race {
     r.draft = false; r.draftTeam = false;
     let pull = false;
     for (const o of this.riders) {
-      if (o === r) continue;
+      if (o === r || (this.ttt && !this.mate(r, o))) continue; // ploegentijdrit: andere ploegen zijn spoken
       const gap = o.dist - r.dist;
       if (gap > 0.8 && gap < 10 && Math.abs(o.x - r.x) < 0.28) { r.draft = true; if (this.mate(r, o)) r.draftTeam = true; } // achter een ploeggenoot: extra slipstream
       if (e.magnet > 0 && gap > 3 && gap < 160) pull = true;
@@ -360,13 +381,13 @@ export class Race {
       (r.towing ? 1 + TOW_BONUS : 1) * (e.flat > 0 ? 1 - FLAT : 1) * (e.wheel > 0 ? 0.05 : 1);
     r.prog = prog;
     r.dist += r.v * dt * prog;
-    if (r.dist > prev && !r.finished && !this.free) { this._sprintLine(r, prev); this._timedZones(r, prev); }
+    if (r.dist > prev && !r.finished && !this.free && !this.ttt) { this._sprintLine(r, prev); this._timedZones(r, prev); } // tijdrit: geen tussensprints of truien
 
     if (r.dist >= 0 && !this.free) this._pickups(r, prev);
     if (r.roulette > 0) {
       r.roulette -= dt;
       if (r.roulette <= 0) {
-        r.item = pickItem(this.rng, r.rank, this.riders.length);
+        r.item = this.ttt ? pickTeamItem(this.rng) : pickItem(this.rng, r.rank, this.riders.length);
         if (r === this.me) this.emit('sfx', 'item');
       }
     }
@@ -381,9 +402,9 @@ export class Race {
 
   // Een box of blitzje is gepakt: hier laten verdwijnen en de anderen laten weten,
   // anders blijft hij op hun scherm liggen en kunnen ze hem nog een keer pakken.
-  _took(o, secs) {
-    this.objCool[o.id] = this.time + secs;
-    this.room?.send({ t: 'pick', o: o.id, c: secs, st: this.stageIdx | 0 });
+  _took(o, secs, r) {
+    this.coolFor(r)[o.id] = this.time + secs;
+    this.room?.send({ t: 'pick', o: o.id, c: secs, st: this.stageIdx | 0, tm: this.ttt ? r?.team : undefined });
   }
 
   _pickups(r, prev) {
@@ -393,14 +414,14 @@ export class Race {
     for (let s = s0; ; s = (s + 1) % tr.n) {
       const seg = tr.segs[s];
       for (const o of seg.objs) {
-        if (this.objCool[o.id] > this.time) continue;
+        if (this.coolFor(r)[o.id] > this.time) continue;
         const passed = m1 >= m0 ? o.d > m0 && o.d <= m1 : o.d > m0 || o.d <= m1;
         if (!passed) continue;
-        if (o.type === 'box' && Math.abs(o.x - r.x) < 0.2) {
-          this._took(o, 5);
+        if (o.type === 'box' && Math.abs(o.x - r.x) < 0.2 && !this.noItems) {
+          this._took(o, 5, r);
           if (!r.item && r.roulette <= 0) { r.roulette = 1.3; if (isMe) this.emit('sfx', 'box'); }
         } else if (o.type === 'bolt' && Math.abs(o.x - r.x) < 0.14) {
-          this._took(o, 15);
+          this._took(o, 15, r);
           if (isMe && r.bolts === 9) this.emit('banner', { text: '⚡ FULL BLITZ! ⚡', sub: '20% minder luchtweerstand', color: '#ffd166' });
           r.bolts = Math.min(10, r.bolts + 1);
           if (isMe) this.emit('sfx', 'bolt');
@@ -946,6 +967,12 @@ export class Race {
       const comply = { makkelijk: 0.94, normaal: 0.97, zwaar: 0.99, beul: 1.01 }[this.difficulty] ?? 0.97;
       p = REF_FTP * (tg != null ? tg / ftp : 0.6) * Math.min(1.03, comply + 0.03 * (ai.skill - 0.5) + 0.01 * Math.sin(this.time * 0.31 + ai.ph));
     }
+    if (this.ttt && !r.finished) { // ploegentijdrit: samen blijven – wachten op de laatste, niet op een ploeggenoot knallen
+      const team = this.riders.filter((o) => this.mate(r, o) && !o.finished);
+      const last = Math.min(r.dist, ...team.map((o) => o.dist));
+      if (r.dist - last > 10) p *= 0.72; else if (r.dist - last > 5) p *= 0.9;
+      if (team.some((o) => o.dist - r.dist > 0 && o.dist - r.dist < 3 && Math.abs(o.x - r.x) < 0.2 && o.v < r.v)) p *= 0.85;
+    }
     if (ai.takeover > 0) { // overnemen na een elleboogje: even aanzetten tot hij voorbij is
       ai.takeover -= dt;
       const L = this.byId(ai.takeoverOf);
@@ -968,7 +995,7 @@ export class Race {
         const sg = this.track.segs[(s0 + k) % this.track.n];
         if (sg.pad && k < best) { best = k; tx = sg.pad.x; }
         for (const o of sg.objs) {
-          if (this.objCool[o.id] > this.time || (o.type === 'box' && r.item)) continue;
+          if (this.coolFor(r)[o.id] > this.time || (o.type === 'box' && (r.item || this.noItems))) continue;
           const cost = k + Math.abs(o.x - r.x) * 12 - (o.type === 'box' ? 6 : 0);
           if (Math.abs(o.x - r.x) < 0.55 && cost < best) { best = cost; tx = o.x; }
         }
@@ -984,11 +1011,15 @@ export class Race {
         if (o) { tx = o.x; ai.kwakT = 0.8; }
       }
       // Niet achterop een tragere renner rijden: eromheen sturen.
-      const blk = this.riders.find((q) => q !== r && q.dist - r.dist > 0 && q.dist - r.dist < 8 && Math.abs(q.x - tx) < 0.2 && q.v < r.v + 0.3);
+      if (this.ttt && !(ai.takeover > 0)) { // ploegentijdrit: in het wiel van de ploeggenoot vóór je
+        const mate = this.riders.filter((q) => q !== r && this.mate(r, q) && q.dist > r.dist && q.dist - r.dist < 30).sort((a, b) => a.dist - b.dist)[0];
+        if (mate) tx = mate.x;
+      }
+      const blk = this.ttt ? null : this.riders.find((q) => q !== r && q.dist - r.dist > 0 && q.dist - r.dist < 8 && Math.abs(q.x - tx) < 0.2 && q.v < r.v + 0.3);
       if (blk && !(ai.kwakT > 0)) tx = blk.x + (r.x >= blk.x ? 0.34 : -0.34);
       if (ai.takeover > 0) { const L = this.byId(ai.takeoverOf); if (L) tx = r.dist < L.dist + 2 ? L.x + ai.passSide * 0.34 : L.x; } // ernaast en dan ervoor
       // Lang op kop met iemand in het wiel? Dan zelf een elleboogje.
-      const wheel = !this.free && !r.finished && this.riders.some((o) => o !== r && r.dist - o.dist > 0.8 && r.dist - o.dist < 10 && Math.abs(o.x - r.x) < 0.28);
+      const wheel = !this.free && !r.finished && this.riders.some((o) => o !== r && (!this.ttt || this.mate(r, o)) && r.dist - o.dist > 0.8 && r.dist - o.dist < 10 && Math.abs(o.x - r.x) < 0.28);
       ai.leadT = wheel ? (ai.leadT || 0) + 0.35 : 0;
       if (ai.leadT > 10 && this.rng() < 0.08) { ai.leadT = 0; this.elbow(r); }
       const wAhead = this.track.wAt(r.dist + 12);
@@ -1103,7 +1134,8 @@ export class Race {
       case 'pick': {
         const id = msg.o;
         if ((msg.st | 0) !== (this.stageIdx | 0) || !Number.isInteger(id) || id < 0 || id >= this.objCool.length) break;
-        this.objCool[id] = Math.max(this.objCool[id], this.time + Math.min(20, Math.max(0, +msg.c || 0)));
+        const cool = this.ttt ? (this.teams.some((t) => t.id === msg.tm) ? this.coolFor({ team: msg.tm }) : null) : this.objCool;
+        if (cool) cool[id] = Math.max(cool[id], this.time + Math.min(20, Math.max(0, +msg.c || 0)));
         break;
       }
       case 'kom':
@@ -1151,7 +1183,7 @@ export class Race {
     return [...this.order.map(row), ...(this.gone || []).map((r) => ({ ...row(r), rank: null, dnf: true }))];
   }
 
-  // Ploegenklassement: alle renners van een ploeg opgeteld (incl. tijdstraffen).
+  // Ploegenklassement: alle renners van een ploeg opgeteld (incl. tijdstraffen); in de ploegentijdrit de tijd van de laatste renner.
   // Wie nog rijdt telt mee met een geschatte eindtijd (resterende afstand tegen het gemiddelde tempo van het veld);
   // wie is uitgevallen krijgt de tijd van de laatste renner + 30 s. Geeft [{ id, name, color, total, gap, done, riders }].
   teamStandings() {
@@ -1164,7 +1196,7 @@ export class Race {
     for (const g of this.gone || []) all.push([g, g.finished ? g.finishTime : worst]);
     const rows = this.teams.map((t) => {
       const mem = all.filter(([r]) => r.team === t.id);
-      return { id: t.id, name: t.name, color: t.color, total: mem.reduce((a, [, x]) => a + x, 0), done: mem.every(([r]) => r.finished || (this.gone || []).includes(r)),
+      return { id: t.id, name: t.name, color: t.color, total: this.ttt ? Math.max(...mem.map(([, x]) => x)) : mem.reduce((a, [, x]) => a + x, 0) /* tijdrit: de laatste renner telt */, done: mem.every(([r]) => r.finished || (this.gone || []).includes(r)),
         riders: mem.map(([r, x]) => ({ id: r.id, name: r.name, bib: r.bib, time: x, finished: r.finished, dnf: (this.gone || []).includes(r) && !r.finished })) };
     }).filter((t) => t.riders.length).sort((a, b) => a.total - b.total);
     rows.forEach((t) => { t.gap = t.total - rows[0].total; });

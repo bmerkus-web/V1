@@ -24,7 +24,6 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
-| WB-56 | Ploegentijdrit: ploegen starten tegelijk maar zien elkaar als spoken (geen botsingen, geen slipstream van andere ploegen); ploegtijd = tijd van de laatste renner van de ploeg (iedereen moet binnen zijn); kopwissels met extra slipstream en het elleboogje; power-ups standaard uit, met als optie alleen power-ups voor je eigen ploeg (turbo, magneet die je naar een ploeggenoot trekt, scooter, plakbidon); beste ploegtijden in het klassement. Na WB-55. | zelf | M |
 | WB-57 | Veldritbaan: korte rondes op tijd met bel voor de laatste ronde, lint als baanrand, gras/modder (met snel spoor)/zand, balken springen op het goede moment, trap met afstappen en lopen, vliegbrug, materiaalpost met modder op je fiets, Zandkoning-trui; later Modderspat en een kermis-hardstyle Clubsound. In stappen bouwen. | zelf | L |
 | WB-10 | Lichte weergave voor oude tablets: minder decor en minder ver vooruit tekenen. | zelf (zorg over oude tablet) | S |
 | WB-11 | Bluetooth-presentatieklikker als power-up-knop (PageUp/PageDown en pijltjes koppelen). | idee | S |
@@ -75,6 +74,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- ⏱️ WB-56 Ploegentijdrit: andere ploegen als spoken (geen botsing, kwak of slipstream), elke ploeg in een eigen startstrook en met eigen boxen en blitzjes, ploegtijd = laatste renner, power-ups uit of alleen voor je ploeg (turbo, magneet naar ploeggenoot, scooter, plakbidon), bots rijden als ploeg (wachten op de laatste, in het wiel), plek van je ploeg in beeld, uitslag en records
 - 💪 Bel vervangen door het elleboogje (overnemen!): alleen het gebaar (geen teksten), een bot-ploeggenoot in je wiel neemt de kop over, bots die lang op kop rijden doen het zelf ook; B, ↓/B op de Zwift-knoppen en 💪 op het remote stuur
 - 👥 WB-55 Ploegen: 2×2, 2×3 of 3×2 bij een race, zelf kiezen of eerlijk verdelen, bots vullen aan; trui in de ploegkleur met rugnummers (geel voor de leidende ploeg), groene trui en bolletjestrui met mouwen en rand in de ploegkleur; geen kwak en geen last van power-ups van ploeggenoten, extra slipstream achter een ploeggenoot; live ploegenklassement (verschil met de leidende ploeg), ploegenklassement in de uitslag (alle renners opgeteld, uitvaller = laatste + 30 s) en ploegtijden in het klassement
 - 📲 WB-53 Remote stuur: je telefoon als stuur voor je tablet of laptop: verbinden met code of QR-code (los van een race-kamer, dus ook in multiplayer), sturen met de gyroscoop, grote power-upknop die laat zien welke power-up je hebt, plus bel, rechtzetten, schakelen of −5%/+5%, volgend nummer en pauze; verbindt vanzelf opnieuw
