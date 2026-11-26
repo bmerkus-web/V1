@@ -1159,3 +1159,37 @@ test('Botsing: ook voorwiel tegen achterwiel als je naar iemand toe stuurt; naas
   assert.ok(a.x < 0, `opzij geschoven: ${a.x}`);
   assert.ok(!(a.fx.bump > 0), 'zonder straf');
 });
+
+test('Botsing: stuur je je achterwiel in het voorwiel van een ploeggenoot, dan botst hij (jij niet)', async () => {
+  const { Race } = await import('../js/game.js');
+  const teams = [{ id: 't0', name: 'Neon', color: '#ff3fa4' }];
+  const sent = [];
+  const mk = (kind) => new Race({ track: getTrack('polder'), laps: 1, seed: 10, room: { send: (m) => sent.push(m) }, isHost: true, ns: 'demo', teams,
+    riders: [{ id: 'a', name: 'A', color: '#fff', kind: 'me', team: 't0' }, { id: 'b', name: 'B', color: '#aaa', kind, skill: 0.5, team: 't0' }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  // b (bot) zit links achter me met overlap; ik stuur naar links
+  let g = mk('bot'); g.countdown = 0; g.update(0.04); g.time = 10;
+  let [a, b] = g.riders;
+  a.dist = 301.2; a.x = 0.1; a.v = 10; b.dist = 300; b.x = -0.1; b.v = 10;
+  g._stepLocal(a, 200, -1, 0.01, false);
+  assert.ok(b.fx.bump > 0 && !(a.fx.bump > 0), 'de ploeggenoot achter me botst, ik niet');
+  // naar rechts sturen (van hem af): niets
+  g = mk('bot'); g.countdown = 0; g.update(0.04); g.time = 10; [a, b] = g.riders;
+  a.dist = 301.2; a.x = 0.1; b.dist = 300; b.x = -0.1;
+  g._stepLocal(a, 200, 1, 0.01, false);
+  assert.ok(!(b.fx.bump > 0));
+  // een menselijke ploeggenoot: bericht naar zijn scherm, daar botst hij
+  g = mk('remote'); g.countdown = 0; g.update(0.04); g.time = 10; [a, b] = g.riders;
+  a.dist = 301.2; a.x = 0.1; b.dist = 300; b.x = -0.1;
+  g._stepLocal(a, 200, -1, 0.01, false);
+  const m = sent.find((x) => x.t === 'bump');
+  assert.ok(m && m.to === 'b' && m.by === 'a');
+  const other = new Race({ track: getTrack('polder'), laps: 1, seed: 10, room: null, isHost: false, ns: 'demo', teams,
+    riders: [{ id: 'a', name: 'A', color: '#fff', kind: 'remote', team: 't0' }, { id: 'b', name: 'B', color: '#aaa', kind: 'me', team: 't0' }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  other.countdown = 0; other.update(0.04); other.me.v = 10;
+  other.onNet(m);
+  assert.ok(other.me.fx.bump > 0);
+});
