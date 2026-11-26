@@ -377,10 +377,16 @@ export class Race {
       if (!this.free && r.kwakCd <= 0 && (!r.ai || r.ai.kwakT > 0) && !(o.kwakSafe > 0) && this.time > 3 && !r.finished && !o.finished && !this.mate(r, o) &&
         Math.abs(gap) < 1.8 && Math.abs(side) > 0.04 && Math.abs(side) < 0.32 && steer * Math.sign(side) > 0.4) this._kwak(r, o, Math.sign(side));
       // Botsing: wie achterop iemand rijdt wijkt uit, en verliest snelheid als hij harder ging.
+      // Ook als je schuin achter iemand zit en naar hem toe stuurt (voorwiel tegen achterwiel). De voorste merkt niets.
       // (Een gestuurde kwak van opzij is iets anders: die kost de ander iets, niet jou.)
-      if (gap > 0 && gap < 1.6 && Math.abs(o.x - r.x) < 0.16) {
+      const canBump = !this.free && r.bumpCd <= 0 && !r.finished && !o.finished && this.time > 3;
+      if (gap > 0 && gap < BIKE && Math.abs(o.x - r.x) < 0.16) {
         r.x += (r.x >= o.x ? 1 : -1) * dt * 0.8;
-        if (!this.free && r.bumpCd <= 0 && r.v > o.v + 0.4 && !r.finished && !o.finished && this.time > 3) this._bump(r, o);
+        if (canBump && r.v > o.v + 0.4) this._bump(r, o);
+      } else if (canBump && r.kind === 'me' && gap > 0.6 && gap < BIKE && Math.abs(side) < 0.26 && steer * Math.sign(side) > 0.4 && !(o.kwakSafe > 0) && (this.mate(r, o) || r.kwakCd > 0)) {
+        this._bump(r, o); // voorwiel tegen achterwiel (een tegenstander kwak je eerst)
+      } else if (Math.abs(gap) <= 0.6 && Math.abs(side) < 0.14 && this.mate(r, o)) {
+        r.x -= (Math.sign(side) || (r.id < o.id ? 1 : -1)) * dt * 0.8; // naast een ploeggenoot: niet door elkaar heen, rustig opzij
       }
     }
     r.draftCut = (1 - best) * (pushed ? 0.975 : 1);
@@ -876,7 +882,7 @@ export class Race {
   // r rijdt achterop o: r valt terug tot onder de snelheid van o en moet even herstellen.
   _bump(r, o) {
     r.bumpCd = 2.5;
-    r.v = Math.max(o.v * 0.92, r.v * 0.75);
+    r.v = Math.min(r.v, Math.max(o.v * 0.92, r.v * 0.75)); // nooit sneller door een botsing
     r.fx.bump = 1.2;
     r.hitAt = this.clock;
     if (r === this.me) {
@@ -1044,7 +1050,7 @@ export class Race {
       // Niet achterop een tragere renner rijden: eromheen sturen.
       if (this.ttt && !(ai.takeover > 0)) { // ploegentijdrit: in het wiel van de ploeggenoot vóór je
         const mate = this.riders.filter((q) => q !== r && this.mate(r, q) && q.dist > r.dist && q.dist - r.dist < 30).sort((a, b) => a.dist - b.dist)[0];
-        if (mate) tx = mate.x;
+        if (mate) tx = mate.dist - r.dist > 2.2 ? mate.x : r.x + clamp(mate.x - r.x, -0.02, 0.02); // pas invoegen met ruimte
       }
       const blk = this.ttt ? null : this.riders.find((q) => q !== r && q.dist - r.dist > 0 && q.dist - r.dist < 8 && Math.abs(q.x - tx) < 0.2 && q.v < r.v + 0.3);
       if (blk && !(ai.kwakT > 0)) tx = blk.x + (r.x >= blk.x ? 0.34 : -0.34);
