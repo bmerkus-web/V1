@@ -203,6 +203,7 @@ test('Zonder stuurhulp duwt een bocht je naar buiten', () => {
 
 test('Short cut: oprit sluit aan op de weg, pad loont, ernaast is berm', () => {
   for (const d of TRACK_DEFS) {
+    if (d.cx) continue; // veldrit: geen short cut
     const t = getTrack(d.id), cut = t.cut;
     assert.ok(cut && cut.end - cut.start >= 120, d.id);
     const cs = t.segs.filter((s) => s.cut);
@@ -1221,4 +1222,40 @@ test('Obstakels: op een verkeerseiland of wegwerkzaamheden rijden = berm, bots s
   let on = 0, n = 0;
   while (bot.dist < w0.at + 160 && n < 4000) { g._bot(bot, 0.02); if (bot.onObs) on++; n++; }
   assert.ok(on < 10, `bot ${on} keer op een obstakel`);
+});
+
+test('Veldrit: kaart sluit, legs kruisen alleen via de brug, ondergrond remt, trap en balk remmen af, bots ontwijken', async () => {
+  const { Race } = await import('../js/game.js');
+  const tr = getTrack('modder');
+  assert.ok(tr.m7 && tr.n > 150);
+  const step = tr.step, S = tr.segs;
+  for (let k = 0; k < tr.n; k++) { const a = S[k], b = S[(k + 1) % tr.n]; assert.ok(Math.abs(Math.hypot(b.wx - a.wx, b.wy - a.wy) - step) < 0.3, `gat bij ${k}`); }
+  // Geen twee stukken parcours over elkaar, behalve onder de brug door
+  for (let i = 0; i < tr.n; i++) for (let j = i + 6; j < tr.n; j++) {
+    if (Math.abs(i - j) > tr.n - 6) continue;
+    const a = S[i], b = S[j], gap = Math.hypot(a.wx - b.wx, a.wy - b.wy) - (a.wA + b.wA) * 4.5;
+    if (a.open || b.open || Math.max(a.y1, b.y1) > 1) continue;
+    assert.ok(gap > 1.5, `legs ${a.leg} en ${b.leg} te dicht (${gap.toFixed(1)} m)`);
+  }
+  for (const s of S) assert.ok(s.wA > 0.25 && s.wA < 0.9);
+  assert.ok(new Set(S.map((s) => s.surf)).size >= 5);
+  const mk = () => new Race({ track: tr, laps: 2, seed: 3, room: null, isHost: true, ns: 'demo', riders: [{ id: 'p0', name: 'Ik', color: '#fff', kind: 'me' }, { id: 'b0', name: 'Bot', color: '#000', kind: 'bot', skill: 0.6 }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  const g = mk(); g.countdown = 0; g.update(0.04); g.time = 10;
+  const [me, bot] = g.riders;
+  const ride = (surf) => { const s = S.find((x) => x.surf === surf && !x.puddle && !x.obs && !x.stairs && Math.abs(x.grade) < 0.5); me.dist = s.i * SEG; me.x = 0; me.v = 6; for (let i = 0; i < 20; i++) { g._stepLocal(me, 200, 0, 0.05, false); me.dist = s.i * SEG; me.x = 0; } return me.v; };
+  const vA = ride('asphalt'), vS = ride('sand'), vG = ride('grass');
+  assert.ok(vS < vG && vG < vA, `asfalt ${vA}, gras ${vG}, zand ${vS}`);
+  const st = S.find((s) => s.stairs); me.dist = st.i * SEG; me.x = 0; me.v = 7; g._stepLocal(me, 300, 0, 0.05, false);
+  assert.ok(me.v <= 2.5, 'trap: lopen');
+  const pl = tr.obstacles.find((o) => o.type === 'plank'); me.dist = pl.at - 0.3; me.x = 0; me.v = 8; g._stepLocal(me, 300, 0, 0.1, false);
+  assert.ok(me.v < 5 && me.bumpKick > 0, 'balk: afremmen en tik');
+  me.dist = 99999;
+  let on = 0;
+  for (const o of tr.obstacles.filter((x) => x.block)) {
+    bot.dist = o.at - 40; bot.x = o.x; bot.v = 7; let n = 0;
+    while (bot.dist < o.at + o.len + 5 && n < 3000) { g._bot(bot, 0.02); if (bot.onObs) on++; n++; }
+  }
+  assert.ok(on < 15, `bot ${on} keer op een obstakel`);
 });

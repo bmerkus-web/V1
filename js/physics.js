@@ -20,7 +20,7 @@ export function stepSpeed(r, power, gradePct, dt, magnetPull = false) {
   const e = r.fx;
   let p = Math.max(0, power);
   let cda = CDA * (1 - 0.02 * Math.min(10, r.bolts || 0));
-  let crr = CRR;
+  let crr = CRR * (r.surfK || 1); // veldrit: zand, modder, gras
   if (e.boost > 0) { p += 320; cda *= 0.55; }
   if (magnetPull) p += 380;
   cda *= r.draftCut ?? (r.draft ? 0.7 : 1); // slipstream (zie game.js: afstand, ploeggenoot, plek in de rij)
