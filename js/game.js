@@ -18,6 +18,7 @@ export const ITEMS = {
   tacks: { name: 'Punaises', icon: '📌', hint: 'Strooi ze achter je: wie erdoor rijdt, rijdt lek' },
 };
 
+export const raceKind = (c) => (c.ttt ? (c.teams?.length ? 'ttt' : 'tt') : 'race');
 export const BOT_NAMES = ['Turbo Tess', 'Watt Wout', 'Sprint Sanne', 'Klim Kees', 'Demarrage Daan', 'Bidon Bram', 'Kopman Koen'];
 // Ideale lijn: binnendoor is korter. Echte meetkunde (straal R = SEG²/bocht), iets aangedikt.
 const LINE_K = (ROAD_W / (SEG * SEG)) * 1.3;
@@ -53,9 +54,10 @@ export const DIFFICULTY = { makkelijk: 0.7, normaal: 0.82, zwaar: 0.93, beul: 1.
 
 // Ploegentijdrit met power-ups: alleen wat iets voor jezelf of je ploeg doet.
 const TEAM_ITEMS = { turbo: 3, magnet: 2, scooter: 2, bottle: 1.5 };
-function pickTeamItem(rng) {
-  let r = rng() * Object.values(TEAM_ITEMS).reduce((a, w) => a + w, 0);
-  for (const [k, w] of Object.entries(TEAM_ITEMS)) { r -= w; if (r <= 0) return k; }
+function pickTeamItem(rng, solo) { // individuele tijdrit: geen magneet (niemand om naartoe te trekken)
+  const list = Object.entries(TEAM_ITEMS).filter(([k]) => !(solo && k === 'magnet'));
+  let r = rng() * list.reduce((a, [, w]) => a + w, 0);
+  for (const [k, w] of list) { r -= w; if (r <= 0) return k; }
   return 'turbo';
 }
 function pickItem(rng, rank, total) {
@@ -98,12 +100,16 @@ export class Race {
     this.teams = cfg.teams?.length ? cfg.teams : null;
     this.teamById = new Map(cfg.riders.map((r) => [r.id, r.team ?? null]));
     // Ploegentijdrit: andere ploegen zijn spoken (geen botsing, slipstream of kwak); ploegtijd = de laatste renner.
-    this.ttt = cfg.ttt && this.teams ? { items: cfg.ttt.items === 'team' ? 'team' : 'off' } : null;
+    // Zonder ploegen is het een individuele tijdrit: iedereen tegelijk, alle anderen zijn spoken.
+    this.ttt = cfg.ttt ? { items: cfg.ttt.items === 'team' ? 'team' : 'off', solo: !this.teams } : null;
     this.noItems = !!this.ttt && this.ttt.items === 'off';
     if (this.ttt) this.rubber = false;
     this.teamCool = {}; // ploegentijdrit: elke ploeg zijn eigen boxen en blitzjes
     this.riders = cfg.riders.map((r, i) => this._mkRider(r, i));
-    if (this.ttt) { // startopstelling: elke ploeg achter elkaar in een eigen strook
+    if (this.ttt?.solo) { // individuele tijdrit: iedereen naast elkaar op de streep
+      const n = this.riders.length;
+      this.riders.forEach((r, i) => { r.x = n > 1 ? -0.75 + (1.5 * i) / (n - 1) : 0; r.dist = -3; });
+    } else if (this.ttt) { // startopstelling: elke ploeg achter elkaar in een eigen strook
       const n = this.teams.length, seen = {};
       for (const r of this.riders) {
         const k = this.teams.findIndex((t) => t.id === r.team), m = (seen[r.team] = (seen[r.team] ?? -1) + 1);
@@ -178,7 +184,7 @@ export class Race {
 
   byId(id) { return this.riders.find((r) => r.id === id); }
   // Wanneer komen boxen en blitzjes terug: voor iedereen, of in de ploegentijdrit per ploeg.
-  coolFor(r) { return this.ttt && r?.team != null ? (this.teamCool[r.team] ||= new Float32Array(this.track.objects.length)) : this.objCool; }
+  coolFor(r) { const k = this.ttt ? r?.team ?? r?.id : null; return k != null ? (this.teamCool[k] ||= new Float32Array(this.track.objects.length)) : this.objCool; } // tijdrit: per ploeg of per renner
   // Ploeggenoten? (b mag een renner of een id zijn)
   mate(a, b) {
     if (!this.teams || !a || b == null) return false;
@@ -412,7 +418,7 @@ export class Race {
     if (r.roulette > 0) {
       r.roulette -= dt;
       if (r.roulette <= 0) {
-        r.item = this.ttt ? pickTeamItem(this.rng) : pickItem(this.rng, r.rank, this.riders.length);
+        r.item = this.ttt ? pickTeamItem(this.rng, this.ttt.solo) : pickItem(this.rng, r.rank, this.riders.length);
         if (r === this.me) this.emit('sfx', 'item');
       }
     }
@@ -429,7 +435,7 @@ export class Race {
   // anders blijft hij op hun scherm liggen en kunnen ze hem nog een keer pakken.
   _took(o, secs, r) {
     this.coolFor(r)[o.id] = this.time + secs;
-    this.room?.send({ t: 'pick', o: o.id, c: secs, st: this.stageIdx | 0, tm: this.ttt ? r?.team : undefined });
+    this.room?.send({ t: 'pick', o: o.id, c: secs, st: this.stageIdx | 0, tm: this.ttt ? r?.team ?? r?.id : undefined });
   }
 
   _pickups(r, prev) {
@@ -551,9 +557,9 @@ export class Race {
     }
     if (me.finished) {
       if (!this.training) {
-        const key = `${id}|race|${this.laps}`;
-        const res = this._time(key, me.finishTime, 'Race');
-        if (res.isPR) setGhost(this.ns, `${id}|ghost|${this.laps}`, { d: this.rec });
+        const kind = raceKind(this); // race, tijdrit en ploegentijdrit hebben elk hun eigen PR en spook
+        const res = this._time(`${id}|${kind}|${this.laps}`, me.finishTime, { race: 'Race', tt: 'Tijdrit', ttt: 'Ploegentijdrit' }[kind]);
+        if (res.isPR) setGhost(this.ns, `${id}|${kind === 'race' ? 'ghost' : kind + 'ghost'}|${this.laps}`, { d: this.rec });
       }
       this.state = 'done';
       const s = store.stats;
@@ -1159,7 +1165,7 @@ export class Race {
       case 'pick': {
         const id = msg.o;
         if ((msg.st | 0) !== (this.stageIdx | 0) || !Number.isInteger(id) || id < 0 || id >= this.objCool.length) break;
-        const cool = this.ttt ? (this.teams.some((t) => t.id === msg.tm) ? this.coolFor({ team: msg.tm }) : null) : this.objCool;
+        const cool = this.ttt ? (this.teams?.some((t) => t.id === msg.tm) ? this.coolFor({ team: msg.tm }) : this.teamById.has(msg.tm) ? this.coolFor({ id: msg.tm }) : null) : this.objCool;
         if (cool) cool[id] = Math.max(cool[id], this.time + Math.min(20, Math.max(0, +msg.c || 0)));
         break;
       }

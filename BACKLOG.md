@@ -74,6 +74,8 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- ⏱️ Individuele tijdrit: iedereen tegelijk naast elkaar, alle anderen als spoken (geen botsing, kwak of slipstream), eigen boxen en blitzjes per renner, power-ups uit of aan (turbo, scooter, plakbidon zonder jury), geen sprints of truien, eigen PR en PR-spook
+- 💨 Slipstream op afstand (vol tot 1 m achter het wiel), extra verder in de rij, klein voordeel voor de kop; scooter rijdt vóór de kop van je rij; plakbidon zonder jury in de tijdrit
 - ⏱️ WB-56 Ploegentijdrit: andere ploegen als spoken (geen botsing, kwak of slipstream), elke ploeg in een eigen startstrook en met eigen boxen en blitzjes, ploegtijd = laatste renner, power-ups uit of aan met minder soorten (turbo, magneet naar ploeggenoot, scooter, plakbidon), bots rijden als ploeg (wachten op de laatste, in het wiel), plek van je ploeg in beeld, uitslag en records
 - 💪 Bel vervangen door het elleboogje (overnemen!): alleen het gebaar (geen teksten), een bot-ploeggenoot in je wiel neemt de kop over, bots die lang op kop rijden doen het zelf ook; B, ↓/B op de Zwift-knoppen en 💪 op het remote stuur
 - 👥 WB-55 Ploegen: 2×2, 2×3 of 3×2 bij een race, zelf kiezen of eerlijk verdelen, bots vullen aan; trui in de ploegkleur met rugnummers (geel voor de leidende ploeg), groene trui en bolletjestrui met mouwen en rand in de ploegkleur; geen kwak en geen last van power-ups van ploeggenoten, extra slipstream achter een ploeggenoot; live ploegenklassement (verschil met de leidende ploeg), ploegenklassement in de uitslag (alle renners opgeteld, uitvaller = laatste + 30 s) en ploegtijden in het klassement

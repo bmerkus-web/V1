@@ -1109,3 +1109,27 @@ test('Slipstream: vol voordeel tot 1 m achter het wiel, verder in de rij iets me
   assert.ok(b.scooterLine && a.scooterLine, 'de rij erachter heeft er ook wat aan');
   assert.ok(a.draftCut < 0.55, `achterste in de scooterrij: ${a.draftCut}`);
 });
+
+test('Individuele tijdrit: iedereen naast elkaar, anderen zijn spoken, eigen boxen, geen magneet, eigen PR', async () => {
+  const { Race, raceKind } = await import('../js/game.js');
+  const g = new Race({ track: getTrack('polder'), laps: 1, seed: 8, room: null, isHost: true, ns: 'demo', ttt: { items: 'team' },
+    riders: [{ id: 'p0', name: 'Ik', color: '#fff', kind: 'me' }, { id: 'b0', name: 'Bot', color: '#000', kind: 'bot', skill: 0.5 }, { id: 'b1', name: 'Bot2', color: '#111', kind: 'bot', skill: 0.5 }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  assert.ok(g.ttt.solo && !g.teams);
+  assert.equal(raceKind({ ttt: {} }), 'tt'); assert.equal(raceKind({ ttt: {}, teams: [{}] }), 'ttt'); assert.equal(raceKind({}), 'race');
+  const [me, b0] = g.riders;
+  assert.ok(g.riders.every((r) => r.dist === -3) && new Set(g.riders.map((r) => r.x)).size === 3, 'naast elkaar op de streep');
+  g.countdown = 0; g.update(0.04); g.time = 10;
+  me.dist = 300; me.x = 0; b0.dist = 302.4; b0.x = 0;
+  g._stepLocal(me, 200, 0, 0.0001, false);
+  assert.ok(!me.draft, 'geen slipstream achter een ander');
+  const box = g.track.objects.find((o) => o.type === 'box');
+  g._took(box, 5, b0);
+  assert.ok(!(g.coolFor(me)[box.id] > g.time), 'een box van een ander blijft voor jou staan');
+  const got = new Set();
+  for (let i = 0; i < 200; i++) { me.item = null; me.roulette = 0.001; g._stepLocal(me, 200, 0, 0.01, false); if (me.item) got.add(me.item); }
+  assert.ok(!got.has('magnet') && [...got].every((k) => ['turbo', 'scooter', 'bottle'].includes(k)), [...got].join(','));
+  me.item = 'bottle'; me.pens = []; g.useItem();
+  assert.ok(!me.pens.length, 'geen jury bij de plakbidon');
+});
