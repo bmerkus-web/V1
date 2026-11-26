@@ -1228,8 +1228,10 @@ test('Veldrit: kaart sluit, legs kruisen alleen via de brug, ondergrond remt, tr
   const { Race } = await import('../js/game.js');
   const tr = getTrack('modder');
   assert.ok(tr.m7 && tr.n > 150);
+  assert.ok(tr.segs[0].surf === 'asphalt' && tr.segs.slice(-6).every((s) => s.leg === 0), 'start op het rechte stuk');
+  assert.ok(Math.max(...tr.segs.filter((s) => s.open).map((s) => s.y1)) > 3.6, 'brug hoog genoeg om onderdoor te kijken');
   const step = tr.step, S = tr.segs;
-  for (let k = 0; k < tr.n; k++) { const a = S[k], b = S[(k + 1) % tr.n]; assert.ok(Math.abs(Math.hypot(b.wx - a.wx, b.wy - a.wy) - step) < 0.3, `gat bij ${k}`); }
+  for (let k = 0; k < tr.n; k++) { const a = S[k], b = S[(k + 1) % tr.n]; const ch = Math.hypot(b.wx - a.wx, b.wy - a.wy); assert.ok(ch < step + 0.05 && ch > step * 0.85, `gat bij ${k}`); } // in een krappe bocht is de koorde iets korter
   // Geen twee stukken parcours over elkaar, behalve onder de brug door
   for (let i = 0; i < tr.n; i++) for (let j = i + 6; j < tr.n; j++) {
     if (Math.abs(i - j) > tr.n - 6) continue;
