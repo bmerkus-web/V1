@@ -191,7 +191,7 @@ export class Renderer {
     for (const h of race.hazards) put(h.d, { haz: h });
     for (const r of race.riders) {
       const m = r.mask || 0;
-      if (r.fx?.scooter > 0 || m & 1024) put(r.dist + 7, { scooter: { x: r.scooterX ?? r.x, color: r.color } });
+      if (r.fx?.scooter > 0 || m & 1024) { const hd = race.byId(r.scooterFor) || r; put(hd.dist + 7, { scooter: { x: r.scooterX ?? hd.x, color: r.color } }); } // vóór de kop van de rij
       const tow = r.fx?.tow > 0 || m & 512;
       if (tow || r.fx?.wheel > 0 || m & 256) { const side = (tow ? r.towSide : 0) || Math.sign(r.x || 1); put(r.dist + 0.3, { car: { x: side * 1.34, side, rider: r, tow } }); }
     }

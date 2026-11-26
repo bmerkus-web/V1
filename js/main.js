@@ -1399,7 +1399,7 @@ function hud(dt) {
   $('h-hr').classList.toggle('hidden', !me.hr);
   setText($('h-hr-v'), me.hr || '');
   $('h-draft').classList.toggle('hidden', !me.draft && !me.inScooter);
-  setText($('h-draft'), me.inScooter ? '🛵 SLIPSTREAM SCOOTER' : '💨 SLIPSTREAM');
+  setText($('h-draft'), me.inScooter ? '🛵 SLIPSTREAM SCOOTER −50%' : `💨 SLIPSTREAM −${Math.round((1 - (me.draftCut ?? 0.7)) * 20) * 5}%`); // hoe dicht op het wiel
   // Eén regel voor je lijn: berm (kost), short cut (winst) of binnen-/buitenbocht.
   const ln = $('h-line'), gain = me.finished && !r.free ? 0 : me.line || 0;
   const cut = me.onCut && me.cutValid && Math.abs(me.x) > 1;

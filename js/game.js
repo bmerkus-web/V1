@@ -31,6 +31,11 @@ const SPRINT_BONUS = 0.05, SPRINT_SECS = 30; // groene trui: 5% sneller, 30 seco
 const ROCKET_ARM = 1.0; // een vuurpijl hangt eerst even stil: tijd om je schild te pakken
 const STORM_DELAY = 1.5; // tegenwind komt na een korte waarschuwing
 const ELBOW_SECS = 1.6, TAKEOVER_SECS = 8; // elleboogje: zo lang zie je het gebaar; zo lang komt een bot over
+// Slipstream: vol voordeel tot 1 m achter het wiel, daarna minder tot niets op 10 m (renners zijn ~1,6 m lang).
+// 30% minder luchtweerstand (achter een ploeggenoot 40%), 5% extra als je voorganger zelf ook in het wiel zit,
+// en wie iemand vlak achter zich heeft krijgt zelf 2,5%. In de ploegentijdrit: 5% extra in de rij achter de scooter.
+const BIKE = 1.6, DRAFT_FULL = 1, DRAFT_MAX = 10;
+const draftFalloff = (gap) => clamp(1 - (gap - BIKE - DRAFT_FULL) / (DRAFT_MAX - BIKE - DRAFT_FULL), 0, 1);
 const TEAM_DNF = 30; // ploegenklassement: wie uitvalt krijgt de tijd van de laatste renner + 30 s
 // Jury: [kans, tijdstraf in s]. Afgestemd zodat het gemiddeld ongeveer quitte speelt met wat het oplevert:
 // plakbidon ≈ 1,4 s winst, vuile kwak (de berm in) ≈ 0,9 s, gewone kwak ≈ 0,05 s plus een blitzje.
@@ -179,6 +184,18 @@ export class Race {
     if (!this.teams || !a || b == null) return false;
     const tb = typeof b === 'object' ? b.team : this.teamById.get(b);
     return a.team != null && a.team === tb && (typeof b === 'object' ? a !== b : a.id !== b);
+  }
+  // De scooter die vóór r rijdt (van r zelf, of van een ploeggenoot verderop in de rij), of null.
+  scooterFor(r) { return this.riders.find((o) => o.fx.scooter > 0 && (o.scooterFor ?? o.id) === r.id) || null; }
+  // De kop van de rij waar r in zit: steeds de ploeggenoot recht voor je in wiens wiel je rijdt (zonder ploegen: jijzelf).
+  lineHead(r) {
+    let h = r;
+    for (let k = 0; k < 8 && this.teams; k++) {
+      const o = this.riders.filter((q) => q !== h && this.mate(r, q) && !q.finished && q.dist - h.dist > 0.8 && q.dist - h.dist < DRAFT_MAX && Math.abs(q.x - h.x) < 0.28).sort((a, b) => a.dist - b.dist)[0];
+      if (!o) break;
+      h = o;
+    }
+    return h;
   }
   // De eerste tegenstander (geen ploeggenoot) vóór r in de stand.
   rivalAhead(r) {
@@ -338,12 +355,16 @@ export class Race {
     }
 
     // Slipstream en magneet
-    r.draft = false; r.draftTeam = false;
-    let pull = false;
+    let pull = false, best = 0, bestO = null, pushed = false;
     for (const o of this.riders) {
       if (o === r || (this.ttt && !this.mate(r, o))) continue; // ploegentijdrit: andere ploegen zijn spoken
       const gap = o.dist - r.dist;
-      if (gap > 0.8 && gap < 10 && Math.abs(o.x - r.x) < 0.28) { r.draft = true; if (this.mate(r, o)) r.draftTeam = true; } // achter een ploeggenoot: extra slipstream
+      if (gap > 0.8 && gap < DRAFT_MAX && Math.abs(o.x - r.x) < 0.28) { // slipstream: hoe dichter op het wiel, hoe meer
+        const R = (this.mate(r, o) ? 0.4 : 0.3) + (o.draft ? 0.05 : 0) + (this.ttt && this.mate(r, o) && (o.inScooter || o.scooterLine) ? 0.05 : 0);
+        const v = R * draftFalloff(gap);
+        if (v > best) { best = v; bestO = o; }
+      }
+      if (gap < -0.8 && gap > -(BIKE + 1.5) && Math.abs(o.x - r.x) < 0.28) pushed = true; // iemand vlak achter je duwt een beetje mee
       if (e.magnet > 0 && gap > 3 && gap < 160) pull = true;
       // Kwak: rijd vlak naast iemand en stuur naar hem toe.
       const side = o.x - r.x;
@@ -356,9 +377,13 @@ export class Race {
         if (!this.free && r.bumpCd <= 0 && r.v > o.v + 0.4 && !r.finished && !o.finished && this.time > 3) this._bump(r, o);
       }
     }
-    // Scooter: alleen voordeel recht achter hem. Plakbidon: alleen zolang je tegen de rand blijft.
-    r.inScooter = e.scooter > 0 && Math.abs(r.x - r.scooterX) < 0.18;
-    if (r.inScooter) r.draft = false;
+    r.draftCut = (1 - best) * (pushed ? 0.975 : 1);
+    r.draft = best > 0.06; r.draftTeam = r.draft && this.mate(r, bestO);
+    r.scooterLine = !!this.ttt && r.draftTeam && (bestO.inScooter || bestO.scooterLine);
+    // Scooter: rijdt vóór de kop van je rij; alleen voordeel recht achter hem. Plakbidon: alleen zolang je tegen de rand blijft.
+    const sc = this.scooterFor(r);
+    r.inScooter = !!sc && Math.abs(r.x - sc.scooterX) < 0.18;
+    if (r.inScooter) { r.draft = false; r.draftCut = 1; r.scooterLine = false; }
     r.towing = false;
     if (e.tow > 0) {
       if (r.towSide * r.x > 0.55) { r.towing = true; r.towLost = 0; }
@@ -680,7 +705,7 @@ export class Race {
       }
       case 'storm': this._storm(r); break;
       case 'scooter':
-        r.fx.scooter = 8; r.scooterX = clamp(r.x, -0.8, 0.8); msg.sx = r.scooterX;
+        { const head = this.lineHead(r); r.scooterFor = head.id; r.fx.scooter = 8; r.scooterX = clamp(head.x, -0.8, 0.8); msg.sx = r.scooterX; msg.sf = head.id; } // vóór de kop van je rij
         if (isMe) this.emit('sfx', 'scooter');
         break;
       case 'bottle':
@@ -1037,7 +1062,7 @@ export class Race {
         }
       }
     }
-    if (r.fx.scooter > 0) ai.tx = r.scooterX; // in de slipstream van de scooter blijven
+    { const sc = this.scooterFor(r); if (sc) ai.tx = sc.scooterX; } // in de slipstream van de scooter blijven
     if (r.fx.tow > 0) ai.tx = r.towSide * 0.8; // bidon vasthouden
     const steer = clamp((ai.tx - r.x) * (ai.takeCut ? 7 : 4), -0.8, 0.8);
     this._stepLocal(r, p, steer, dt, true);
@@ -1123,7 +1148,7 @@ export class Race {
           const okType = h.type == null || h.type === 'glue' || h.type === 'wall' || h.type === 'tacks';
           if (okType && typeof h.d === 'number' && typeof h.x === 'number' && (h.st | 0) === (this.stageIdx | 0))
             this.hazards.push({ ...h, life: Math.min(45, +h.life || 45), age: 0, hitBy: [] });
-        } else if (msg.item === 'scooter') { r.fx.scooter = 8; r.scooterX = clamp(+msg.sx || 0, -0.8, 0.8); }
+        } else if (msg.item === 'scooter') { r.fx.scooter = 8; r.scooterX = clamp(+msg.sx || 0, -0.8, 0.8); r.scooterFor = this.byId(msg.sf) ? msg.sf : r.id; }
         else if (msg.item === 'bottle') { r.fx.tow = 4; r.towSide = msg.side > 0 ? 1 : -1; }
         else if (msg.item === 'rocket' && msg.to) {
           this.rockets.push({ from: r.id, to: msg.to, d: r.dist + 1, x: r.x, age: 0 });

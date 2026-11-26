@@ -1072,3 +1072,40 @@ test('Ploegentijdrit: andere ploegen zijn spoken, eigen boxen per ploeg, alleen 
   const n = mk('off');
   assert.ok(n.noItems);
 });
+
+test('Slipstream: vol voordeel tot 1 m achter het wiel, verder in de rij iets meer, de kop krijgt een beetje; scooter vóór de kop', async () => {
+  const { Race } = await import('../js/game.js');
+  const teams = [{ id: 't0', name: 'Neon', color: '#ff3fa4' }, { id: 't1', name: 'Bliksem', color: '#22d3ff' }];
+  const g = new Race({ track: getTrack('polder'), laps: 1, seed: 7, room: null, isHost: true, ns: 'demo', teams, ttt: { items: 'team' },
+    riders: [{ id: 'a', name: 'A', color: '#fff', kind: 'me', team: 't0' }, { id: 'b', name: 'B', color: '#aaa', kind: 'remote', team: 't0' },
+      { id: 'c', name: 'C', color: '#888', kind: 'remote', team: 't0' }, { id: 'x', name: 'X', color: '#000', kind: 'remote', team: 't1' }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  g.countdown = 0; g.update(0.04); g.time = 10;
+  const [a, b, c, x] = g.riders; x.dist = 5000;
+  const step = (r) => g._stepLocal(r, 200, 0, 0.0001, false);
+  // a achter b: dicht op het wiel = vol, verder weg = minder
+  c.dist = 9000; b.dist = 302.5; b.x = 0; a.dist = 300; a.x = 0; step(a);
+  assert.ok(Math.abs(a.draftCut - 0.6) < 0.01, `vol (ploeggenoot 40%): ${a.draftCut}`);
+  a.dist = 300 - 3.5; step(a);
+  const mid = a.draftCut;
+  assert.ok(mid > 0.6 && mid < 0.9, `half: ${mid}`);
+  a.dist = 300 - 9; step(a);
+  assert.ok(a.draftCut > mid, 'nog verder: nog minder');
+  // a achter b die zelf in het wiel van c zit: 5% extra
+  c.dist = 305; c.x = 0; b.draft = true; a.dist = 300; step(a);
+  assert.ok(Math.abs(a.draftCut - 0.55) < 0.01, `derde in de rij: ${a.draftCut}`);
+  // de kop (c) met b vlak achter zich: 2,5% minder
+  b.dist = 302.4; step(c);
+  assert.ok(Math.abs(c.draftCut - 0.975) < 0.001, `kop: ${c.draftCut}`);
+  // scooter: de achterste (a) zet hem in, hij rijdt vóór de kop (c)
+  a.dist = 300; b.dist = 302.5; c.dist = 305; [a, b, c].forEach((r) => { r.x = 0; });
+  g.rank();
+  a.item = 'scooter'; g.useItem(a);
+  assert.equal(a.scooterFor, 'c');
+  step(c);
+  assert.ok(c.inScooter, 'de kop rijdt achter de scooter');
+  step(b); step(a);
+  assert.ok(b.scooterLine && a.scooterLine, 'de rij erachter heeft er ook wat aan');
+  assert.ok(a.draftCut < 0.55, `achterste in de scooterrij: ${a.draftCut}`);
+});
