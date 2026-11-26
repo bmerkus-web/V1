@@ -323,7 +323,7 @@ export class Race {
     r.x += steer * 1.15 * dt * authority;
     if (!auto) {
       // Zonder stuurhulp duwt de bocht je naar buiten; mét stuurhulp blijf je vanzelf op de weg.
-      if (!this.profile.assist) r.x -= seg.curve * r.v * r.v * 0.0055 * dt;
+      if (!this.profile.assist) r.x -= seg.curve * r.v * r.v * 0.0055 * (this.track.m7 ? 0.15 : 1) * dt; // veldrit: de bochtwaarden zijn veel groter
       else if (Math.abs(r.x) > this.track.wAt(r.dist) - 0.02 && Math.abs(steer) < 0.15 && !r.onCut) r.x -= Math.sign(r.x) * 0.5 * dt;
     }
     // Bij een short cut is er meer berm (ook aan de buitenkant van het pad).
@@ -474,10 +474,10 @@ export class Race {
         if (this.coolFor(r)[o.id] > this.time) continue;
         const passed = m1 >= m0 ? o.d > m0 && o.d <= m1 : o.d > m0 || o.d <= m1;
         if (!passed) continue;
-        if (o.type === 'box' && Math.abs(o.x - r.x) < 0.2 && !this.noItems) {
+        if (o.type === 'box' && Math.abs(o.x - r.x) < (tr.m7 ? 0.09 : 0.2) && !this.noItems) { // veldrit: kleinere boxen, dicht op elkaar
           this._took(o, 5, r);
           if (!r.item && r.roulette <= 0) { r.roulette = 1.3; if (isMe) this.emit('sfx', 'box'); }
-        } else if (o.type === 'bolt' && Math.abs(o.x - r.x) < 0.14) {
+        } else if (o.type === 'bolt' && Math.abs(o.x - r.x) < (tr.m7 ? 0.09 : 0.14)) {
           this._took(o, 15, r);
           if (isMe && r.bolts === 9) this.emit('banner', { text: '⚡ FULL BLITZ! ⚡', sub: '20% minder luchtweerstand', color: '#ffd166' });
           r.bolts = Math.min(10, r.bolts + 1);

@@ -69,10 +69,11 @@ export const M7 = {
     const rp = tr.world(me.dist, me.x), ahead = tr.world(me.dist + 4, me.x);
     const lv = (me.steer || 0) * 1.15 * clamp(me.v / 4, 0.25, 1) * ROAD_W; // zijwaartse snelheid door jouw sturen (niet het wiebelen op zand)
     this.lv7 = (this.lv7 || 0) + (lv - (this.lv7 || 0)) * Math.min(1, dt * 6);
-    const ty = rp.h + wrap(ahead.h - rp.h) * 0.5 + Math.atan2(this.lv7, Math.max(2.5, me.v));
-    this.yaw7 = this.yaw7 == null ? ty : this.yaw7 + wrap(ty - this.yaw7) * Math.min(1, dt * 6);
+    const ty = rp.h + wrap(ahead.h - rp.h) * 0.35 + Math.atan2(this.lv7, Math.max(2.5, me.v));
+    this.yaw7 = this.yaw7 == null ? ty : this.yaw7 + wrap(ty - this.yaw7) * Math.min(1, dt * 10); // snel volgen: anders lijkt het of je door de bocht glijdt
     const yaw = this.yaw7, fx = Math.sin(yaw), fy = Math.cos(yaw);
-    this.camZ7 = this.camZ7 == null ? rp.z : this.camZ7 + (rp.z - this.camZ7) * Math.min(1, dt * 6);
+    const zt = Math.max(rp.z, tr.yAt(me.dist - back)); // afdalen van de brug: de camera hangt nog boven het dek, niet erdoorheen
+    this.camZ7 = this.camZ7 == null ? zt : this.camZ7 + (zt - this.camZ7) * Math.min(1, dt * 6);
     const g = tr.segAt(me.dist + 4).grade;
     this.pitch7 = (this.pitch7 || 0) + (clamp(g / 100, -0.3, 0.3) * 0.45 * f - (this.pitch7 || 0)) * Math.min(1, dt * 3); // klimmen: je kijkt omhoog
     const hz = (this.hz = hz0 + this.pitch7);
@@ -107,6 +108,12 @@ export const M7 = {
     c.imageSmoothingEnabled = true; c.drawImage(this.f7, 0, y0, W, H - y0 + 1);
     // diepte per segment (voor de volgorde van tekenen)
     for (const s of tr.segs) { const z = (s.wx - cam.x) * fx + (s.wy - cam.y) * fy; s.scr.z1 = s.scr.z2 = z; s.scr.clip = H; s.scr.frame = frame; s.scr.n = 0; }
+  },
+
+  // Hoe schuin een renner in de bocht hangt (eenheden zoals sturen: 1 = 0,2 rad): eigen sturen plus de bocht zelf.
+  _lean7(r) {
+    const tr = this.tr7, s = tr.segAt(r.dist), q = tr.segs[(s.i + 1) % tr.n], kap = wrap(q.hd - s.hd) / tr.step;
+    return clamp((r.steer || 0) + (Math.atan(((r.v || 0) ** 2 * kap) / 9.81) / 0.2) * 0.6, -1.8, 1.8);
   },
 
   // Wereldpunt → scherm
