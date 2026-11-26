@@ -24,6 +24,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
+| WB-58 | Bochten met decor: kruispunt met 90-gradenbocht (zijweg, afgesloten weg rechtdoor met dranghekken), rotonde (eiland, zijwegen met hekken), haarspeld met parallelle weg en tegenliggers; horizon die meedraait met de bocht, decor aan de buitenkant snel en binnenkant langzaam; snelheid omlaag in scherpe bochten. Eerst proefanimatie van het kruispunt. | zelf | M |
 | WB-57 | Veldritbaan: korte rondes op tijd met bel voor de laatste ronde, lint als baanrand, gras/modder (met snel spoor)/zand, balken springen op het goede moment, trap met afstappen en lopen, vliegbrug, materiaalpost met modder op je fiets, Zandkoning-trui; later Modderspat en een kermis-hardstyle Clubsound. In stappen bouwen. | zelf | L |
 | WB-10 | Lichte weergave voor oude tablets: minder decor en minder ver vooruit tekenen. | zelf (zorg over oude tablet) | S |
 | WB-11 | Bluetooth-presentatieklikker als power-up-knop (PageUp/PageDown en pijltjes koppelen). | idee | S |
@@ -74,6 +75,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- 🚧 Obstakels op de weg: verkeerseiland, paaltjes, wegwerkzaamheden (chicane) en drempels op alle drie de banen; erop rijden = berm, drempel = tik op de trainer, bots sturen eromheen; de zon schuift mee in bochten
 - ⏱️ Individuele tijdrit: iedereen tegelijk naast elkaar, alle anderen als spoken (geen botsing, kwak of slipstream), eigen boxen en blitzjes per renner, power-ups uit of aan (turbo, scooter, plakbidon zonder jury), geen sprints of truien, eigen PR en PR-spook
 - 💨 Slipstream op afstand (vol tot 1 m achter het wiel), extra verder in de rij, klein voordeel voor de kop; scooter rijdt vóór de kop van je rij; plakbidon zonder jury in de tijdrit
 - ⏱️ WB-56 Ploegentijdrit: andere ploegen als spoken (geen botsing, kwak of slipstream), elke ploeg in een eigen startstrook en met eigen boxen en blitzjes, ploegtijd = laatste renner, power-ups uit of aan met minder soorten (turbo, magneet naar ploeggenoot, scooter, plakbidon), bots rijden als ploeg (wachten op de laatste, in het wiel), plek van je ploeg in beeld, uitslag en records

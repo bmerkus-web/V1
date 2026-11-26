@@ -76,6 +76,30 @@ const P = {
     c.fillStyle = '#ff3fa4'; c.beginPath(); c.moveTo(w * 0.38, h * 0.7); c.lineTo(w * 0.2, h); c.lineTo(w * 0.42, h * 0.88); c.moveTo(w * 0.72, h * 0.7); c.lineTo(w * 0.9, h); c.lineTo(w * 0.68, h * 0.88); c.fill();
     c.fillStyle = '#39d0c8'; c.beginPath(); c.arc(w * 0.55, h * 0.3, w * 0.09, 0, 7); c.fill();
   } },
+  // Obstakels op de weg (verkeerseiland, paaltjes, wegwerkzaamheden)
+  bollard: { w: 0.9, h: 1.5, draw(c, w, h) {
+    c.fillStyle = '#f5f5ff'; c.fillRect(w * 0.32, h * 0.22, w * 0.36, h * 0.78);
+    c.fillStyle = '#ff7b1c'; for (let y = h * 0.28; y < h; y += h * 0.22) c.fillRect(w * 0.32, y, w * 0.36, h * 0.1);
+    c.fillStyle = '#1f6fff'; c.beginPath(); c.arc(w / 2, h * 0.14, w * 0.36, 0, 7); c.fill();
+    c.strokeStyle = '#fff'; c.lineWidth = Math.max(2, w * 0.08); c.beginPath(); c.moveTo(w * 0.36, h * 0.07); c.lineTo(w * 0.6, h * 0.2); c.lineTo(w * 0.4, h * 0.2); c.stroke();
+  } },
+  barrier: { w: 2.6, h: 1.2, draw(c, w, h) {
+    c.fillStyle = '#2a2a3a'; c.fillRect(w * 0.08, h * 0.5, w * 0.06, h * 0.5); c.fillRect(w * 0.86, h * 0.5, w * 0.06, h * 0.5);
+    c.fillStyle = '#f5f5ff'; c.fillRect(0, h * 0.12, w, h * 0.42);
+    c.fillStyle = '#ff2e4a'; for (let x = -w; x < w; x += w * 0.25) { c.beginPath(); c.moveTo(x, h * 0.54); c.lineTo(x + w * 0.12, h * 0.12); c.lineTo(x + w * 0.24, h * 0.12); c.lineTo(x + w * 0.12, h * 0.54); c.fill(); }
+    c.fillStyle = '#ffd166'; c.beginPath(); c.arc(w * 0.5, h * 0.06, w * 0.05, 0, 7); c.fill();
+  } },
+  cone: { w: 0.7, h: 0.9, draw(c, w, h) {
+    c.fillStyle = '#ff7b1c'; c.beginPath(); c.moveTo(w * 0.5, 0); c.lineTo(w * 0.85, h * 0.9); c.lineTo(w * 0.15, h * 0.9); c.fill();
+    c.fillStyle = '#f5f5ff'; c.fillRect(w * 0.3, h * 0.45, w * 0.4, h * 0.14);
+    c.fillStyle = '#222'; c.fillRect(0, h * 0.88, w, h * 0.12);
+  } },
+  worksign: { w: 1.6, h: 2.2, draw(c, w, h) {
+    c.fillStyle = '#555'; c.fillRect(w * 0.47, h * 0.5, w * 0.06, h * 0.5);
+    c.fillStyle = '#ff2e4a'; c.beginPath(); c.moveTo(w * 0.5, h * 0.02); c.lineTo(w * 0.98, h * 0.55); c.lineTo(w * 0.02, h * 0.55); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.moveTo(w * 0.5, h * 0.12); c.lineTo(w * 0.84, h * 0.5); c.lineTo(w * 0.16, h * 0.5); c.fill();
+    c.fillStyle = '#111'; c.fillRect(w * 0.4, h * 0.3, w * 0.2, h * 0.14); c.fillRect(w * 0.3, h * 0.44, w * 0.4, h * 0.04);
+  } },
 };
 
 export const SCENERY = {};
