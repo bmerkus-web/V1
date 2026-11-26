@@ -1065,6 +1065,9 @@ test('Ploegentijdrit: andere ploegen zijn spoken, eigen boxen per ploeg, alleen 
   const st = g.teamStandings();
   assert.deepEqual(st.map((t) => [t.id, t.total]), [['t1', 125], ['t0', 140]]);
   assert.ok(st.every((t) => t.done), 'iedereen binnen: geen voorlopige uitslag');
+  // plakbidon in de tijdrit: geen jurystraf
+  me.finished = false; me.pens = []; me.penalty = 0; me.item = 'bottle'; g.useItem();
+  assert.ok(me.fx.tow > 0 && !me.pens.length && !(me.penalty > 0), 'geen jury in de ploegentijdrit');
   // zonder power-ups: geen boxen te pakken
   const n = mk('off');
   assert.ok(n.noItems);

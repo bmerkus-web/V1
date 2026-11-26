@@ -686,7 +686,7 @@ export class Race {
       case 'bottle':
         r.towSide = r.x >= 0 ? 1 : -1; r.fx.tow = 4; r.towLost = 0; msg.side = r.towSide;
         if (isMe) { this.emit('sfx', 'boost'); this.emit('banner', { text: '🚗 PLAKBIDON!', sub: `blijf ${r.towSide > 0 ? 'rechts' : 'links'} tegen de rand`, color: '#7df9ff' }); }
-        this._jury(r, 'bottle');
+        if (!this.ttt) this._jury(r, 'bottle'); // tijdrit: geen tegenstander op de baan, dus geen jury
         break;
       case 'wall': {
         const target = r.rank > 1 ? this.rivalAhead(r) : null;
