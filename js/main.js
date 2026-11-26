@@ -398,7 +398,7 @@ function renderSetup() {
     b.disabled = !canEdit;
     const pr = getTime(ns(), `${d.id}|${sel.ttt ? (teamShape() ? 'ttt' : 'tt') : 'race'}|${sel.laps}`);
     b.innerHTML = `<b>${d.name}</b><canvas width="300" height="54"></canvas><span>${(tr.length / 1000).toFixed(1)} km · ${Math.round(tr.climbTotal)} hm per ronde</span><span class="small">${d.desc}</span><span class="pr">${pr ? '🏆 PR ' + fmtTime(pr) : 'Nog geen PR'}</span>`;
-    b.onclick = () => { sel.track = d.id; audio.prepare(d.id); pushSettings(); };
+    b.onclick = () => { sel.track = d.id; audio.prepare(d.music || d.id); pushSettings(); };
     $('tracks').appendChild(b);
     drawProfile(b.querySelector('canvas'), tr);
   }
@@ -1058,7 +1058,7 @@ function launch(cfg, carry) {
     profile: { ...P, fair: cfg.fair, assist: !!P.assist && ((cfg.workout && cfg.wkMode === 'ride') || (!!cfg.plan && !room)) /* stuurhulp alleen bij Ride en solo training */ }, difficulty: cfg.diff, rubber: !!cfg.rubber, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
   });
   race.multi = !!room;
-  audio.setScene(wk?.zen ? 'zen' : track.id); // elke baan zijn eigen muziek
+  audio.setScene(wk?.zen ? 'zen' : track.music || track.id); // elke baan zijn eigen muziek
   // Training: de muziek van de volgende baan alvast klaarzetten, zodat hij na de teleport meteen wisselt.
   const nxt = training?.stages.slice(training.idx + 1).find((s) => s.track !== st.track);
   if (nxt) { const r = race; setTimeout(() => { if (race === r) audio.prepare(nxt.track); }, 10000); }

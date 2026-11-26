@@ -100,6 +100,29 @@ const P = {
     c.fillStyle = '#fff'; c.beginPath(); c.moveTo(w * 0.5, h * 0.12); c.lineTo(w * 0.84, h * 0.5); c.lineTo(w * 0.16, h * 0.5); c.fill();
     c.fillStyle = '#111'; c.fillRect(w * 0.4, h * 0.3, w * 0.2, h * 0.14); c.fillRect(w * 0.3, h * 0.44, w * 0.4, h * 0.04);
   } },
+  // Veldrit
+  crowd: { w: 6, h: 2.6, draw(c, w, h) { // publiek achter het lint, met vlaggetjes
+    const cols = ['#ff3fa4', '#7df9ff', '#ffd166', '#39ffb0', '#f5f5ff', '#ff8a1c'];
+    for (let i = 0; i < 6; i++) {
+      const x = (i + 0.5) * w / 6 + (((i * 37) % 7) - 3) * w * 0.01, y = h * (0.45 + (i % 3) * 0.06);
+      c.fillStyle = cols[i % cols.length]; c.fillRect(x - w * 0.03, y, w * 0.06, h - y);
+      c.fillStyle = '#e8b58f'; c.beginPath(); c.arc(x, y - h * 0.06, w * 0.022, 0, 7); c.fill();
+      if (i % 3 === 1) { c.fillStyle = '#ffd400'; c.fillRect(x, y - h * 0.42, w * 0.07, h * 0.18); c.fillStyle = '#111'; c.fillRect(x + w * 0.02, y - h * 0.38, w * 0.025, h * 0.1); c.fillStyle = '#ddd'; c.fillRect(x - 1, y - h * 0.42, 2, h * 0.36); }
+      if (i % 4 === 2) { c.fillStyle = '#e8b58f'; c.fillRect(x - w * 0.04, y - h * 0.18, w * 0.015, h * 0.16); }
+    }
+  } },
+  frites: { w: 6, h: 4.2, draw(c, w, h) { // frietkot
+    c.fillStyle = '#f5f5ff'; c.fillRect(w * 0.08, h * 0.4, w * 0.84, h * 0.6);
+    for (let i = 0; i < 6; i++) { c.fillStyle = i % 2 ? '#ff3b3b' : '#f5f5ff'; c.beginPath(); c.moveTo(w * (0.04 + i * 0.153), h * 0.4); c.lineTo(w * (0.115 + i * 0.153), h * 0.2); c.lineTo(w * (0.19 + i * 0.153), h * 0.4); c.fill(); }
+    c.fillStyle = '#ff3b3b'; c.fillRect(0, h * 0.18, w, h * 0.06);
+    c.fillStyle = '#ffd166'; c.fillRect(w * 0.18, h * 0.5, w * 0.64, h * 0.2);
+    c.fillStyle = '#7a2a10'; c.font = `bold ${h * 0.15}px sans-serif`; c.textAlign = 'center'; c.fillText('FRIETEN', w / 2, h * 0.65);
+  } },
+  oak: { w: 6, h: 8, draw(c, w, h) {
+    c.fillStyle = '#2a1a14'; c.fillRect(w * 0.44, h * 0.55, w * 0.12, h * 0.45);
+    c.fillStyle = '#123a24'; c.beginPath(); c.ellipse(w / 2, h * 0.4, w * 0.46, h * 0.36, 0, 0, 7); c.fill();
+    c.fillStyle = '#1d5534'; c.beginPath(); c.ellipse(w * 0.4, h * 0.32, w * 0.24, h * 0.2, 0, 0, 7); c.fill();
+  } },
 };
 
 export const SCENERY = {};

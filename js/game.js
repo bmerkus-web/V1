@@ -1,4 +1,5 @@
 // Race-logica: renners, items, bots, zones/PR's, spook en netwerk-synchronisatie.
+import { SURF, STAIRS_V, PLANK_V } from './cx.js';
 import { SEG, ROAD_W, GUTTER } from './track.js';
 import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
@@ -302,7 +303,7 @@ export class Race {
     this._ghosts();
 
     const seg = this.track.segAt(me.dist);
-    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) + (me.bermKick > 0 ? BERM_KICK * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) : 0) + (me.bumpKick > 0 ? 6 : 0) /* drempel */ + (me.onCobble ? 3 + (Math.floor(this.clock * 2) % 2 ? 2 : -2) : 0) /* hobbelen op de kasseien */ + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
+    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) + (me.bermKick > 0 ? BERM_KICK * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) : 0) + (me.bumpKick > 0 ? 6 : 0) /* drempel */ + (me.surf ? SURF[me.surf].feel : 0) /* veldrit: zand, modder */ + (me.onCobble ? 3 + (Math.floor(this.clock * 2) % 2 ? 2 : -2) : 0) /* hobbelen op de kasseien */ + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
     this._net(dt);
   }
 
@@ -341,6 +342,11 @@ export class Race {
     r.berm = (Math.abs(r.x) > w && !r.onCut) || !!r.onObs;
     r.onCobble = seg.cobble && !r.berm && Math.abs(r.x) < w - GUTTER;
     r.inGutter = seg.cobble && !r.berm && !r.onCobble;
+    // Veldrit: ondergrond (zand, modder, gras…) remt en laat het stuur wiebelen; door een plas spat het.
+    const sf = this.track.m7 ? (r.berm ? 'grass' : seg.surf) : null, pud = sf && seg.puddle && Math.abs(r.x - seg.puddle.x) < seg.puddle.w;
+    if (pud && !r.inPuddle && r === this.me) this.emit('shake', 3);
+    r.inPuddle = !!pud; r.surf = sf; r.surfK = sf ? SURF[sf].k * (pud ? 1.4 : 1) : 1;
+    if (sf) { const wob = SURF[sf].wob + (pud ? 0.25 : 0); if (wob) r.x += (Math.sin(this.clock * 7.3 + r.dist * 0.9) * 0.6 + Math.sin(this.clock * 13.1 + r.dist)) * wob * dt; }
     if (r.onCobble) r.x += (Math.sin(this.clock * 9.1 + r.dist * 0.7) * 0.18 + Math.sin(this.clock * 15.7 + r.dist) * 0.1) * dt; // stuur wiebelt op de stenen
     if ((r.onCobble || r.inGutter) && !this.free && !r.finished && this.rng() < (r.onCobble ? COBBLE_FLAT : GUTTER_FLAT) * dt) this._flat(r, 'kasseien');
     // Lek uit de berm: de kans groeit met elke keer in de berm én met de tijd erin.
@@ -414,6 +420,7 @@ export class Race {
     }
     const prev = r.dist;
     r.v = stepSpeed(r, power, seg.grade, dt, pull);
+    if (seg.stairs) r.v = Math.min(r.v, STAIRS_V); // trap: lopen met de fiets op de schouder
     // Voortgang t.o.v. je snelheid: lijn in de bocht, short cut, berm en groene trui.
     const viaCut = r.onCut && r.cutValid;
     r.line = 1 / (1 - (viaCut ? r.x : clamp(r.x, -w, w)) * seg.curve * LINE_K) - 1;
@@ -429,10 +436,10 @@ export class Race {
     if (r.dist > prev && !r.finished && !this.free && !this.ttt) { this._sprintLine(r, prev); this._timedZones(r, prev); } // tijdrit: geen tussensprints of truien
 
     if (r.dist >= 0 && !this.free) this._pickups(r, prev);
-    if (r === this.me && r.dist > prev) for (const o of this.track.obstacles) { // drempel: een tik op de trainer
-      if (o.type !== 'bump') continue;
+    if (r.dist > prev) for (const o of this.track.obstacles) { // drempel of balk: een tik op de trainer (balk: ook even afremmen)
+      if (o.type !== 'bump' && o.type !== 'plank') continue;
       const line = Math.floor((r.dist - o.at) / this.L) * this.L + o.at;
-      if (prev < line && r.dist >= line) { r.bumpKick = 0.45; this.emit('shake', 4); }
+      if (prev < line && r.dist >= line) { if (o.type === 'plank') r.v = Math.min(r.v, PLANK_V); if (r === this.me) { r.bumpKick = 0.45; this.emit('shake', 4); } }
     }
     if (r.roulette > 0) {
       r.roulette -= dt;
@@ -1076,7 +1083,7 @@ export class Race {
       if (this.track.segAt(r.dist + 12).cobble) tx = ai.skill > 0.35 ? (Math.sign(r.x) || (ai.ph > 5 ? 1 : -1)) * (wAhead - GUTTER / 2) : clamp(tx, -(wAhead - 0.2), wAhead - 0.2); // goede bots zoeken het gootje
       for (let k = 0; k < 14; k++) { // obstakels op de weg: eerst het dichtstbijzijnde, kies de kant die het dichtst bij is
         const o = this.track.segs[(s0 + k) % this.track.n].obs;
-        if (!o || o.type === 'bump') continue;
+        if (!o || !o.block) continue;
         const lo = o.x - o.w - 0.22, hi = o.x + o.w + 0.22, lim = Math.min(0.85, wAhead - 0.05);
         if ((tx > lo && tx < hi) || (r.x < o.x) !== (tx < o.x)) tx = (Math.abs(lo - r.x) <= Math.abs(hi - r.x) && lo > -lim) || hi > lim ? lo : hi; // in de weg, of je zou erdoorheen sturen
         break;

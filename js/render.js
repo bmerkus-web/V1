@@ -1,6 +1,7 @@
 // Pseudo-3D wegweergave op canvas (licht genoeg voor een oude Mac of tablet).
 import { SEG, ROAD_W, KERB, GUTTER } from './track.js';
 import { mod, clamp, mulberry } from './util.js';
+import { M7 } from './floor7.js';
 import { SCENERY, drawRider, drawBox, drawBolt, drawGlue, drawRocket, drawWall, drawTacks, drawScooter, drawCar, drawBottleArm } from './sprites.js';
 
 const ZS = 1.6, YS = 2.3, CURVE_VIS = 1.8; // visuele rek: diepte, hoogte, bochten
@@ -84,6 +85,7 @@ export class Renderer {
 
   // Projecteert een punt op segment `seg`, fractie t langs het segment, lateraal in wegbreedtes.
   _pt(seg, t, lat, lift = 0) {
+    if (this.cam7) return this._pt7(seg, t, lat, lift); // veldrit: draaiende vloer
     const s = seg.scr;
     const z = Math.max(NEAR, s.z1 + (s.z2 - s.z1) * t);
     const k = (DEPTH / z) * (this.W / 2);
@@ -110,6 +112,10 @@ export class Renderer {
     c.save();
     if (this.shake > 0.3) { c.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake); this.shake *= Math.pow(0.02, dt); }
 
+    const frame = (this.frame = (this.frame || 0) + 1);
+    if (tr.m7) this._floor7(race, dt, frame); // veldrit: draaiende vloer (floor7.js)
+    else {
+    this.cam7 = null;
     // --- achtergrond ---
     this.bgOff += tr.segAt(me.dist).curve * me.v * dt * 3;
     c.drawImage(this.bg.sky, 0, 0);
@@ -128,7 +134,6 @@ export class Renderer {
     // richting 0). Zo verspringt het beeld niet wanneer de camera een segmentgrens passeert.
     const c0 = tr.segs[base].curve * CURVE_VIS;
     let x = 0.5 * c0 * basePct * basePct, h = -c0 * basePct, maxy = H;
-    const frame = (this.frame = (this.frame || 0) + 1);
     c.fillStyle = th.grass[0]; c.fillRect(0, hz, W, H - hz);
     for (let n = 0; n < DRAW; n++) {
       const seg = tr.segs[(base + n) % tr.n], s = seg.scr;
@@ -192,11 +197,12 @@ export class Renderer {
     fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(0.3, th.fog + '77'); fg.addColorStop(1, th.fog + '00');
     c.fillStyle = fg; c.fillRect(0, hz - H * 0.03, W, H * 0.13);
 
+    }
     // --- dynamische objecten per segment verzamelen ---
     const dyn = new Map();
     const put = (d, o) => {
       const rel = mod(d - camD, L);
-      if (rel > (DRAW - 2) * SEG) return;
+      if (!tr.m7 && rel > (DRAW - 2) * SEG) return;
       const idx = Math.floor(mod(d, L) / SEG) % tr.n;
       o.t = mod(d, SEG) / SEG;
       (dyn.get(idx) || dyn.set(idx, []).get(idx)).push(o);
@@ -216,11 +222,12 @@ export class Renderer {
     for (const p of race.rockets) put(p.d, { rocket: p });
 
     // --- sprites van ver naar dichtbij ---
-    for (let n = DRAW - 1; n >= 0; n--) {
-      const seg = tr.segs[(base + n) % tr.n], s = seg.scr;
-      if (s.z1 < NEAR * 0.5 && !dyn.has(seg.i)) continue;
+    const drawSeg = (seg) => {
+      const s = seg.scr;
+      if (s.z1 < NEAR * 0.5 && !dyn.has(seg.i)) return;
       const clipped = s.clip < H;
       if (clipped) { c.save(); c.beginPath(); c.rect(0, 0, W, s.clip); c.clip(); }
+      if (tr.m7) this._seg7(seg, t);
       const ar = seg.i === 0 && race.portal ? race.portal : seg.arch;
       if (ar && s.z1 > NEAR) this._arch(seg, ar, t);
       if (s.z1 > NEAR) {
@@ -269,7 +276,8 @@ export class Renderer {
         }
       }
       if (clipped) c.restore();
-    }
+    };
+    if (tr.m7) this._sprites7(race, drawSeg); else for (let n = DRAW - 1; n >= 0; n--) drawSeg(tr.segs[(base + n) % tr.n]);
 
     this._overlay(race, dt);
     c.restore();
@@ -404,3 +412,5 @@ export class Renderer {
     for (let i = 0; i < 160; i++) this.confetti.push({ x: Math.random(), y: -Math.random() * 0.5, vx: (Math.random() - 0.5) * 0.2, vy: 0.1 + Math.random() * 0.3, r: Math.random() * 6, vr: (Math.random() - 0.5) * 10, col: cols[i % 5] });
   }
 }
+
+Object.assign(Renderer.prototype, M7);
