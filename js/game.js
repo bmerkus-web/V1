@@ -314,6 +314,7 @@ export class Race {
     if (r.kwakCd > 0) r.kwakCd -= dt;
     if (r.kwakSafe > 0) r.kwakSafe -= dt;
     if (r.bumpCd > 0) r.bumpCd -= dt;
+    if (r.cutCd > 0) r.cutCd -= dt;
     const seg = this.track.segAt(r.dist);
     if (e.spin > 0) steer += Math.sin(this.clock * 22) * 0.9;
     r.steer = lerp(r.steer, steer, Math.min(1, dt * 10));
@@ -385,6 +386,11 @@ export class Race {
         if (canBump && r.v > o.v + 0.4) this._bump(r, o);
       } else if (canBump && r.kind === 'me' && gap > 0.6 && gap < BIKE && Math.abs(side) < 0.26 && steer * Math.sign(side) > 0.4 && !(o.kwakSafe > 0) && (this.mate(r, o) || r.kwakCd > 0)) {
         this._bump(r, o); // voorwiel tegen achterwiel (een tegenstander kwak je eerst)
+      } else if (r.kind === 'me' && !this.free && !(r.cutCd > 0) && gap < -0.6 && gap > -BIKE && Math.abs(side) < 0.26 && steer * Math.sign(side) > 0.4 && this.mate(r, o) && !o.finished && this.time > 3) {
+        // De deur dichtgooien: je stuurt je achterwiel in het voorwiel van een ploeggenoot. Hij botst, jij merkt niets.
+        r.cutCd = 1.5;
+        if (this.local(o)) { if (!(o.bumpCd > 0)) this._bump(o, r, 'cut'); }
+        else this.room?.send({ t: 'bump', to: o.id, by: r.id });
       } else if (Math.abs(gap) <= 0.6 && Math.abs(side) < 0.14 && this.mate(r, o)) {
         r.x -= (Math.sign(side) || (r.id < o.id ? 1 : -1)) * dt * 0.8; // naast een ploeggenoot: niet door elkaar heen, rustig opzij
       }
@@ -880,13 +886,13 @@ export class Race {
   }
 
   // r rijdt achterop o: r valt terug tot onder de snelheid van o en moet even herstellen.
-  _bump(r, o) {
+  _bump(r, o, how) {
     r.bumpCd = 2.5;
     r.v = Math.min(r.v, Math.max(o.v * 0.92, r.v * 0.75)); // nooit sneller door een botsing
     r.fx.bump = 1.2;
     r.hitAt = this.clock;
     if (r === this.me) {
-      this.emit('banner', { text: '💢 BOTSING!', sub: `achterop ${o.name} – snelheid kwijt`, color: '#ff6b6b' });
+      this.emit('banner', { text: '💢 BOTSING!', sub: how === 'cut' ? `${o.name} stuurde in je voorwiel – snelheid kwijt` : `achterop ${o.name} – snelheid kwijt`, color: '#ff6b6b' });
       this.emit('sfx', 'drop'); this.emit('shake', 7);
     }
   }
@@ -1201,6 +1207,11 @@ export class Race {
       case 'fin': {
         const r = this.byId(msg.id);
         if (r && !r.finished) { r.finished = true; r.finishTime = msg.time; this.say(`🏁 ${r.name}`); }
+        break;
+      }
+      case 'bump': { // een ploeggenoot stuurde zijn achterwiel in mijn voorwiel
+        const by = this.byId(msg.by);
+        if (msg.to === this.me.id && by && this.mate(this.me, by) && !(this.me.bumpCd > 0) && !this.me.finished) this._bump(this.me, by, 'cut');
         break;
       }
       case 'elbow': { const r = this.byId(msg.id); if (r && !(r.elbow > 0)) { r.elbow = ELBOW_SECS; this._elbowFx(r); } break; }
