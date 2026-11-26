@@ -90,8 +90,13 @@ export const M7 = {
     });
     // vloer op halve resolutie
     const y0 = Math.max(0, Math.ceil(hz)), w2 = W >> 1, h2 = Math.max(1, (H - y0) >> 1);
-    if (!this.f7 || this.f7.width !== w2 || this.f7.height !== h2) { this.f7 = document.createElement('canvas'); this.f7.width = w2; this.f7.height = h2; this.f7img = this.f7.getContext('2d').createImageData(w2, h2); }
-    const D = new Uint32Array(this.f7img.data.buffer), b = T.b, fc = T.fogC;
+    // Eén keer per schermformaat aanmaken (op volle hoogte). Steeds opnieuw aanmaken als de horizon verschuift
+    // (klimmen, brug) gaf haperingen op een iPhone: dan moet hij telkens geheugen opruimen.
+    if (!this.f7 || this.f7.width !== w2 || this.f7.height !== (H >> 1) + 1) {
+      this.f7 = document.createElement('canvas'); this.f7.width = w2; this.f7.height = (H >> 1) + 1;
+      this.f7ctx = this.f7.getContext('2d'); this.f7img = this.f7ctx.createImageData(w2, this.f7.height); this.f7D = new Uint32Array(this.f7img.data.buffer);
+    }
+    const D = this.f7D, b = T.b, fc = T.fogC;
     for (let j = 0; j < h2; j++) {
       const sy = y0 + j * 2 + 1 - hz, z = (cam.h * f) / Math.max(0.5, sy), fog = clamp((z - 70) / 130, 0, 1);
       const k = (z / f) * 2, L = k * PX > 1.6 ? T.lo : T.hi, px = L.px, TD = L.d, TW = L.w, TH = L.h;
@@ -104,8 +109,8 @@ export const M7 = {
         D[j * w2 + i] = col;
       }
     }
-    this.f7.getContext('2d').putImageData(this.f7img, 0, 0);
-    c.imageSmoothingEnabled = true; c.drawImage(this.f7, 0, y0, W, H - y0 + 1);
+    this.f7ctx.putImageData(this.f7img, 0, 0, 0, 0, w2, h2);
+    c.imageSmoothingEnabled = true; c.drawImage(this.f7, 0, 0, w2, h2, 0, y0, W, H - y0 + 1);
     // diepte per segment (voor de volgorde van tekenen)
     for (const s of tr.segs) { const z = (s.wx - cam.x) * fx + (s.wy - cam.y) * fy; s.scr.z1 = s.scr.z2 = z; s.scr.clip = H; s.scr.frame = frame; s.scr.n = 0; }
   },
