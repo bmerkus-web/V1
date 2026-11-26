@@ -1,6 +1,6 @@
 // Watt Blitz – menu's, HUD en de hoofdlus.
 import { TRACK_DEFS, getTrack } from './track.js';
-import { Race, ITEMS, BOT_NAMES, juryWhat } from './game.js';
+import { Race, ITEMS, BOT_NAMES, juryWhat, raceKind } from './game.js';
 import { Renderer } from './render.js';
 import { Trainer, Sterzo, HeartRate, ZwiftPad, bleSupported, errText } from './ble.js';
 import { GyroSteer } from './gyro.js';
@@ -396,7 +396,7 @@ function renderSetup() {
     const b = document.createElement('button');
     b.className = 'track' + (sel.track === d.id ? ' sel' : '');
     b.disabled = !canEdit;
-    const pr = getTime(ns(), `${d.id}|race|${sel.laps}`);
+    const pr = getTime(ns(), `${d.id}|${sel.ttt ? (teamShape() ? 'ttt' : 'tt') : 'race'}|${sel.laps}`);
     b.innerHTML = `<b>${d.name}</b><canvas width="300" height="54"></canvas><span>${(tr.length / 1000).toFixed(1)} km · ${Math.round(tr.climbTotal)} hm per ronde</span><span class="small">${d.desc}</span><span class="pr">${pr ? '🏆 PR ' + fmtTime(pr) : 'Nog geen PR'}</span>`;
     b.onclick = () => { sel.track = d.id; audio.prepare(d.id); pushSettings(); };
     $('tracks').appendChild(b);
@@ -461,12 +461,15 @@ function renderTeams(canEdit) {
   if (!race_) return;
   $('o-teams').value = sel.teams || '0'; $('o-teams').disabled = !canEdit;
   const plan = teamPlan(humans());
-  $('teams').classList.toggle('hidden', !plan); $('team-tools').classList.toggle('hidden', !plan); $('ttt-row').classList.toggle('hidden', !plan);
-  if (!plan) return;
+  $('teams').classList.toggle('hidden', !plan); $('team-tools').classList.toggle('hidden', !plan);
+  // Tijdrit: met ploegen een ploegentijdrit, zonder ploegen een individuele tijdrit.
   $('o-ttt').checked = !!sel.ttt; $('o-tttitems').value = sel.tttItems || 'off';
   $('o-ttt').disabled = $('o-tttitems').disabled = !canEdit;
+  $('o-ttt-t').textContent = plan ? '⏱️ Ploegentijdrit' : '⏱️ Tijdrit';
   $('o-tttitems-l').classList.toggle('hidden', !sel.ttt);
   $('o-rubber').parentElement.classList.toggle('hidden', !!sel.ttt); // tijdrit: geen rubber banding
+  $('ttt-note').classList.toggle('hidden', !sel.ttt || !!plan);
+  if (!plan) return;
   const myId = room ? room.me.id : 'p0';
   $('teams').innerHTML = plan.mem.map((m, i) => {
     const t = plan.teams[i], mine = m.some((p) => p.id === myId);
@@ -678,6 +681,7 @@ $('b-start').onclick = () => {
       }
     });
   }
+  else if (sel.ttt && sel.mode === 'race') { cfg.ttt = { items: sel.tttItems === 'team' ? 'team' : 'off' }; cfg.rubber = false; } // individuele tijdrit
   if (sel.mode === 'training') Object.assign(cfg, { plan: sel.plan.map((s) => ({ track: s.track, laps: s.laps })), warm: sel.warm, cool: sel.cool });
   if (sel.mode === 'workout') {
     const w = allWorkouts().find((x) => x.id === sel.wk) || BUILTIN[0], mode = room ? 'game' : sel.wkMode;
@@ -803,7 +807,7 @@ function renderRecords() {
   for (const d of TRACK_DEFS) {
     const tr = getTrack(d.id);
     const rows = [];
-    for (const l of [1, 2, 3, 5]) { const t = book[`${d.id}|race|${l}`]?.t; if (t) rows.push([`Race · ${l} ronde${l > 1 ? 's' : ''}`, t]); }
+    for (const [k, lbl] of [['race', 'Race'], ['tt', '⏱️ Tijdrit'], ['ttt', '⏱️ Ploegentijdrit']]) for (const l of [1, 2, 3, 5]) { const t = book[`${d.id}|${k}|${l}`]?.t; if (t) rows.push([`${lbl} · ${l} ronde${l > 1 ? 's' : ''}`, t]); }
     const lap = book[`${d.id}|lap`]?.t; if (lap) rows.push(['Snelste ronde', lap]);
     for (const z of tr.zones) { const t = book[`${d.id}|seg|${z.id}`]?.t; if (t) rows.push([({ sprint: '⚡ ', climb: '⛰️ ', cobble: '🪨 ' }[z.type] || '') + z.name, t]); }
     html += `<div class="card"><h2>${d.name}</h2>${rows.length ? '<table>' + rows.map(([a, t]) => `<tr><td>${a}</td><td>${fmtTime(t, 2)}</td></tr>`).join('') + '</table>' : '<p class="small">Nog geen tijden.</p>'}</div>`;
@@ -1023,7 +1027,8 @@ function launch(cfg, carry) {
     ...cfg.bots.map((b) => ({ ...b, kind: iRunBots ? 'bot' : 'remote' })),
   ];
   const n = ns();
-  const ghost = !training && P.ghostRace ? getGhost(n, `${track.id}|ghost|${cfg.laps}`) : null;
+  const gk = raceKind(cfg); // tijdrit en ploegentijdrit hebben hun eigen PR-spook
+  const ghost = !training && !cfg.workout && P.ghostRace ? getGhost(n, `${track.id}|${gk === 'race' ? 'ghost' : gk + 'ghost'}|${cfg.laps}`) : null;
   let extra = {};
   if (cfg.workout) extra = { mode: 'workout', timed: cfg.workout.total, wgame: !!cfg.wgame, wk: cfg.workout, wkFinish: cfg.wkFinish || 0 };
   if (training) {
@@ -1297,7 +1302,7 @@ function showResults(jump) {
       const myPens = res.find((x) => x.me)?.pens.length ? `<p class="small">⚖️ Jouw straffen: ${penList(res.find((x) => x.me))}</p>` : '';
       const tPlace = ts ? ts.findIndex((t) => t.id === me.team) + 1 : 0;
       const title = r.ttt && ts ? (tPlace === 1 && !ts.some((t) => !t.done) ? '🏆 PLOEG WINT!' : `Je ploeg: ${tPlace}e`) : win ? '🥇 GEWONNEN!' : me.rank + 'e plaats';
-      body = `<h2>${title}</h2><p class="rv-sub">${r.ttt ? 'Ploegentijdrit · ' : ''}Definitieve uitslag${judged.length ? '' : ' · de jury zag niets bijzonders ✓'}${pending ? ' · nog niet iedereen is binnen' : ''}</p>
+      body = `<h2>${title}</h2><p class="rv-sub">${r.ttt ? (r.teams ? 'Ploegentijdrit · ' : 'Tijdrit · ') : ''}Definitieve uitslag${judged.length ? '' : ' · de jury zag niets bijzonders ✓'}${pending ? ' · nog niet iedereen is binnen' : ''}</p>
         ${r.training ? `<p class="small">Training: ${training ? training.count : ''} etappe(s) · ${(r.courseLen / 1000).toFixed(1)} km. De tijd is die van de etappes samen, zonder in- en uitrijden.</p>` : ''}
         ${r.ttt ? teamBlock : ''}<table class="rv-table">${rows}</table>${myPens}${r.ttt ? '' : teamBlock}
         ${jer ? `<p><b>Eindtruien</b></p><div class="jers">${jer}</div>` : ''}
@@ -1424,7 +1429,7 @@ function hud(dt) {
   }
   // Op een telefoon: alleen de koploper en wie vlak voor en achter je rijdt.
   // Ploegentijdrit: alleen je eigen ploeg, met het verschil tot jullie voorste renner.
-  const own = r.ttt ? r.order.filter((x) => x === me || r.mate(me, x)) : null;
+  const own = r.ttt && r.teams ? r.order.filter((x) => x === me || r.mate(me, x)) : null;
   const rows = own || (PHONE.matches ? r.order.filter((x) => x.rank === 1 || Math.abs(x.rank - me.rank) <= 1) : r.order);
   const tcol = (x) => r.teams?.find((t) => t.id === x.team)?.color;
   setHTML($('h-rank'), rows.map((x) => {
