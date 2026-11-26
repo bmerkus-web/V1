@@ -33,6 +33,11 @@ export const TRACK_DEFS = [
     },
     cut: [2950, 150],
     cobbles: [{ name: 'De Hel van de Polder', start: 1680, len: 500, stars: 4 }],
+    obstacles: [
+      { type: 'bump', at: 200 }, { type: 'island', at: 1200, len: 25 }, { type: 'bump', at: 2320 },
+      { type: 'works', at: 3240, len: 30, x: -0.5, w: 0.55 }, { type: 'works', at: 3300, len: 30, x: 0.5, w: 0.55 }, // chicane
+      { type: 'bollards', at: 3700, len: 5, w: 0.12 },
+    ],
     sections: [
       T(300), T(400, 2), T(300, 0, 0, sprint('Dijksprint')), T(350, -3), T(150, 0, 4), T(150, 0, -4),
       T(500, 2.5), T(300, -1.5, 0.5), T(400, 0, 0, sprint('Molenstraat')), T(450, -3.5, -0.5),
@@ -59,6 +64,10 @@ export const TRACK_DEFS = [
     },
     cut: [2500, 140],
     cobbles: [{ name: 'Basaltmuur', start: 1580, len: 300, stars: 5 }],
+    obstacles: [
+      { type: 'works', at: 2150, len: 30, x: 0.5, w: 0.55 }, { type: 'works', at: 2210, len: 30, x: -0.5, w: 0.55 }, // chicane in de afdaling
+      { type: 'island', at: 4300, len: 25 }, { type: 'bump', at: 4700 },
+    ],
     sections: [
       T(400), T(300, 2, 1), T(350, -4, 6, climb('Lavamuur')), T(250, 5, 8, climb('Lavamuur')),
       T(300, -5, 7, climb('Lavamuur')), T(300, 4, 6, climb('Lavamuur')), T(200, 0, 2),
@@ -84,6 +93,11 @@ export const TRACK_DEFS = [
       scenery: ['antenna', 'dome', 'rocketpad', 'lamp', 'crystal', 'billboard'],
     },
     cut: [3380, 130],
+    obstacles: [
+      { type: 'bump', at: 250 }, { type: 'island', at: 1000, len: 25 },
+      { type: 'works', at: 2700, len: 30, x: -0.5, w: 0.55 }, { type: 'works', at: 2760, len: 30, x: 0.5, w: 0.55 }, // chicane
+      { type: 'bollards', at: 4000, len: 5, w: 0.12 },
+    ],
     sections: [
       T(300), T(300, 4, 2), T(300, -4, -2), T(250, 5, 3), T(250, -5, -3),
       T(400, 0, 0, sprint('Lanceerbaan')), T(400, 3, 10, climb('Raketmuur')), T(300, -2, 2),
@@ -161,10 +175,27 @@ function build(def) {
   }
   segs[0].arch = { text: 'START · FINISH', color: '#ff3fa4' };
 
+  // Obstakels op de weg: verkeerseiland, paaltjes, wegwerkzaamheden (twee na elkaar = chicane) en drempels.
+  // x en w in halve wegbreedtes (zoals de rest). Erop rijden = berm; een drempel voel je alleen op de trainer.
+  const obstacles = (def.obstacles || []).map((o) => ({ ...o, len: o.len ?? (o.type === 'bump' ? SEG : 20), x: o.x ?? 0, w: o.w ?? (o.type === 'bump' ? 1.2 : 0.25) }));
+  const inObs = (d, x, m = 0.12) => obstacles.some((o) => o.type !== 'bump' && d > o.at - 8 && d < o.at + o.len + 8 && Math.abs(x - o.x) < o.w + m);
+  for (const o of obstacles) {
+    const k0 = Math.floor(o.at / SEG), k1 = Math.max(k0 + 1, Math.ceil((o.at + o.len) / SEG));
+    for (let k = k0; k < k1; k++) segs[k % n].obs = o;
+    const put = (k, sp) => segs[k % n].sprites.push(sp);
+    if (o.type === 'island') { put(k0, { k: 'bollard', x: o.x }); put(k1 - 1, { k: 'bollard', x: o.x }); }
+    if (o.type === 'bollards') for (let i = -1; i <= 1; i++) put(k0, { k: 'bollard', x: o.x + i * o.w * 0.8 });
+    if (o.type === 'works') {
+      const edge = o.x - Math.sign(o.x || 1) * o.w; // rand aan de kant van de vrije weg
+      for (let k = k0; k < k1; k += 2) put(k, { k: 'barrier', x: edge });
+      put(k0, { k: 'cone', x: edge - Math.sign(o.x || 1) * 0.08 }); put(k0, { k: 'worksign', x: o.x });
+    }
+  }
+
   // Objecten: itemboxen, blitzjes (bliksemschichtjes) en turbostroken. Deterministisch per baan.
   const objects = [];
   const add = (type, d, x) => {
-    if (inCobble(d, 10)) return; // niets op de kasseien: daar draait het om het gootje
+    if (inCobble(d, 10) || inObs(d, x)) return; // niets op de kasseien (daar draait het om het gootje) en niet op een obstakel
     const o = { id: objects.length, type, d, x };
     objects.push(o);
     segs[Math.floor(d / SEG) % n].objs.push(o);
@@ -179,7 +210,7 @@ function build(def) {
     for (let b = 0; b < 5; b++) add('bolt', d0 + b * 16, mid + side * (b % 2 ? -1 : 1) * amp + Math.sin(ph + b) * 0.06);
   }
   const padAt = (d, x) => {
-    if (inCobble(d, 25)) return;
+    if (inCobble(d, 25) || inObs(d, x, 0.3) || inObs(d + 15, x, 0.3)) return;
     const s = Math.floor(d / SEG);
     for (let k = 0; k < 3; k++) segs[(s + k) % n].pad = { x, w: 0.15 };
     objects.push({ id: objects.length, type: 'pad', d, x, len: 3 * SEG, w: 0.15 });
@@ -216,7 +247,9 @@ function build(def) {
 
   const track = {
     id: def.id, name: def.name, desc: def.desc, theme: def.theme,
-    segs, n, length: total, zones, objects, cut, cobbles,
+    segs, n, length: total, zones, objects, cut, cobbles, obstacles,
+    // Obstakel waar je op (x) rijdt, of null. Drempels tellen hier niet: die liggen over de hele weg.
+    obsAt(d, x) { const o = this.segAt(d).obs; return o && o.type !== 'bump' && Math.abs(x - o.x) < o.w ? o : null; },
     wAt(d) { const m = mod(d, total), s = segs[Math.floor(m / SEG) % n]; return s.wA + (s.wB - s.wA) * ((m % SEG) / SEG); },
     segAt(d) { return segs[Math.floor(mod(d, total) / SEG) % n]; },
     yAt(d) {

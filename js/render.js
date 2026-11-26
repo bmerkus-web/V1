@@ -41,13 +41,14 @@ export class Renderer {
     theme.sky.forEach((col, i) => g.addColorStop(i / (theme.sky.length - 1), col));
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     if (theme.stars) for (let i = 0; i < 140; i++) { c.fillStyle = `rgba(255,255,255,${0.3 + rng() * 0.7})`; const s = rng() < 0.1 ? 2 : 1; c.fillRect(rng() * W, rng() * hz * 0.75, s, s); }
-    // zon met strepen
-    const sr = H * 0.17, sx = W * 0.5, sy = hz - sr * 0.35;
-    const sg = c.createLinearGradient(0, sy - sr, 0, sy + sr); sg.addColorStop(0, theme.sun); sg.addColorStop(1, theme.sky[2]);
-    c.save(); c.beginPath(); c.arc(sx, sy, sr, 0, 7); c.clip(); c.fillStyle = sg; c.fillRect(sx - sr, sy - sr, sr * 2, sr * 2);
-    c.fillStyle = theme.sky[2]; c.globalAlpha = 0.85;
-    for (let i = 0; i < 6; i++) c.fillRect(sx - sr, sy + sr * (0.05 + i * 0.16), sr * 2, sr * (0.03 + i * 0.012));
-    c.restore();
+    // zon met strepen: een eigen laagje, zodat hij in bochten mee kan schuiven
+    const sr = H * 0.17, sy = hz - sr * 0.35;
+    const sun = document.createElement('canvas'); sun.width = sun.height = Math.ceil(sr * 2) + 2;
+    const sc = sun.getContext('2d'), sx = sun.width / 2, scy = sun.height / 2;
+    const sg = sc.createLinearGradient(0, scy - sr, 0, scy + sr); sg.addColorStop(0, theme.sun); sg.addColorStop(1, theme.sky[2]);
+    sc.beginPath(); sc.arc(sx, scy, sr, 0, 7); sc.clip(); sc.fillStyle = sg; sc.fillRect(0, 0, sun.width, sun.height);
+    sc.fillStyle = theme.sky[2]; sc.globalAlpha = 0.85;
+    for (let i = 0; i < 6; i++) sc.fillRect(sx - sr, scy + sr * (0.05 + i * 0.16), sr * 2, sr * (0.03 + i * 0.012));
     // silhouetlagen (2x breed, herhalend)
     const layers = [0, 1].map((li) => {
       const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = Math.round(H * 0.3);
@@ -78,7 +79,7 @@ export class Renderer {
       }
       return cv;
     });
-    this.bg = { sky, layers, theme, hz };
+    this.bg = { sky, layers, theme, hz, sun, sunY: sy };
   }
 
   // Projecteert een punt op segment `seg`, fractie t langs het segment, lateraal in wegbreedtes.
@@ -112,6 +113,10 @@ export class Renderer {
     // --- achtergrond ---
     this.bgOff += tr.segAt(me.dist).curve * me.v * dt * 3;
     c.drawImage(this.bg.sky, 0, 0);
+    // De zon schuift in een bocht naar de buitenkant en komt daarna terug: zo voel je de bocht.
+    this.turn = (this.turn || 0) + (tr.segAt(me.dist).curve - (this.turn || 0)) * Math.min(1, dt * 1.2);
+    const sun = this.bg.sun, sunX = W * 0.5 - Math.max(-W * 0.42, Math.min(W * 0.42, this.turn * W * 0.05));
+    c.drawImage(sun, sunX - sun.width / 2, this.bg.sunY - sun.height / 2);
     this.bg.layers.forEach((cv, i) => {
       const off = mod(this.bgOff * (i ? 1.6 : 0.8) * W * 0.004, cv.width);
       c.drawImage(cv, -off, hz - cv.height + 2);
@@ -161,6 +166,19 @@ export class Renderer {
         c.fillStyle = th.lane; c.globalAlpha = 0.55;
         for (const l of [-1 / 3, 1 / 3]) this._quad(a.X + w1 * l, a.Y, w1 * 0.014, b.X + w2 * l, b.Y, w2 * 0.014);
         c.globalAlpha = 1;
+      }
+      if (seg.obs) { // obstakels op het wegdek
+        const o = seg.obs, u1 = a.u * ROAD_W, u2 = b.u * ROAD_W, d0 = seg.i * SEG, d1 = d0 + SEG;
+        if (o.type === 'bump') { // drempel: geel-zwart over de hele weg
+          c.fillStyle = '#ffd166'; this._quad(a.X, a.Y, w1, b.X, b.Y, w2);
+          c.fillStyle = '#15152a'; for (let q = -5; q <= 5; q += 2) this._quad(a.X + w1 * q / 6, a.Y, w1 / 12, b.X + w2 * q / 6, b.Y, w2 / 12);
+        } else if (o.type === 'island' || o.type === 'works') {
+          const end = (d) => Math.min(1, Math.max(0.3, Math.min(d - o.at, o.at + o.len - d) / 4)); // afgeronde kopjes
+          const h1 = o.w * (o.type === 'island' ? end(d0) : 1), h2 = o.w * (o.type === 'island' ? end(d1) : 1);
+          c.fillStyle = o.type === 'island' ? th.rumble[alt ? 1 : 0] : alt ? '#ff7b1c' : '#3a2a20';
+          this._quad(a.X + u1 * o.x, a.Y, u1 * h1, b.X + u2 * o.x, b.Y, u2 * h2);
+          if (o.type === 'island') { c.fillStyle = th.grass[alt]; this._quad(a.X + u1 * o.x, a.Y, u1 * h1 * 0.78, b.X + u2 * o.x, b.Y, u2 * h2 * 0.78); }
+        }
       }
       if (seg.pad) {
         const p = seg.pad, blink = (Math.floor(t * 8) + seg.i) % 3;

@@ -1193,3 +1193,32 @@ test('Botsing: stuur je je achterwiel in het voorwiel van een ploeggenoot, dan b
   other.onNet(m);
   assert.ok(other.me.fx.bump > 0);
 });
+
+test('Obstakels: op een verkeerseiland of wegwerkzaamheden rijden = berm, bots sturen eromheen, drempel geeft een tik', async () => {
+  const { Race } = await import('../js/game.js');
+  const tr = getTrack('polder');
+  assert.ok(tr.obstacles.some((o) => o.type === 'island') && tr.obstacles.filter((o) => o.type === 'works').length >= 2);
+  // geen boxen of blitzjes op een obstakel
+  for (const ob of tr.objects) assert.ok(!tr.obstacles.some((o) => o.type !== 'bump' && ob.d > o.at - 2 && ob.d < o.at + o.len + 2 && Math.abs(ob.x - o.x) < o.w), `object ${ob.type} op ${ob.d}`);
+  const mk = (riders) => new Race({ track: tr, laps: 2, seed: 11, room: null, isHost: true, ns: 'demo', riders,
+    profile: { ftp: 200, fair: true, weight: 75, assist: true, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  const g = mk([{ id: 'p0', name: 'Ik', color: '#fff', kind: 'me' }, { id: 'b0', name: 'Bot', color: '#000', kind: 'bot', skill: 0.6 }]);
+  g.countdown = 0; g.update(0.04); g.time = 10;
+  const [me, bot] = g.riders;
+  const isl = tr.obstacles.find((o) => o.type === 'island');
+  me.dist = isl.at + 10; me.x = isl.x; me.v = 9;
+  g._stepLocal(me, 200, 0, 0.01, false);
+  assert.ok(me.onObs && me.berm, 'op het eiland = berm');
+  // drempel: tik op de trainer
+  const bump = tr.obstacles.find((o) => o.type === 'bump');
+  me.dist = bump.at - 0.5; me.x = 0; me.v = 9; me.bumpKick = 0;
+  g._stepLocal(me, 200, 0, 0.1, false);
+  assert.ok(me.bumpKick > 0);
+  // bot door de chicane: (bijna) nooit op de wegwerkzaamheden
+  const w0 = tr.obstacles.find((o) => o.type === 'works');
+  me.dist = 99999; bot.dist = w0.at - 80; bot.x = w0.x; bot.v = 9;
+  let on = 0, n = 0;
+  while (bot.dist < w0.at + 160 && n < 4000) { g._bot(bot, 0.02); if (bot.onObs) on++; n++; }
+  assert.ok(on < 10, `bot ${on} keer op een obstakel`);
+});

@@ -302,7 +302,7 @@ export class Race {
     this._ghosts();
 
     const seg = this.track.segAt(me.dist);
-    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) + (me.bermKick > 0 ? BERM_KICK * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) : 0) + (me.onCobble ? 3 + (Math.floor(this.clock * 2) % 2 ? 2 : -2) : 0) /* hobbelen op de kasseien */ + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
+    this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) + (me.bermKick > 0 ? BERM_KICK * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) : 0) + (me.bumpKick > 0 ? 6 : 0) /* drempel */ + (me.onCobble ? 3 + (Math.floor(this.clock * 2) % 2 ? 2 : -2) : 0) /* hobbelen op de kasseien */ + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
     this._net(dt);
   }
 
@@ -337,7 +337,8 @@ export class Race {
     if (!r.onCut) r.cutValid = false;
     const w = this.track.wAt(r.dist); // halve wegbreedte hier (smaller op de kasseien)
     const wasBerm = r.berm;
-    r.berm = Math.abs(r.x) > w && !r.onCut;
+    r.onObs = this.track.obsAt(r.dist, r.x); // verkeerseiland, paaltjes of wegwerkzaamheden: net als de berm
+    r.berm = (Math.abs(r.x) > w && !r.onCut) || !!r.onObs;
     r.onCobble = seg.cobble && !r.berm && Math.abs(r.x) < w - GUTTER;
     r.inGutter = seg.cobble && !r.berm && !r.onCobble;
     if (r.onCobble) r.x += (Math.sin(this.clock * 9.1 + r.dist * 0.7) * 0.18 + Math.sin(this.clock * 15.7 + r.dist) * 0.1) * dt; // stuur wiebelt op de stenen
@@ -353,10 +354,11 @@ export class Race {
     }
     if (r === this.me) {
       if (r.bermKick > 0) r.bermKick -= dt;
+      if (r.bumpKick > 0) r.bumpKick -= dt;
       if (r.berm && !wasBerm && !r.finished) r.bermKick = BERM_KICK_SECS; // ook een kort tikje voel je zo
       if (r.berm && !wasBerm && !r.finished && this.clock - (this._bermAt || -9) > 4) {
         this._bermAt = this.clock;
-        this.emit('banner', { text: '⚠️ BERM!', sub: 'stuur terug naar de weg', color: '#ff6b6b' });
+        this.emit('banner', r.onObs ? { text: '⚠️ OBSTAKEL!', sub: 'stuur eromheen', color: '#ff6b6b' } : { text: '⚠️ BERM!', sub: 'stuur terug naar de weg', color: '#ff6b6b' });
         this.emit('sfx', 'drop'); this.emit('shake', 5);
       }
     }
@@ -427,6 +429,11 @@ export class Race {
     if (r.dist > prev && !r.finished && !this.free && !this.ttt) { this._sprintLine(r, prev); this._timedZones(r, prev); } // tijdrit: geen tussensprints of truien
 
     if (r.dist >= 0 && !this.free) this._pickups(r, prev);
+    if (r === this.me && r.dist > prev) for (const o of this.track.obstacles) { // drempel: een tik op de trainer
+      if (o.type !== 'bump') continue;
+      const line = Math.floor((r.dist - o.at) / this.L) * this.L + o.at;
+      if (prev < line && r.dist >= line) { r.bumpKick = 0.45; this.emit('shake', 4); }
+    }
     if (r.roulette > 0) {
       r.roulette -= dt;
       if (r.roulette <= 0) {
@@ -1067,6 +1074,13 @@ export class Race {
       if (ai.leadT > 10 && this.rng() < 0.08) { ai.leadT = 0; this.elbow(r); }
       const wAhead = this.track.wAt(r.dist + 12);
       if (this.track.segAt(r.dist + 12).cobble) tx = ai.skill > 0.35 ? (Math.sign(r.x) || (ai.ph > 5 ? 1 : -1)) * (wAhead - GUTTER / 2) : clamp(tx, -(wAhead - 0.2), wAhead - 0.2); // goede bots zoeken het gootje
+      for (let k = 0; k < 14; k++) { // obstakels op de weg: eerst het dichtstbijzijnde, kies de kant die het dichtst bij is
+        const o = this.track.segs[(s0 + k) % this.track.n].obs;
+        if (!o || o.type === 'bump') continue;
+        const lo = o.x - o.w - 0.22, hi = o.x + o.w + 0.22, lim = Math.min(0.85, wAhead - 0.05);
+        if ((tx > lo && tx < hi) || (r.x < o.x) !== (tx < o.x)) tx = (Math.abs(lo - r.x) <= Math.abs(hi - r.x) && lo > -lim) || hi > lim ? lo : hi; // in de weg, of je zou erdoorheen sturen
+        break;
+      }
       ai.tx = clamp(tx, -Math.min(0.85, wAhead - 0.05), Math.min(0.85, wAhead - 0.05));
       // Short cut: betere bots nemen hem vaker en strakker.
       const cut = this.track.cut;
