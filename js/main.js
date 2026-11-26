@@ -38,7 +38,7 @@ let myWorkouts = loadWorkouts();
 const allWorkouts = () => [...BUILTIN, ...myWorkouts];
 // Ploegen (alleen bij een race): '0' = uit, of 'NxM' = N ploegen van M renners. Lege plekken worden bots.
 const TEAM_DEFS = [{ name: 'Neon', color: '#ff3fa4' }, { name: 'Bliksem', color: '#22d3ff' }, { name: 'Lava', color: '#ff8a1c' }, { name: 'Kosmos', color: '#9b5cff' }];
-Object.assign(sel, { teams: store.teams || '0', teamOf: {}, teamNames: store.teamNames || TEAM_DEFS.map((t) => t.name) });
+Object.assign(sel, { teams: store.teams || '0', teamOf: {}, teamNames: store.teamNames || TEAM_DEFS.map((t) => t.name), ttt: !!store.ttt, tttItems: store.tttItems || 'off' });
 Object.assign(sel, { wk: store.wkSel || 'b-kennis', erg: store.wkErg ?? true, wkMode: store.wkMode || (store.wkZen ? 'zen' : 'ride'), wkObj: null });
 let wk = null; // { w, bias, erg, log: [{t,p,tgt,hr,cad}], sec, bi, p3, chartAt }
 const clock = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = String(sec % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
@@ -461,17 +461,21 @@ function renderTeams(canEdit) {
   if (!race_) return;
   $('o-teams').value = sel.teams || '0'; $('o-teams').disabled = !canEdit;
   const plan = teamPlan(humans());
-  $('teams').classList.toggle('hidden', !plan); $('team-tools').classList.toggle('hidden', !plan);
+  $('teams').classList.toggle('hidden', !plan); $('team-tools').classList.toggle('hidden', !plan); $('ttt-row').classList.toggle('hidden', !plan);
   if (!plan) return;
+  $('o-ttt').checked = !!sel.ttt; $('o-tttitems').value = sel.tttItems || 'off';
+  $('o-ttt').disabled = $('o-tttitems').disabled = !canEdit;
+  $('o-tttitems-l').classList.toggle('hidden', !sel.ttt);
+  $('o-rubber').parentElement.classList.toggle('hidden', !!sel.ttt); // tijdrit: geen rubber banding
   const myId = room ? room.me.id : 'p0';
   $('teams').innerHTML = plan.mem.map((m, i) => {
     const t = plan.teams[i], mine = m.some((p) => p.id === myId);
-    const rows = [...m.map((p, k) => `<div class="mem${canEdit && plan.teams.length > 1 ? ' mv' : ''}" data-p="${esc(p.id)}"${canEdit ? ' title="Tik om naar de volgende ploeg te verplaatsen"' : ''}><i style="background:${esc(p.color)}"></i><span class="nm">${esc(p.name)}${p.id === myId ? ' (jij)' : ''}</span><span class="bibn">#${(i + 1) * 10 + k + 1}</span></div>`),
+    const rows = [...m.map((p, k) => `<div class="mem${canEdit && plan.teams.length > 1 ? ' movable' : ''}" data-p="${esc(p.id)}"${canEdit ? ' title="Tik om naar de volgende ploeg te verplaatsen"' : ''}><i style="background:${esc(p.color)}"></i><span class="nm">${esc(p.name)}${p.id === myId ? ' (jij)' : ''}</span><span class="bibn">#${(i + 1) * 10 + k + 1}</span></div>`),
       ...Array.from({ length: plan.size - m.length }, (_, k) => `<div class="mem bot">🤖 bot<span class="bibn">#${(i + 1) * 10 + m.length + k + 1}</span></div>`)];
     return `<div class="team" style="--tc:${t.color}"><input data-tn="${i}" value="${esc(t.name)}" maxlength="16" aria-label="Naam ploeg ${i + 1}"${canEdit ? '' : ' disabled'}>${rows.join('')}${mine ? '' : `<button class="ghost" data-join="${i}">Bij deze ploeg</button>`}</div>`;
   }).join('');
   $('t-fair').classList.toggle('hidden', !canEdit || humans().length < 2);
-  $('team-note').textContent = `Lege plekken worden bots. Ploegenklassement: alle renners van een ploeg opgeteld.${canEdit && humans().length > 1 ? ' Tik op een naam om die renner te verplaatsen.' : ''}`;
+  $('team-note').textContent = `Lege plekken worden bots. ${sel.ttt ? 'Ploegentijdrit: de andere ploegen zijn spoken; de ploegtijd is de tijd van je laatste renner, dus blijf bij elkaar.' : 'Ploegenklassement: alle renners van een ploeg opgeteld.'}${canEdit && humans().length > 1 ? ' Tik op een naam om die renner te verplaatsen.' : ''}`;
 }
 // Renner naar een ploeg; is die vol, dan ruilt de laatste daar van plek.
 function setTeam(id, t) {
@@ -487,6 +491,8 @@ function setTeam(id, t) {
   pushSettings();
 }
 function pickTeam(t) { const id = room ? room.me.id : 'p0'; if (!room || room.isHost) setTeam(id, t); else room.send({ t: 'teampick', id, team: t }); }
+$('o-ttt').onchange = (e) => { sel.ttt = e.target.checked; if (!room) { store.ttt = sel.ttt; save(); } pushSettings(); };
+$('o-tttitems').onchange = (e) => { sel.tttItems = e.target.value; if (!room) { store.tttItems = sel.tttItems; save(); } pushSettings(); };
 $('o-teams').onchange = (e) => { sel.teams = e.target.value; if (!room) { store.teams = sel.teams; save(); } pushSettings(); };
 $('teams').onchange = (e) => {
   const i = e.target.dataset.tn;
@@ -496,7 +502,7 @@ $('teams').onchange = (e) => {
   store.teamNames = sel.teamNames; save(); pushSettings();
 };
 $('teams').onclick = (e) => {
-  const j = e.target.closest('[data-join]'), mv = e.target.closest('.mem.mv');
+  const j = e.target.closest('[data-join]'), mv = e.target.closest('.mem.movable');
   if (j) { pickTeam(+j.dataset.join); return; }
   if (mv && (!room || room.isHost)) {
     const plan = teamPlan(humans()), id = mv.dataset.p, cur = plan.mem.findIndex((m) => m.some((p) => p.id === id));
@@ -662,6 +668,7 @@ $('b-start').onclick = () => {
   const plan = teamPlan(humans());
   if (plan) { // ploegen: rugnummers (11, 12… 21, 22…) en bots tot iedereen even groot is
     cfg.bots = []; cfg.teams = plan.teams;
+    if (sel.ttt) { cfg.ttt = { items: sel.tttItems === 'team' ? 'team' : 'off' }; cfg.rubber = false; }
     plan.mem.forEach((m, t) => {
       m.forEach((p, k) => { const r = roster.find((x) => x.id === p.id); if (r) Object.assign(r, { team: 't' + t, bib: (t + 1) * 10 + k + 1 }); });
       for (let k = m.length; k < plan.size; k++) {
@@ -764,7 +771,7 @@ function shareBoard() {
 function saveTeamRecords(r, ts) {
   if (r._teamSaved || r.rubber || r.training || r.wk) return;
   r._teamSaved = true;
-  const size = ts[0].riders.length, key = `${r.track.id}|${r.laps}|${size}`;
+  const size = ts[0].riders.length, key = `${r.ttt ? 'ttt|' : ''}${r.track.id}|${r.laps}|${size}`;
   const book = (store.teamRecords ||= {}), list = (book[key] ||= []);
   for (const t of ts) {
     if (t.riders.some((x) => x.dnf)) continue;
@@ -783,8 +790,8 @@ function renderBoard() {
   // 👥 Ploegen: beste ploegtijden (alle renners opgeteld)
   const tb = store.teamRecords || {}, tk = Object.keys(tb).filter((k) => tb[k].length).sort();
   $('board').insertAdjacentHTML('beforeend', `<div class="card board"><h2>👥 Ploegen</h2>${tk.length ? tk.map((k) => {
-    const [tid, laps, size] = k.split('|'), d = TRACK_DEFS.find((x) => x.id === tid);
-    return `<h3>${esc(d ? d.name : tid)} · ${laps} ronde${laps > 1 ? 's' : ''} · ploegen van ${size}</h3><table>${tb[k].map((e, i) => `<tr><td>${i + 1}</td><td><span class="tdot" style="background:${esc(e.color)}"></span><b>${esc(e.team)}</b><br><small>${e.riders.map(esc).join(', ')}${e.ns === 'demo' ? ' · demo' : ''}</small></td><td>${fmtTime(e.total, 1)}</td></tr>`).join('')}</table>`;
+    const tt = k.startsWith('ttt|'), [tid, laps, size] = (tt ? k.slice(4) : k).split('|'), d = TRACK_DEFS.find((x) => x.id === tid);
+    return `<h3>${tt ? '⏱️ Ploegentijdrit · ' : ''}${esc(d ? d.name : tid)} · ${laps} ronde${laps > 1 ? 's' : ''} · ploegen van ${size}</h3><table>${tb[k].map((e, i) => `<tr><td>${i + 1}</td><td><span class="tdot" style="background:${esc(e.color)}"></span><b>${esc(e.team)}</b><br><small>${e.riders.map(esc).join(', ')}${e.ns === 'demo' ? ' · demo' : ''}</small></td><td>${fmtTime(e.total, 1)}</td></tr>`).join('')}</table>`;
   }).join('') : '<p class="small">Nog geen ploegtijden. Rijd een race met ploegen (bij de start: 👥 Ploegen).</p>'}</div>`);
 }
 
@@ -1041,6 +1048,7 @@ function launch(cfg, carry) {
   }
   race = new Race({
     teams: training || cfg.workout ? null : cfg.teams || null,
+    ttt: training || cfg.workout ? null : cfg.ttt || null,
     track, laps: st.laps, seed: cfg.seed + (training ? training.idx : 0), riders, room, isHost: iRunBots, ns: n,
     profile: { ...P, fair: cfg.fair, assist: !!P.assist && ((cfg.workout && cfg.wkMode === 'ride') || (!!cfg.plan && !room)) /* stuurhulp alleen bij Ride en solo training */ }, difficulty: cfg.diff, rubber: !!cfg.rubber, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
   });
@@ -1275,9 +1283,9 @@ function showResults(jump) {
       const win = me.rank === 1 && res.length > 1;
       const ts = r.teamStandings(); // ploegenklassement (alle renners opgeteld), of null
       if (ts && !pending) saveTeamRecords(r, ts);
-      const teamBlock = ts ? `<p><b>👥 Ploegenklassement</b>${ts.some((t) => !t.done) ? ' <small>· voorlopig, nog niet iedereen is binnen</small>' : ''}</p><table class="rv-table">${ts.map((t, i) => `<tr class="rv-row${t.id === me.team ? ' me' : ''}" style="animation-delay:${res.length * 0.25 + (ts.length - 1 - i) * 0.35}s"><td>${i ? i + 1 : '🏆'}</td>
+      const teamBlock = ts ? `<p><b>${r.ttt ? '⏱️ Ploegentijdrit · de laatste renner telt' : '👥 Ploegenklassement'}</b>${ts.some((t) => !t.done) ? ' <small>· voorlopig, nog niet iedereen is binnen</small>' : ''}</p><table class="rv-table">${ts.map((t, i) => `<tr class="rv-row${t.id === me.team ? ' me' : ''}" style="animation-delay:${res.length * 0.25 + (ts.length - 1 - i) * 0.35}s"><td>${i ? i + 1 : '🏆'}</td>
         <td><span class="tdot" style="background:${esc(t.color)}"></span><b>${esc(t.name)}</b><br><small>${t.riders.map((x) => `#${x.bib} ${esc(x.name)}${x.dnf ? ' (gestopt: +30 s)' : ''}`).join(' · ')}</small></td><td>${fmtTime(t.total, 1)}</td><td>${i ? fmtDelta(t.gap) : ''}</td></tr>`).join('')}</table>
-        ${ts[0].id === me.team && ts.length > 1 && !ts.some((t) => !t.done) ? `<p class="small">🏆 Je ploeg ${esc(ts[0].name)} wint het ploegenklassement!</p>` : ''}` : '';
+        ${ts[0].id === me.team && ts.length > 1 && !ts.some((t) => !t.done) ? `<p class="small">🏆 Je ploeg ${esc(ts[0].name)} wint ${r.ttt ? 'de ploegentijdrit' : 'het ploegenklassement'}!</p>` : ''}` : '';
       const ico = { sprint: '⚡', climb: '⛰️', cobble: '🪨' };
       const segs = cl.segs.map((g) => `<li>${ico[g.type]} ${esc(g.zone)}: <b>${esc(g.name)}</b> ${g.type === 'sprint' ? `(${g.wins}× gewonnen)` : fmtTime(g.t, 1)}</li>`).join('');
       const jer = [[cl.green, JERSEY_SVG, 'Groene trui', (n) => `${n} sprint${n > 1 ? 's' : ''}`], [cl.kom, POLKA_SVG, 'Bolletjestrui', (n) => `${n} klim${n > 1 ? 'men' : ''}`], [cl.cass, CASS_SVG, 'Gouden Kassei', (n) => `${n} strook${n > 1 ? 'en' : ''}`]]
@@ -1287,9 +1295,11 @@ function showResults(jump) {
       for (const w of r.powerPRs || []) prs.push(`<li>Vermogen ${pn[w]}: ${Math.round(st.best[w])} W</li>`);
       const avgP = st.n ? st.sumP / st.n : 0;
       const myPens = res.find((x) => x.me)?.pens.length ? `<p class="small">⚖️ Jouw straffen: ${penList(res.find((x) => x.me))}</p>` : '';
-      body = `<h2>${win ? '🥇 GEWONNEN!' : me.rank + 'e plaats'}</h2><p class="rv-sub">Definitieve uitslag${judged.length ? '' : ' · de jury zag niets bijzonders ✓'}${pending ? ' · nog niet iedereen is binnen' : ''}</p>
+      const tPlace = ts ? ts.findIndex((t) => t.id === me.team) + 1 : 0;
+      const title = r.ttt && ts ? (tPlace === 1 && !ts.some((t) => !t.done) ? '🏆 PLOEG WINT!' : `Je ploeg: ${tPlace}e`) : win ? '🥇 GEWONNEN!' : me.rank + 'e plaats';
+      body = `<h2>${title}</h2><p class="rv-sub">${r.ttt ? 'Ploegentijdrit · ' : ''}Definitieve uitslag${judged.length ? '' : ' · de jury zag niets bijzonders ✓'}${pending ? ' · nog niet iedereen is binnen' : ''}</p>
         ${r.training ? `<p class="small">Training: ${training ? training.count : ''} etappe(s) · ${(r.courseLen / 1000).toFixed(1)} km. De tijd is die van de etappes samen, zonder in- en uitrijden.</p>` : ''}
-        <table class="rv-table">${rows}</table>${myPens}${teamBlock}
+        ${r.ttt ? teamBlock : ''}<table class="rv-table">${rows}</table>${myPens}${r.ttt ? '' : teamBlock}
         ${jer ? `<p><b>Eindtruien</b></p><div class="jers">${jer}</div>` : ''}
         ${segs ? `<p><b>Segmenten</b></p><ul class="segs">${segs}</ul>` : ''}
         ${prs.length ? `<p><b>🏆 Nieuwe records</b></p><ul class="prlist">${prs.join('')}</ul>` : ''}
@@ -1358,7 +1368,8 @@ function hud(dt) {
   // Binnen: plaats en stand verbergen, anders verklapt de HUD de uitslag voordat de jury beslist.
   const over = r.state === 'done';
   for (const id of ['h-pos', 'h-rank', 'h-feed']) $(id).classList.toggle('gone', over);
-  setHTML($('h-pos'), `${me.rank}<small>/${total}</small>`);
+  if (r.ttt && r.teamTable) { const tp = r.teamTable.findIndex((t) => t.id === me.team) + 1; setHTML($('h-pos'), `${tp}<small>/${r.teamTable.length}</small>`); } // tijdrit: plek van je ploeg
+  else setHTML($('h-pos'), `${me.rank}<small>/${total}</small>`);
   const left = r.timed ? fmtTime(Math.ceil(Math.max(0, r.timed - (r.time - r.t0))), 0) : '';
   setText($('h-lap'), r.mode === 'warm' ? `WARMING-UP · nog ${left}` : r.mode === 'cool' ? `COOLING-DOWN · nog ${left}`
     : `${r.training ? `Etappe ${r.stageN}/${r.stageCount} · ` : ''}Ronde ${clamp(Math.floor(Math.max(0, me.dist) / r.L) + 1, 1, r.laps)}/${r.laps} · ${(Math.max(0, r.total - me.dist) / 1000).toFixed(2)} km`);
@@ -1412,10 +1423,13 @@ function hud(dt) {
     z.style.borderColor = a.zone.type === 'sprint' ? '#39ffb0' : '#ff7b1c';
   }
   // Op een telefoon: alleen de koploper en wie vlak voor en achter je rijdt.
-  const rows = PHONE.matches ? r.order.filter((x) => x.rank === 1 || Math.abs(x.rank - me.rank) <= 1) : r.order;
+  // Ploegentijdrit: alleen je eigen ploeg, met het verschil tot jullie voorste renner.
+  const own = r.ttt ? r.order.filter((x) => x === me || r.mate(me, x)) : null;
+  const rows = own || (PHONE.matches ? r.order.filter((x) => x.rank === 1 || Math.abs(x.rank - me.rank) <= 1) : r.order);
   const tcol = (x) => r.teams?.find((t) => t.id === x.team)?.color;
   setHTML($('h-rank'), rows.map((x) => {
-    const g = r.gapToLeader(x), gap = (x.finished ? ' 🏁' : '') + (x.rank === 1 ? '' : ` ${fmtDelta(g)}`); // achterstand op de leider in tijd
+    const g = own ? (x === own[0] ? 0 : x.finished ? 0 : Math.max(0, own[0].dist - x.dist) / Math.max(5, own[0].v || 5)) : r.gapToLeader(x);
+    const gap = (x.finished ? ' 🏁' : '') + ((own ? x === own[0] : x.rank === 1) || (own && x.finished) ? '' : ` ${fmtDelta(g)}`); // achterstand in tijd
     return `<div class="${x === me ? 'me' : ''}"${r.teams ? ` style="border-right:4px solid ${esc(tcol(x) || 'transparent')}"` : ''}><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${x.penalty ? ` ⚖️+${x.penalty}s` : ''}${gap}</div>`;
   }).join(''));
   // Ploegenklassement live: alleen het tijdsverschil met de leidende ploeg.
