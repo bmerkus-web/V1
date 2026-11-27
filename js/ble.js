@@ -113,7 +113,10 @@ class Device {
       await withTimeout(this._setup(server), 10000, 'duurt te lang');
     } catch (e) {
       try { this.device.gatt.disconnect(); } catch (_) { /* negeer */ }
-      throw stepError(step, e);
+      const err = stepError(step, e);
+      // Gevonden maar niet te verbinden: meestal hangt hij nog aan een andere app (bijv. Wahoo of Zwift op je telefoon).
+      if (step === 'verbinden') err.message += ' – is hij nog verbonden met een andere app of telefoon? Verbreek die verbinding en probeer opnieuw.';
+      throw err;
     }
     this.connected = true;
     this.onstatus();
