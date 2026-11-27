@@ -396,15 +396,41 @@ export class ZwiftPad extends Device {
       this.kind = a.kind;
       this.pressed = a.left > 0 || a.right > 0 || a.item || a.elbow || a.up || a.down;
       this.lastData = performance.now();
+      if (this.pressed) this.lastPress = this.lastData;
       this.onpad(a);
     };
     this._timer = null;
+    // Wakker houden (proef): de knop valt na een tijd zonder knopdruk in slaap om zijn batterij te sparen.
+    // De eerste keer meten we na hoeveel tijd (T); daarna sturen we ~10 s daarvoor een seintje (de begroeting
+    // opnieuw). Valt hij toch in slaap terwijl er net een seintje was, dan werkt het bij deze knop niet: dan stoppen we.
+    this.wake = { on: false, T: 0, bad: false };
+    this.onwake = () => {};
+    this.lastPress = performance.now();
+    this._lastPing = 0;
+    this._rx = null;
+  }
+  _onDisconnect() {
+    if (!this._refreshing && this._wantConnected && this.wake.on && !this.wake.bad) {
+      const now = performance.now(), idle = now - this.lastPress;
+      if (this.wake.T && this._lastPing && now - this._lastPing < this.wake.T - 3000) { this.wake.bad = true; this._log('wakker houden werkt niet bij deze knop'); }
+      else if (idle > 15000 && (!this.wake.T || idle < this.wake.T)) { this.wake.T = Math.round(idle); this._log(`in slaap na ${Math.round(idle / 1000)} s zonder knopdruk`); }
+      this.onwake();
+    }
+    super._onDisconnect();
+  }
+  _ping(now) {
+    if (!this._rx) return;
+    this._lastPing = now;
+    const msg = new TextEncoder().encode('RideOn');
+    (this._rx.writeValueWithoutResponse ? this._rx.writeValueWithoutResponse(msg) : this._rx.writeValue(msg)).then(() => this._log('seintje (wakker houden)'), () => {});
   }
   get needsRefresh() {
     return /click/i.test(this.name) && this.kind !== 'click'; // Click v2 (de eerste Click heeft dit niet nodig)
   }
   // Wordt elke paar seconden aangeroepen.
   keepAlive(now = performance.now()) {
+    const w = this.wake;
+    if (this.connected && w.on && !w.bad && w.T && now - Math.max(this.lastPress, this._lastPing) > Math.max(5000, w.T - 10000)) this._ping(now);
     if (!this.connected || !this.needsRefresh || this.pressed) return false;
     if (now - this._lastRefresh < PAD_REFRESH_MS) return false;
     this.refresh('elke minuut (Click v2)');
@@ -431,6 +457,7 @@ export class ZwiftPad extends Device {
     await async_.startNotifications();
     await tx.startNotifications().catch(() => {});
     await (rx.writeValueWithoutResponse ? rx.writeValueWithoutResponse(new TextEncoder().encode('RideOn')) : rx.writeValue(new TextEncoder().encode('RideOn')));
+    this._rx = rx;
     this.pressed = false;
     this._lastRefresh = performance.now();
   }

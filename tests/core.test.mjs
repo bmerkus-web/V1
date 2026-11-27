@@ -1261,3 +1261,21 @@ test('Veldrit: kaart sluit, legs kruisen alleen via de brug, ondergrond remt, tr
   }
   assert.ok(on < 15, `bot ${on} keer op een obstakel`);
 });
+
+test('Zwift-knop wakker houden: meet de slaaptijd, seintje 10 s eerder, stopt als het niet helpt', async () => {
+  const { ZwiftPad } = await import('../js/ble.js');
+  const pad = new ZwiftPad();
+  pad._reconnect = () => {}; pad.onlost = () => {};
+  pad.wake = { on: true, T: 0, bad: false };
+  pad._wantConnected = true; pad.connected = true;
+  const writes = []; pad._rx = { writeValueWithoutResponse: (m) => { writes.push(m); return Promise.resolve(); } };
+  pad.lastPress = performance.now() - 120000; // 2 minuten niets gedrukt, dan valt hij in slaap
+  pad._onDisconnect();
+  assert.ok(Math.abs(pad.wake.T - 120000) < 1000, `T = ${pad.wake.T}`);
+  pad.connected = true; const t0 = performance.now(); pad.lastPress = t0; pad._lastPing = 0;
+  pad.keepAlive(t0 + 100000); assert.equal(writes.length, 0, 'nog geen seintje');
+  pad.keepAlive(t0 + 111000); assert.equal(writes.length, 1, 'seintje ~10 s voor het inslapen');
+  pad.keepAlive(t0 + 115000); assert.equal(writes.length, 1, 'niet meteen nog een');
+  pad._onDisconnect(); // toch in slaap terwijl er net een seintje was
+  assert.equal(pad.wake.bad, true);
+});
