@@ -4,15 +4,23 @@ import { makeClub, CLUB_ORDER } from './clubsound.js';
 let ctx = null, master = null, musicGain = null, sfxGain = null;
 let musicOn = true, sfxOn = true, musicTimer = null, step = 0, nextAt = 0;
 let intensity = 0.5, musicVol = 1, sfxVol = 1; // volumeschuiven (0..1)
+const MASTER = 1.6, MUSIC_BASE = 1.0, SFX_BASE = 0.8, ARCADE_BOOST = 1.6; // de 8-bit-muziek is van zichzelf zachter
+const musicLevel = () => MUSIC_BASE * musicVol * (mode === 'arcade' ? ARCADE_BOOST : 1);
 
 function ensure() {
   if (ctx) return true;
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return false;
   ctx = new AC();
-  master = ctx.createGain(); master.gain.value = 0.6; master.connect(ctx.destination);
-  musicGain = ctx.createGain(); musicGain.gain.value = 0.22 * musicVol; musicGain.connect(master);
-  sfxGain = ctx.createGain(); sfxGain.gain.value = 0.5 * sfxVol; sfxGain.connect(master);
+  // Alles flink harder dan eerst (dat zat zo'n 20 dB onder wat een tablet aankan), met aan het eind een
+  // compressor en een begrenzer: zo klinkt het vol, maar kraakt het niet bij een harde piek.
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -20; comp.knee.value = 8; comp.ratio.value = 3; comp.attack.value = 0.005; comp.release.value = 0.25;
+  const lim = ctx.createDynamicsCompressor();
+  lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.1;
+  master = ctx.createGain(); master.gain.value = MASTER; master.connect(comp); comp.connect(lim); lim.connect(ctx.destination);
+  musicGain = ctx.createGain(); musicGain.gain.value = musicLevel(); musicGain.connect(master);
+  sfxGain = ctx.createGain(); sfxGain.gain.value = SFX_BASE * sfxVol; sfxGain.connect(master);
   return true;
 }
 
@@ -107,7 +115,7 @@ function playStation(id, fresh = true) {
   }
   if (fresh) radioSkips = 0;
   radio._id = id; radio._on = true; radioTry = 0;
-  radio.volume = Math.min(1, 0.55 * musicVol);
+  radio.volume = Math.min(1, musicVol);
   radio.src = st.urls[0];
   radio.play().catch(() => {}); // fouten komen via het 'error'-event
 }
@@ -141,6 +149,7 @@ export const audio = {
   setMode(m) {
     if (m === mode) return;
     mode = m; userTrack = null;
+    if (ctx) musicGain.gain.setTargetAtTime(musicLevel(), ctx.currentTime, 0.05);
     if (musicTimer) { this.stopMusic(); this.startMusic(); }
   },
   // Klanken alvast klaarzetten (bijv. in het menu), zodat de muziek meteen bij de start begint.
@@ -184,7 +193,7 @@ export const audio = {
   // Volumes uit de instellingen (0..1); kwadratisch, zodat de schuif natuurlijker aanvoelt.
   setVolumes(m, s) {
     musicVol = m * m; sfxVol = s * s;
-    if (ctx) { musicGain.gain.setTargetAtTime(0.22 * musicVol, ctx.currentTime, 0.05); sfxGain.gain.setTargetAtTime(0.5 * sfxVol, ctx.currentTime, 0.05); }
-    if (radio) radio.volume = Math.min(1, 0.55 * musicVol);
+    if (ctx) { musicGain.gain.setTargetAtTime(musicLevel(), ctx.currentTime, 0.05); sfxGain.gain.setTargetAtTime(SFX_BASE * sfxVol, ctx.currentTime, 0.05); }
+    if (radio) radio.volume = Math.min(1, musicVol);
   },
 };
