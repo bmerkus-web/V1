@@ -209,6 +209,7 @@ export class Renderer {
     };
     for (const r of race.riders) {
       r._ph = (r._ph || 0) + ((r.cadence || 0) / 60) * Math.PI * 2 * dt;
+      if (r.dist < -40) continue; // training: rijdt nog op de vorige baan (achter je), niet op deze laten zien
       put(r.dist, { rider: r });
     }
     for (const gr of race.ghostRiders) if (!gr.hidden) { gr._ph = (gr._ph || 0) + 8 * dt; put(gr.dist, { rider: gr, ghost: true }); }
@@ -233,7 +234,7 @@ export class Renderer {
       if (s.z1 > NEAR) {
         for (const sp of seg.sprites) {
           const def = SCENERY[sp.k]; if (!def) continue;
-          const p = this._pt(seg, 0, sp.x + (Math.sign(sp.x) * def.w) / 2 / ROAD_W);
+          const p = this._pt(seg, 0, sp.x + (sp.c ? 0 : (Math.sign(sp.x) * def.w) / 2 / ROAD_W)); // c: midden op die plek (op de weg); anders naar buiten
           const w = def.w * p.u, h = def.h * p.u;
           if (h < 3 || p.X + w < 0 || p.X - w > W || p.Y - h > s.clip) continue;
           c.drawImage(def.cv, p.X - w / 2, p.Y - h, w, h);
@@ -270,7 +271,7 @@ export class Renderer {
             const r = o.rider, p = this._pt(seg, o.t, r.x);
             if (s.z1 + (s.z2 - s.z1) * o.t < NEAR) continue;
             const tm = !o.ghost && race.teams && r.team != null ? race.teams.find((x) => x.id === r.team) : null; // ploegtrui en rugnummer
-            drawRider(c, p.X, p.Y, p.u * 1.2, r, t, { ghost: o.ghost, fade: !o.ghost && !!race.ttt && r !== me && !race.mate(me, r), // tijdrit: andere ploegen als spoken green: !o.ghost && r.id === race.greenId, polka: !o.ghost && r.id === race.komId && r.id !== race.greenId, cass: !o.ghost && r.id === race.cassId, tire: (th.cobble || COBBLE_LOOK).joint, label: r === me ? null : r.name, lean: tr.m7 ? this._lean7(r) : undefined,
+            drawRider(c, p.X, p.Y, p.u * 1.2, r, t, { ghost: o.ghost, fade: !o.ghost && !!race.ttt && r !== me && !race.mate(me, r), /* tijdrit: andere ploegen als spoken */ green: !o.ghost && r.id === race.greenId, polka: !o.ghost && r.id === race.komId && r.id !== race.greenId, cass: !o.ghost && r.id === race.cassId, tire: (th.cobble || COBBLE_LOOK).joint, label: r === me ? null : r.name, lean: tr.m7 ? this._lean7(r) : undefined,
               team: tm?.color, bib: tm ? r.bib : null, leadBib: !!tm && race.teamLead === r.team });
             if (r === me) this.meScr = p;
           }

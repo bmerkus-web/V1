@@ -1436,7 +1436,7 @@ function hud(dt) {
   setHTML($('h-rank'), rows.map((x) => {
     const g = own ? (x === own[0] ? 0 : x.finished ? 0 : Math.max(0, own[0].dist - x.dist) / Math.max(5, own[0].v || 5)) : r.gapToLeader(x);
     const gap = (x.finished ? ' 🏁' : '') + ((own ? x === own[0] : x.rank === 1) || (own && x.finished) ? '' : ` ${fmtDelta(g)}`); // achterstand in tijd
-    return `<div class="${x === me ? 'me' : ''}"${r.teams ? ` style="border-right:4px solid ${esc(tcol(x) || 'transparent')}"` : ''}><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${x.penalty ? ` ⚖️+${x.penalty}s` : ''}${gap}</div>`;
+    return `<div class="${x === me ? 'me' : ''}"${r.teams ? ` style="border-right:4px solid ${esc(tcol(x) || 'transparent')}"` : ''}><span style="color:${esc(x.color)}">●</span> ${x.rank}. ${esc(x.name)}${gap}</div>`; // jurystraffen pas in de uitslag
   }).join(''));
   // Ploegenklassement live: alleen het tijdsverschil met de leidende ploeg.
   $('h-teams').classList.toggle('hidden', !r.teamTable);
