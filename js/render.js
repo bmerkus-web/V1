@@ -169,7 +169,7 @@ export class Renderer {
       if (seg.cobble) this._cobbles(seg, a, b, w1, w2, n, th.road[alt], th.cobble || COBBLE_LOOK);
       else if (alt && n < 90) {
         c.fillStyle = th.lane; c.globalAlpha = 0.55;
-        for (const l of [-1 / 3, 1 / 3]) this._quad(a.X + w1 * l, a.Y, w1 * 0.014, b.X + w2 * l, b.Y, w2 * 0.014);
+        this._quad(a.X, a.Y, w1 * 0.014, b.X, b.Y, w2 * 0.014); // middenstreep: twee rijstroken
         c.globalAlpha = 1;
       }
       if (seg.obs) { // obstakels op het wegdek

@@ -24,6 +24,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
+| WB-59 | Moddermolen (veldrit): af en toe nog een hapering op de iPhone (demo-modus). Uitzoeken met een profiel op het toestel; mogelijke oorzaken: geheugen opruimen door tijdelijke objecten per beeld (lijsten, punten), of de vloer op de grafische chip laten tekenen. | zelf | S |
 | WB-58 | Bochten met decor: kruispunt met 90-gradenbocht (zijweg, afgesloten weg rechtdoor met dranghekken), rotonde (eiland, zijwegen met hekken), haarspeld met parallelle weg en tegenliggers; horizon die meedraait met de bocht, decor aan de buitenkant snel en binnenkant langzaam; snelheid omlaag in scherpe bochten. Eerst proefanimatie van het kruispunt. | zelf | M |
 | WB-57 | Veldritbaan (testbaan Moddermolen staat er; nog te doen): korte rondes op tijd met bel voor de laatste ronde, lint als baanrand, gras/modder (met snel spoor)/zand, balken springen op het goede moment, trap met afstappen en lopen, vliegbrug, materiaalpost met modder op je fiets, Zandkoning-trui; later Modderspat en een kermis-hardstyle Clubsound. In stappen bouwen. | zelf | L |
 | WB-10 | Lichte weergave voor oude tablets: minder decor en minder ver vooruit tekenen. | zelf (zorg over oude tablet) | S |
@@ -75,6 +76,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- 🧭 Rit kiezen: eerst Wegrace of Tijdrit, dan Ploegen (geen of 2/3 ploegen); de titel zegt wat het wordt (Race, Ploegenrace, Individuele tijdrit, Ploegentijdrit). Weg met twee rijstroken (één middenstreep)
 - 🌀 Testveldrit Moddermolen op een draaiende vloer (Mode 7): plattegrond met linten, haarspelden en zigzaggen, zand/modder/gras/kasseien/asfalt, plassen, balken, strobalen, boomstam, bandenchicane, trap op een talud en een brug over het parcours (dek boven de vloer, camera gaat mee omhoog) (WB-57, eerste stap)
 - 🚧 Obstakels op de weg: verkeerseiland, paaltjes, wegwerkzaamheden (chicane) en drempels op alle drie de banen; erop rijden = berm, drempel = tik op de trainer, bots sturen eromheen; de zon schuift mee in bochten
 - ⏱️ Individuele tijdrit: iedereen tegelijk naast elkaar, alle anderen als spoken (geen botsing, kwak of slipstream), eigen boxen en blitzjes per renner, power-ups uit of aan (turbo, scooter, plakbidon zonder jury), geen sprints of truien, eigen PR en PR-spook
