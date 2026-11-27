@@ -894,9 +894,7 @@ export class Race {
   // Elke straf wordt bewaard (waarvoor, wie je raakte, waar), zodat de uitslag het kan laten zien.
   _juryFx(r, secs, why, vic = null) {
     (r.pens ||= []).push({ why, secs, vic, km: Math.round(Math.max(0, r.dist) / 100) / 10 });
-    const what = juryWhat(why, vic);
-    if (r === this.me) { this.emit('sfx', 'whistle'); this.emit('banner', { text: `⚖️ JURY: +${secs} s`, sub: what, color: '#ffd166' }); }
-    else this.say(`⚖️ ${r.name} +${secs} s (${what})`);
+    // Geen melding tijdens de race: de jury maakt haar straffen pas bekend in de uitslag.
   }
 
   // r rijdt achterop o: r valt terug tot onder de snelheid van o en moet even herstellen.

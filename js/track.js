@@ -36,7 +36,7 @@ export const TRACK_DEFS = [
     cobbles: [{ name: 'De Hel van de Polder', start: 1680, len: 500, stars: 4 }],
     obstacles: [
       { type: 'bump', at: 200 }, { type: 'island', at: 1200, len: 25 }, { type: 'bump', at: 2320 },
-      { type: 'works', at: 3240, len: 30, x: -0.5, w: 0.55 }, { type: 'works', at: 3300, len: 30, x: 0.5, w: 0.55 }, // chicane
+      { type: 'works', at: 3240, len: 30, x: -0.5, w: 0.62 }, { type: 'works', at: 3300, len: 30, x: 0.5, w: 0.62 }, // chicane
       { type: 'bollards', at: 3700, len: 5, w: 0.12 },
     ],
     sections: [
@@ -66,7 +66,7 @@ export const TRACK_DEFS = [
     cut: [2500, 140],
     cobbles: [{ name: 'Basaltmuur', start: 1580, len: 300, stars: 5 }],
     obstacles: [
-      { type: 'works', at: 2150, len: 30, x: 0.5, w: 0.55 }, { type: 'works', at: 2210, len: 30, x: -0.5, w: 0.55 }, // chicane in de afdaling
+      { type: 'works', at: 2150, len: 30, x: 0.5, w: 0.62 }, { type: 'works', at: 2210, len: 30, x: -0.5, w: 0.62 }, // chicane in de afdaling
       { type: 'island', at: 4300, len: 25 }, { type: 'bump', at: 4700 },
     ],
     sections: [
@@ -96,7 +96,7 @@ export const TRACK_DEFS = [
     cut: [3380, 130],
     obstacles: [
       { type: 'bump', at: 250 }, { type: 'island', at: 1000, len: 25 },
-      { type: 'works', at: 2700, len: 30, x: -0.5, w: 0.55 }, { type: 'works', at: 2760, len: 30, x: 0.5, w: 0.55 }, // chicane
+      { type: 'works', at: 2700, len: 30, x: -0.5, w: 0.62 }, { type: 'works', at: 2760, len: 30, x: 0.5, w: 0.62 }, // chicane
       { type: 'bollards', at: 4000, len: 5, w: 0.12 },
     ],
     sections: [
@@ -185,12 +185,12 @@ function build(def) {
     const k0 = Math.floor(o.at / SEG), k1 = Math.max(k0 + 1, Math.ceil((o.at + o.len) / SEG));
     for (let k = k0; k < k1; k++) segs[k % n].obs = o;
     const put = (k, sp) => segs[k % n].sprites.push(sp);
-    if (o.type === 'island') { put(k0, { k: 'bollard', x: o.x }); put(k1 - 1, { k: 'bollard', x: o.x }); }
-    if (o.type === 'bollards') for (let i = -1; i <= 1; i++) put(k0, { k: 'bollard', x: o.x + i * o.w * 0.8 });
-    if (o.type === 'works') {
-      const edge = o.x - Math.sign(o.x || 1) * o.w; // rand aan de kant van de vrije weg
-      for (let k = k0; k < k1; k += 2) put(k, { k: 'barrier', x: edge });
-      put(k0, { k: 'cone', x: edge - Math.sign(o.x || 1) * 0.08 }); put(k0, { k: 'worksign', x: o.x });
+    if (o.type === 'island') { put(k0, { k: 'bollard', x: o.x, c: true }); put(k1 - 1, { k: 'bollard', x: o.x, c: true }); }
+    if (o.type === 'bollards') for (let i = -1; i <= 1; i++) put(k0, { k: 'bollard', x: o.x + i * o.w * 0.8, c: true });
+    if (o.type === 'works') { // hekken, pion en bord staan binnen het afgezette stuk: wie ze raakt, zit erop
+      const sd = Math.sign(o.x || 1), edge = o.x - sd * o.w, half = 1.3 / ROAD_W; // rand aan de kant van de vrije weg; halve breedte van een hek
+      for (let k = k0; k < k1; k += 2) put(k, { k: 'barrier', x: edge + sd * (half + 0.02), c: true });
+      put(k0, { k: 'cone', x: edge + sd * 0.07, c: true }); put(k0, { k: 'worksign', x: o.x + sd * 0.1, c: true });
     }
   }
 

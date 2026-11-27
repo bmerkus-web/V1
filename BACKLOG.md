@@ -76,6 +76,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- 🔧 Truien, namen boven renners en hellen in bochten weer zichtbaar (stonden per ongeluk achter een commentaar); jurystraffen pas in de uitslag; renners die nog op de vorige baan rijden niet tonen; bord, hekken en pion bij wegwerkzaamheden staan in het afgezette stuk (rijbaan smaller); camera bij de brug-afdaling niet hoger dan nodig
 - ⏱️ Tijdrit ook in de training: de etappes als tijdrit (spoken, geen slipstream), warming-up en cooling-down samen
 - 🧭 Rit kiezen: eerst Wegrace of Tijdrit, dan Ploegen (geen of 2/3 ploegen); de titel zegt wat het wordt (Race, Ploegenrace, Individuele tijdrit, Ploegentijdrit). Weg met twee rijstroken (één middenstreep)
 - 🌀 Testveldrit Moddermolen op een draaiende vloer (Mode 7): plattegrond met linten, haarspelden en zigzaggen, zand/modder/gras/kasseien/asfalt, plassen, balken, strobalen, boomstam, bandenchicane, trap op een talud en een brug over het parcours (dek boven de vloer, camera gaat mee omhoog) (WB-57, eerste stap)

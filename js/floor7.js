@@ -72,7 +72,7 @@ export const M7 = {
     const ty = rp.h + wrap(ahead.h - rp.h) * 0.35 + Math.atan2(this.lv7, Math.max(2.5, me.v));
     this.yaw7 = this.yaw7 == null ? ty : this.yaw7 + wrap(ty - this.yaw7) * Math.min(1, dt * 10); // snel volgen: anders lijkt het of je door de bocht glijdt
     const yaw = this.yaw7, fx = Math.sin(yaw), fy = Math.cos(yaw);
-    const zt = Math.max(rp.z, tr.yAt(me.dist - back)); // afdalen van de brug: de camera hangt nog boven het dek, niet erdoorheen
+    const zt = Math.max(rp.z, tr.yAt(me.dist - back) + 0.9 - CAM_H); // afdalen van de brug: net boven het dek blijven (niet erdoorheen), maar niet hoger dan nodig
     this.camZ7 = this.camZ7 == null ? zt : this.camZ7 + (zt - this.camZ7) * Math.min(1, dt * 6);
     const g = tr.segAt(me.dist + 4).grade;
     this.pitch7 = (this.pitch7 || 0) + (clamp(g / 100, -0.3, 0.3) * 0.45 * f - (this.pitch7 || 0)) * Math.min(1, dt * 3); // klimmen: je kijkt omhoog
@@ -183,9 +183,9 @@ export const M7 = {
       for (const sd of [-1, 1]) {
         const p = W(d0, sd * (seg.wA + 0.06)), q = W(d1, sd * (nx.wA + 0.06));
         const A = this._p7(p.x, p.y, p.z), B = this._p7(p.x, p.y, p.z + ht), C2 = this._p7(q.x, q.y, q.z + ht), D2 = this._p7(q.x, q.y, q.z);
-        if (!A.u) continue;
+        if (!A.u || A.z < (seg.y1 > 0.3 ? 7 : 2.5)) continue; // vlak voor de camera (en op het talud of de brug wat ruimer): weglaten
         c.fillStyle = hek ? '#b9bccb' : '#e8e8f0'; c.fillRect(A.X - Math.max(1, A.u * 0.03), B.Y, Math.max(2, A.u * 0.06), A.Y - B.Y);
-        if (!C2.u) continue;
+        if (!C2.u || C2.z < (seg.y1 > 0.3 ? 7 : 2.5)) continue;
         if (hek) { c.fillStyle = 'rgba(200,204,216,.55)'; c.beginPath(); c.moveTo(A.X, A.Y); c.lineTo(B.X, B.Y); c.lineTo(C2.X, C2.Y); c.lineTo(D2.X, D2.Y); c.fill(); }
         c.strokeStyle = (th.tape || ['#ff3fa4', '#fff'])[seg.i & 1]; c.lineWidth = Math.max(1, A.u * 0.05);
         c.beginPath(); c.moveTo(B.X, B.Y + A.u * 0.08); c.lineTo(C2.X, C2.Y + C2.u * 0.08); c.stroke();
