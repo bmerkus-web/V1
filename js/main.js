@@ -376,7 +376,7 @@ function renderSetup() {
   const tr_ = sel.mode === 'training', wk_ = sel.mode === 'workout';
   if (lobby) sel.wkMode = 'game'; // samen een workout = altijd de Game-modus
   const kind = sel.ttt ? (sel.teams && sel.teams !== '0' ? 'Ploegentijdrit' : 'Individuele tijdrit') : sel.teams && sel.teams !== '0' ? 'Ploegenrace' : 'Race';
-  $('setup-title').textContent = tr_ ? 'Training' : wk_ ? 'Workout' : lobby ? `Kamer · ${kind}` : kind;
+  $('setup-title').textContent = tr_ ? (sel.ttt ? 'Training · tijdrit' : 'Training') : wk_ ? 'Workout' : lobby ? `Kamer · ${kind}` : kind;
   $('m-race').classList.toggle('sel', !tr_ && !wk_); $('m-training').classList.toggle('sel', tr_); $('m-workout').classList.toggle('sel', wk_);
   $('m-race').disabled = $('m-training').disabled = !canEdit;
   $('m-workout').disabled = !canEdit;
@@ -415,7 +415,7 @@ function renderSetup() {
   $('o-diff-l').classList.toggle('hidden', !botsShown && !teamsOn);
   renderTeams(canEdit);
   $('o-fair').parentElement.classList.toggle('hidden', wk_); // een workout-game is altijd eerlijk (t.o.v. FTP)
-  $('o-rubber').parentElement.classList.toggle('hidden', wk_ && !game);
+  $('o-rubber').parentElement.classList.toggle('hidden', wk_ ? !game : !!sel.ttt); // tijdrit: geen rubber banding
   $('o-fair-note').classList.toggle('hidden', wk_);
   document.querySelector('.ghosts').classList.toggle('hidden', wk_);
   $('o-erg').checked = store.wkErg ?? true; // ERG is een eigen keuze, ook in een kamer
@@ -457,9 +457,10 @@ function teamPlan(players) {
   return { teams, mem, size };
 }
 function renderTeams(canEdit) {
-  const race_ = sel.mode === 'race';
-  $('team-box').classList.toggle('hidden', !race_);
-  if (!race_) return;
+  const race_ = sel.mode === 'race', tr_ = sel.mode === 'training';
+  $('team-box').classList.toggle('hidden', !race_ && !tr_); // training: alleen wegrace of tijdrit, geen ploegen
+  if (!race_ && !tr_) return;
+  $('teams-row').classList.toggle('hidden', tr_);
   $('o-teams').value = sel.teams || '0'; $('o-teams').disabled = !canEdit;
   const plan = teamPlan(humans());
   $('teams').classList.toggle('hidden', !plan); $('team-tools').classList.toggle('hidden', !plan);
@@ -467,8 +468,7 @@ function renderTeams(canEdit) {
   for (const b of $('kind-seg').children) { const on = (b.dataset.k === 'tt') === !!sel.ttt; b.classList.toggle('sel', on); b.setAttribute('aria-checked', on); b.disabled = !canEdit; }
   $('o-tttitems').value = sel.tttItems || 'off'; $('o-tttitems').disabled = !canEdit;
   $('ttt-row').classList.toggle('hidden', !sel.ttt);
-  $('o-rubber').parentElement.classList.toggle('hidden', !!sel.ttt); // tijdrit: geen rubber banding
-  $('kind-note').textContent = sel.ttt ? (plan ? 'De andere ploegen zijn spoken. De ploegtijd is die van je laatste renner: blijf bij elkaar.' : 'De anderen zijn spoken: geen botsingen, geen kwak, geen slipstream.') : plan ? 'Ploegenklassement: alle renners van een ploeg opgeteld.' : '';
+  $('kind-note').textContent = tr_ ? (sel.ttt ? 'De etappes zijn een tijdrit: de anderen zijn spoken, geen slipstream. In- en uitrijden doe je gewoon samen.' : '') : sel.ttt ? (plan ? 'De andere ploegen zijn spoken. De ploegtijd is die van je laatste renner: blijf bij elkaar.' : 'De anderen zijn spoken: geen botsingen, geen kwak, geen slipstream.') : plan ? 'Ploegenklassement: alle renners van een ploeg opgeteld.' : '';
   if (!plan) return;
   const myId = room ? room.me.id : 'p0';
   $('teams').innerHTML = plan.mem.map((m, i) => {
@@ -681,7 +681,7 @@ $('b-start').onclick = () => {
       }
     });
   }
-  else if (sel.ttt && sel.mode === 'race') { cfg.ttt = { items: sel.tttItems === 'team' ? 'team' : 'off' }; cfg.rubber = false; } // individuele tijdrit
+  else if (sel.ttt && (sel.mode === 'race' || sel.mode === 'training')) { cfg.ttt = { items: sel.tttItems === 'team' ? 'team' : 'off' }; cfg.rubber = false; } // individuele tijdrit
   if (sel.mode === 'training') Object.assign(cfg, { plan: sel.plan.map((s) => ({ track: s.track, laps: s.laps })), warm: sel.warm, cool: sel.cool });
   if (sel.mode === 'workout') {
     const w = allWorkouts().find((x) => x.id === sel.wk) || BUILTIN[0], mode = room ? 'game' : sel.wkMode;
@@ -1053,7 +1053,7 @@ function launch(cfg, carry) {
   }
   race = new Race({
     teams: training || cfg.workout ? null : cfg.teams || null,
-    ttt: training || cfg.workout ? null : cfg.ttt || null,
+    ttt: cfg.workout || (training && st.kind !== 'stage') ? null : cfg.ttt || null, // training: alleen de etappes als tijdrit, in- en uitrijden samen
     track, laps: st.laps, seed: cfg.seed + (training ? training.idx : 0), riders, room, isHost: iRunBots, ns: n,
     profile: { ...P, fair: cfg.fair, assist: !!P.assist && ((cfg.workout && cfg.wkMode === 'ride') || (!!cfg.plan && !room)) /* stuurhulp alleen bij Ride en solo training */ }, difficulty: cfg.diff, rubber: !!cfg.rubber, ghost, ghostLap: P.ghostLap, ghostSeg: P.ghostSeg, getPower, getSteer, emit, ...extra,
   });
