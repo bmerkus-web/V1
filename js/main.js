@@ -375,7 +375,8 @@ function renderSetup() {
   const lobby = !!room, canEdit = !room || room.isHost;
   const tr_ = sel.mode === 'training', wk_ = sel.mode === 'workout';
   if (lobby) sel.wkMode = 'game'; // samen een workout = altijd de Game-modus
-  $('setup-title').textContent = lobby ? 'Kamer' : tr_ ? 'Training' : wk_ ? 'Workout' : 'Solo race';
+  const kind = sel.ttt ? (sel.teams && sel.teams !== '0' ? 'Ploegentijdrit' : 'Individuele tijdrit') : sel.teams && sel.teams !== '0' ? 'Ploegenrace' : 'Race';
+  $('setup-title').textContent = tr_ ? 'Training' : wk_ ? 'Workout' : lobby ? `Kamer · ${kind}` : kind;
   $('m-race').classList.toggle('sel', !tr_ && !wk_); $('m-training').classList.toggle('sel', tr_); $('m-workout').classList.toggle('sel', wk_);
   $('m-race').disabled = $('m-training').disabled = !canEdit;
   $('m-workout').disabled = !canEdit;
@@ -462,13 +463,12 @@ function renderTeams(canEdit) {
   $('o-teams').value = sel.teams || '0'; $('o-teams').disabled = !canEdit;
   const plan = teamPlan(humans());
   $('teams').classList.toggle('hidden', !plan); $('team-tools').classList.toggle('hidden', !plan);
-  // Tijdrit: met ploegen een ploegentijdrit, zonder ploegen een individuele tijdrit.
-  $('o-ttt').checked = !!sel.ttt; $('o-tttitems').value = sel.tttItems || 'off';
-  $('o-ttt').disabled = $('o-tttitems').disabled = !canEdit;
-  $('o-ttt-t').textContent = plan ? '⏱️ Ploegentijdrit' : '⏱️ Tijdrit';
-  $('o-tttitems-l').classList.toggle('hidden', !sel.ttt);
+  // Eerst de soort rit (wegrace of tijdrit), dan wel of geen ploegen. Samen: race, ploegenrace, individuele tijdrit of ploegentijdrit.
+  for (const b of $('kind-seg').children) { const on = (b.dataset.k === 'tt') === !!sel.ttt; b.classList.toggle('sel', on); b.setAttribute('aria-checked', on); b.disabled = !canEdit; }
+  $('o-tttitems').value = sel.tttItems || 'off'; $('o-tttitems').disabled = !canEdit;
+  $('ttt-row').classList.toggle('hidden', !sel.ttt);
   $('o-rubber').parentElement.classList.toggle('hidden', !!sel.ttt); // tijdrit: geen rubber banding
-  $('ttt-note').classList.toggle('hidden', !sel.ttt || !!plan);
+  $('kind-note').textContent = sel.ttt ? (plan ? 'De andere ploegen zijn spoken. De ploegtijd is die van je laatste renner: blijf bij elkaar.' : 'De anderen zijn spoken: geen botsingen, geen kwak, geen slipstream.') : plan ? 'Ploegenklassement: alle renners van een ploeg opgeteld.' : '';
   if (!plan) return;
   const myId = room ? room.me.id : 'p0';
   $('teams').innerHTML = plan.mem.map((m, i) => {
@@ -478,7 +478,7 @@ function renderTeams(canEdit) {
     return `<div class="team" style="--tc:${t.color}"><input data-tn="${i}" value="${esc(t.name)}" maxlength="16" aria-label="Naam ploeg ${i + 1}"${canEdit ? '' : ' disabled'}>${rows.join('')}${mine ? '' : `<button class="ghost" data-join="${i}">Bij deze ploeg</button>`}</div>`;
   }).join('');
   $('t-fair').classList.toggle('hidden', !canEdit || humans().length < 2);
-  $('team-note').textContent = `Lege plekken worden bots. ${sel.ttt ? 'Ploegentijdrit: de andere ploegen zijn spoken; de ploegtijd is de tijd van je laatste renner, dus blijf bij elkaar.' : 'Ploegenklassement: alle renners van een ploeg opgeteld.'}${canEdit && humans().length > 1 ? ' Tik op een naam om die renner te verplaatsen.' : ''}`;
+  $('team-note').textContent = `Lege plekken worden bots.${canEdit && humans().length > 1 ? ' Tik op een naam om die renner te verplaatsen.' : ''}`;
 }
 // Renner naar een ploeg; is die vol, dan ruilt de laatste daar van plek.
 function setTeam(id, t) {
@@ -494,7 +494,7 @@ function setTeam(id, t) {
   pushSettings();
 }
 function pickTeam(t) { const id = room ? room.me.id : 'p0'; if (!room || room.isHost) setTeam(id, t); else room.send({ t: 'teampick', id, team: t }); }
-$('o-ttt').onchange = (e) => { sel.ttt = e.target.checked; if (!room) { store.ttt = sel.ttt; save(); } pushSettings(); };
+$('kind-seg').onclick = (e) => { const b = e.target.closest('button[data-k]'); if (!b || b.disabled) return; sel.ttt = b.dataset.k === 'tt'; if (!room) { store.ttt = sel.ttt; save(); } pushSettings(); };
 $('o-tttitems').onchange = (e) => { sel.tttItems = e.target.value; if (!room) { store.tttItems = sel.tttItems; save(); } pushSettings(); };
 $('o-teams').onchange = (e) => { sel.teams = e.target.value; if (!room) { store.teams = sel.teams; save(); } pushSettings(); };
 $('teams').onchange = (e) => {
