@@ -179,6 +179,8 @@ $('b-pads').onclick = async () => {
   audio.unlock();
   if (!bleSupported()) { noBle(); return; }
   const pad = new ZwiftPad();
+  pad.wake = (P.padWake ||= { on: false, T: 0, bad: false }); // proef: wakker houden (zie ble.js)
+  pad.onwake = () => { save(); padWakeNote(); };
   let was = {};
   pad.onpad = (raw) => {
     const a = { ...raw };
@@ -346,6 +348,17 @@ applyVolumes();
 $('p-mvol').oninput = (e) => { P.musicVol = +e.target.value; $('p-mvol-v').textContent = P.musicVol + '%'; applyVolumes(); save(); };
 $('p-svol').oninput = (e) => { P.sfxVol = +e.target.value; $('p-svol-v').textContent = P.sfxVol + '%'; applyVolumes(); save(); };
 $('p-svol').onchange = () => { audio.unlock(); audio.sfx('bolt'); }; // even laten horen hoe hard het is
+// Zwift-knop wakker houden (proef): de eerste keer meet het spel na hoeveel tijd hij in slaap valt, daarna een seintje ~10 s daarvoor.
+function padWakeNote() {
+  const w = (P.padWake ||= { on: false, T: 0, bad: false });
+  $('p-padwake').checked = !!w.on;
+  $('p-padwake-n').textContent = !w.on ? 'De knoppen vallen na een tijd zonder knopdruk in slaap. Zet dit aan om te proberen dat te voorkomen (kost iets meer batterij).'
+    : w.bad ? 'Werkt niet bij jouw knop: hij viel toch in slaap. Druk op een knop om hem te wekken; het spel verbindt vanzelf opnieuw.'
+    : w.T ? `Je knop viel na ${Math.round(w.T / 1000)} s zonder knopdruk in slaap. Het spel stuurt nu na ${Math.max(5, Math.round(w.T / 1000) - 10)} s een seintje.`
+    : 'Nog niet gemeten: de eerste keer dat je knop in slaap valt, onthoudt het spel na hoeveel tijd. Druk dan op een knop om hem te wekken.';
+}
+padWakeNote();
+$('p-padwake').onchange = (e) => { const w = (P.padWake ||= { on: false, T: 0, bad: false }); w.on = e.target.checked; if (w.on) { w.T = 0; w.bad = false; } save(); padWakeNote(); };
 $('p-sens').oninput = (e) => { P.sens[steerKind()] = +e.target.value; $('p-sens-v').textContent = e.target.value; applySens(); save(); };
 $('p-feel').oninput = (e) => { P.trainerFeel = +e.target.value; $('p-feel-v').textContent = P.trainerFeel + '%'; save(); };
 for (const k of ['vshift', 'music', 'sfx']) $('p-' + k).onchange = (e) => { P[k] = e.target.checked; save(); audio.setOptions(P.music, P.sfx); };

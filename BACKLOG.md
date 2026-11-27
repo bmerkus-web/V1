@@ -76,6 +76,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- 🔋 Proef: Zwift-knop wakker houden (instelling). Meet de eerste keer na hoeveel tijd zonder knopdruk hij in slaap valt en stuurt daarna ~10 s eerder een seintje; valt hij toch in slaap, dan stopt de proef vanzelf. Uitkomst nog te testen met de Click v2.
 - 🔧 Truien, namen boven renners en hellen in bochten weer zichtbaar (stonden per ongeluk achter een commentaar); jurystraffen pas in de uitslag; renners die nog op de vorige baan rijden niet tonen; bord, hekken en pion bij wegwerkzaamheden staan in het afgezette stuk (rijbaan smaller); camera bij de brug-afdaling niet hoger dan nodig
 - ⏱️ Tijdrit ook in de training: de etappes als tijdrit (spoken, geen slipstream), warming-up en cooling-down samen
 - 🧭 Rit kiezen: eerst Wegrace of Tijdrit, dan Ploegen (geen of 2/3 ploegen); de titel zegt wat het wordt (Race, Ploegenrace, Individuele tijdrit, Ploegentijdrit). Weg met twee rijstroken (één middenstreep)
