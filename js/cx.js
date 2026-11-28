@@ -19,7 +19,9 @@ export const PLANK_V = 4.2; // (niet meer gebruikt voor de speler: zie springen/
 // en rennen; nog een keer drukken = weer opstappen. Zonder te drukken tegen een balk of de trap op = een klap.
 export const JUMP_V = 4.2; // vanaf ~15 km/u kun je springen
 export const AIR = 0.45; // zo lang ben je in de lucht (s)
-export const RUN_V = 2.7; // rennen met de fiets op je schouder (~10 km/u)
+export const RUN_V = 2.78; // rennen met de fiets op je schouder: hooguit 10 km/u
+export const RUN_P = 220; // rennen: met zoveel watt haal je 10 km/u, met de helft ga je half zo snel (op de trap 1,5× zoveel nodig)
+export const RUN_FEEL = 6; // extra helling op de trainer tijdens het rennen (%)
 export const CX_LOOK = 14; // zo ver vooruit kijkt de knop naar een balk of trap (m)
 
 const wrap = (a) => ((((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
