@@ -1,5 +1,5 @@
 // Race-logica: renners, items, bots, zones/PR's, spook en netwerk-synchronisatie.
-import { SURF, STAIRS_V, PLANK_V, JUMP_V, AIR, RUN_V, RUN_P, RUN_FEEL, CX_LOOK } from './cx.js';
+import { SURF, CAMBER_PUSH, STAIRS_V, PLANK_V, JUMP_V, AIR, RUN_V, RUN_P, RUN_FEEL, CX_LOOK } from './cx.js';
 import { SEG, ROAD_W, GUTTER } from './track.js';
 import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
@@ -348,6 +348,7 @@ export class Race {
     const sf = this.track.m7 ? (r.berm ? 'grass' : seg.surf) : null, pud = sf && seg.puddle && Math.abs(r.x - seg.puddle.x) < seg.puddle.w;
     if (pud && !r.inPuddle && r === this.me) this.emit('shake', 3);
     r.inPuddle = !!pud; r.surf = sf; r.surfK = sf ? SURF[sf].k * (pud ? 1.4 : 1) : 1; // rennen: zwaar, hoe minder vermogen hoe trager
+    if (sf && seg.camber && !r.run) r.x += seg.camber * CAMBER_PUSH * SURF[sf].slip * (pud ? 1.3 : 1) * dt; // schuine kant: je glijdt naar de lage kant (rennend niet)
     if (sf) { const wob = SURF[sf].wob + (pud ? 0.25 : 0); if (wob) r.x += (Math.sin(this.clock * 7.3 + r.dist * 0.9) * 0.6 + Math.sin(this.clock * 13.1 + r.dist)) * wob * dt; }
     if (r.onCobble) r.x += (Math.sin(this.clock * 9.1 + r.dist * 0.7) * 0.18 + Math.sin(this.clock * 15.7 + r.dist) * 0.1) * dt; // stuur wiebelt op de stenen
     if ((r.onCobble || r.inGutter) && !this.free && !r.finished && this.rng() < (r.onCobble ? COBBLE_FLAT : GUTTER_FLAT) * dt) this._flat(r, 'kasseien');
@@ -1135,6 +1136,7 @@ export class Race {
       if (ai.leadT > 10 && this.rng() < 0.08) { ai.leadT = 0; this.elbow(r); }
       const wAhead = this.track.wAt(r.dist + 12);
       if (this.track.segAt(r.dist + 12).cobble) tx = ai.skill > 0.35 ? (Math.sign(r.x) || (ai.ph > 5 ? 1 : -1)) * (wAhead - GUTTER / 2) : clamp(tx, -(wAhead - 0.2), wAhead - 0.2); // goede bots zoeken het gootje
+      { const cb = this.track.segAt(r.dist + 6).camber; if (cb) tx = -Math.sign(cb) * wAhead * (0.25 + 0.3 * ai.skill); } // schuine kant: de hoge kant aanhouden
       for (let k = 0; k < 14; k++) { // obstakels op de weg: eerst het dichtstbijzijnde, kies de kant die het dichtst bij is
         const o = this.track.segs[(s0 + k) % this.track.n].obs;
         if (!o || !o.block) continue;

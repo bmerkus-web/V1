@@ -279,7 +279,7 @@ export class Renderer {
       }
       if (clipped) c.restore();
     };
-    if (tr.m7) this._sprites7(race, drawSeg); else for (let n = DRAW - 1; n >= 0; n--) drawSeg(tr.segs[(base + n) % tr.n]);
+    if (tr.m7) { this._sprites7(race, drawSeg); if (th.snow) this._snow7(dt); } else for (let n = DRAW - 1; n >= 0; n--) drawSeg(tr.segs[(base + n) % tr.n]);
 
     this._overlay(race, dt);
     c.restore();

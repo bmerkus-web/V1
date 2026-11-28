@@ -28,7 +28,7 @@ export const M7 = {
     for (const s of tr.segs) {
       const d0 = s.i * SEG, d1 = d0 + SEG + 0.4;
       if (s.open) { quad(d0, d1, -s.wA - 0.08, s.wA + 0.08, 'rgba(0,0,0,.35)'); continue; } // schaduw onder de brug
-      if (Math.max(s.y1, s.y2) > 0.4) continue; // het talud tekenen we als dek
+      if (Math.max(s.y1, s.y2) > 0.4 || Math.min(s.y1, s.y2) < -0.4 || s.camber) continue; // talud, kuil en schuine kant tekenen we als dek
       const col = th.surf[s.surf] || th.road[0];
       quad(d0, d1, -s.wA, s.wA, col);
       if (s.i % 2) quad(d0, d1, -s.wA, s.wA, 'rgba(0,0,0,.07)');
@@ -88,6 +88,8 @@ export const M7 = {
       const off = mod(yaw * f * (i ? 1 : 0.85), cv.width);
       c.drawImage(cv, -off, hz - cv.height + 2); c.drawImage(cv, cv.width - off, hz - cv.height + 2);
     });
+    // in de kuil: de camera zit onder het maaiveld, dus je ziet geen vloer maar de wanden rondom
+    if (cam.h < 0.6) { c.fillStyle = (th.bank || th.grass)[1]; c.fillRect(0, Math.max(0, hz), W, H); for (const s of tr.segs) { const z = (s.wx - cam.x) * fx + (s.wy - cam.y) * fy; s.scr.z1 = s.scr.z2 = z; s.scr.clip = H; s.scr.frame = frame; s.scr.n = 0; } return; }
     // vloer op halve resolutie
     const y0 = Math.max(0, Math.ceil(hz)), w2 = W >> 1, h2 = Math.max(1, (H - y0) >> 1);
     // Eén keer per schermformaat aanmaken (op volle hoogte). Steeds opnieuw aanmaken als de horizon verschuift
@@ -123,6 +125,20 @@ export const M7 = {
     r._kap7 = (r._kap7 ?? kap) + (kap - (r._kap7 ?? kap)) * Math.min(1, (this.dt7 || 0.016) * 4);
     const st = r.steer || 0, into = Math.sign(st) === Math.sign(r._kap7) ? Math.min(1.2, Math.abs(r._kap7) * 5) : 0;
     return clamp(st * (1 + into), -1.8, 1.8);
+  },
+
+  // Vallende sneeuw (schermruimte, met wat diepte); schuift mee als de camera draait.
+  _snow7(dt) {
+    const c = this.c, W = this.W, H = this.H, yaw = this.yaw7 || 0;
+    if (!this.flakes7) { this.flakes7 = Array.from({ length: 160 }, () => ({ x: Math.random() * W, y: Math.random() * H, d: 0.3 + Math.random() * 0.7, ph: Math.random() * 6 })); this.snowYaw = yaw; }
+    const dy = wrap(yaw - this.snowYaw) * (W / 2) * DEPTH; this.snowYaw = yaw;
+    c.fillStyle = '#fff';
+    for (const f of this.flakes7) {
+      f.y += (25 + 55 * f.d) * dt; f.x += Math.sin((f.ph += dt * 1.3)) * 12 * dt - dy * f.d;
+      if (f.y > H) { f.y = -5; f.x = Math.random() * W; } if (f.x < -10) f.x += W + 20; else if (f.x > W + 10) f.x -= W + 20;
+      c.globalAlpha = 0.35 + 0.5 * f.d; c.beginPath(); c.arc(f.x, f.y, 0.8 + 2.2 * f.d, 0, 7); c.fill();
+    }
+    c.globalAlpha = 1;
   },
 
   // Wereldpunt → scherm
@@ -164,16 +180,21 @@ export const M7 = {
     const tr = this.tr7, th = tr.theme, z = seg.scr.z1, nx = tr.segs[(seg.i + 1) % tr.n], d0 = seg.i * SEG, d1 = d0 + SEG;
     if (z > FAR || z < -SEG * 2) return;
     const W = (d, l) => tr.world(d, l), e = 0.1;
-    if (seg.y1 > 0.05 || seg.y2 > 0.05) {
-      const w0 = seg.wA + e, w1 = seg.wB + e;
+    if (Math.abs(seg.y1) > 0.05 || Math.abs(seg.y2) > 0.05 || seg.camber) {
+      const w0 = seg.wA + e, w1 = seg.wB + e, bank = th.bank || ['#1f4a2a', '#173a20'];
+      // Van de rand naar de grond (hoogte 0): een talud omhoog of de wand van een kuil omlaag.
+      const toGround = (l0, l1, sd, col) => { const a = W(d0, l0), b = W(d1, l1), c2 = W(d1, l1 + (sd * Math.abs(b.z) * 1.1) / ROAD_W), d = W(d0, l0 + (sd * Math.abs(a.z) * 1.1) / ROAD_W); this._poly7([[a.x, a.y, a.z], [b.x, b.y, b.z], [c2.x, c2.y, 0], [d.x, d.y, 0]], col); };
       if (seg.open) { // brug: pilaren onder het dek
         if (seg.i % 2 === 0) for (const sd of [-1, 1]) { const p = W(d0, sd * w0), q = W(d0 + 0.4, sd * w0); this._poly7([[p.x, p.y, 0], [q.x, q.y, 0], [q.x, q.y, p.z], [p.x, p.y, p.z]], '#3a2a20'); }
-      } else for (const sd of [-1, 1]) { // talud: schuine kanten naar de grond
-        const a = W(d0, sd * w0), b = W(d1, sd * w1), c2 = W(d1, sd * (w1 + (seg.y2 * 1.1) / ROAD_W)), d = W(d0, sd * (w0 + (seg.y1 * 1.1) / ROAD_W));
-        this._poly7([[a.x, a.y, a.z], [b.x, b.y, b.z], [c2.x, c2.y, 0], [d.x, d.y, 0]], sd < 0 ? '#1f4a2a' : '#173a20');
+      } else for (const sd of [-1, 1]) {
+        if (seg.camber) { // schuine kant: de helling loopt naast de baan door (een heuvelflank), dan naar de grond
+          const ext = 6 / ROAD_W, a = W(d0, sd * w0), b = W(d1, sd * w1), a2 = W(d0, sd * (w0 + ext)), b2 = W(d1, sd * (w1 + ext));
+          this._poly7([[a.x, a.y, a.z], [b.x, b.y, b.z], [b2.x, b2.y, b2.z], [a2.x, a2.y, a2.z]], bank[sd < 0 ? 0 : 1]);
+          toGround(sd * (w0 + ext), sd * (w1 + ext), sd, bank[1]);
+        } else toGround(sd * w0, sd * w1, sd, bank[sd < 0 ? 0 : 1]); // talud omhoog of de wand van de kuil
       }
       const a = W(d0, -w0), b = W(d0, w0), c2 = W(d1 + 0.3, w1), d = W(d1 + 0.3, -w1);
-      this._poly7([[a.x, a.y, a.z], [b.x, b.y, b.z], [c2.x, c2.y, c2.z], [d.x, d.y, d.z]], seg.open ? (this.cam7.h < a.z ? '#21140c' : '#3a2416') : '#24461f');
+      this._poly7([[a.x, a.y, a.z], [b.x, b.y, b.z], [c2.x, c2.y, c2.z], [d.x, d.y, d.z]], seg.open ? (this.cam7.h < a.z ? '#21140c' : '#3a2416') : bank[0]);
       if (this.cam7.h > Math.max(a.z, c2.z) + 0.05) { // van onderen zie je alleen de onderkant van de brug
       const a2 = W(d0, -seg.wA), b2 = W(d0, seg.wA), c3 = W(d1 + 0.3, seg.wB), d3 = W(d1 + 0.3, -seg.wB);
       this._poly7([[a2.x, a2.y, a2.z + 0.01], [b2.x, b2.y, b2.z + 0.01], [c3.x, c3.y, c3.z + 0.01], [d3.x, d3.y, d3.z + 0.01]], th.surf[seg.surf] || th.road[0]);
