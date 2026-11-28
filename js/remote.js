@@ -5,7 +5,7 @@
 import { openLink, makeCode } from './net.js';
 
 // Acties die de telefoon mag sturen (de rest negeren we).
-export const REMOTE_ACTIONS = ['item', 'elbow', 'gearUp', 'gearDown', 'pause', 'track'];
+export const REMOTE_ACTIONS = ['item', 'elbow', 'hop', 'gearUp', 'gearDown', 'pause', 'track'];
 
 // ---------- in de game ----------
 export class RemoteHost {

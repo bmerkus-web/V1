@@ -271,7 +271,7 @@ export class Renderer {
             const r = o.rider, p = this._pt(seg, o.t, r.x);
             if (s.z1 + (s.z2 - s.z1) * o.t < NEAR) continue;
             const tm = !o.ghost && race.teams && r.team != null ? race.teams.find((x) => x.id === r.team) : null; // ploegtrui en rugnummer
-            drawRider(c, p.X, p.Y, p.u * 1.2, r, t, { ghost: o.ghost, fade: !o.ghost && !!race.ttt && r !== me && !race.mate(me, r), /* tijdrit: andere ploegen als spoken */ green: !o.ghost && r.id === race.greenId, polka: !o.ghost && r.id === race.komId && r.id !== race.greenId, cass: !o.ghost && r.id === race.cassId, tire: (th.cobble || COBBLE_LOOK).joint, label: r === me ? null : r.name, lean: tr.m7 ? this._lean7(r) : undefined,
+            drawRider(c, p.X, p.Y, p.u * 1.2, r, t, { ghost: o.ghost, fade: !o.ghost && !!race.ttt && r !== me && !race.mate(me, r), /* tijdrit: andere ploegen als spoken */ green: !o.ghost && r.id === race.greenId, polka: !o.ghost && r.id === race.komId && r.id !== race.greenId, cass: !o.ghost && r.id === race.cassId, tire: (th.cobble || COBBLE_LOOK).joint, label: r === me ? null : r.name, lean: tr.m7 ? this._lean7(r) : undefined, lift: r.hopT > 0 ? 0.55 * Math.sin(Math.PI * Math.min(1, (r.hopAge || 0) / 0.45)) : (r.mask || 0) & 8192 ? 0.35 : 0, run: !!r.run || !!((r.mask || 0) & 16384),
               team: tm?.color, bib: tm ? r.bib : null, leadBib: !!tm && race.teamLead === r.team });
             if (r === me) this.meScr = p;
           }

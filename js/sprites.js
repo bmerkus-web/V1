@@ -151,6 +151,8 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   c.translate(X, Y - (m & 2048 ? Math.abs(Math.sin(t * 38 + X)) * 0.04 * u : 0)); // stuiteren op de kasseien
   c.fillStyle = 'rgba(0,0,0,.35)';
   c.beginPath(); c.ellipse(0, 0, 0.5 * u, 0.1 * u, 0, 0, 7); c.fill();
+  if (opts.lift) c.translate(0, -opts.lift * u); // springen: de schaduw blijft op de grond
+  const run = !!opts.run; // veldrit: rennen met de fiets op de schouder
   if (opts.ghost || opts.fade) c.globalAlpha = 0.38;
   c.rotate((opts.lean ?? r.steer ?? 0) * 0.2 + (m & 32 ? Math.sin(t * 25) * 0.45 : 0));
   if (m & 1) { // turbovlammen
@@ -162,12 +164,15 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
     c.fillStyle = 'rgba(255,209,102,.5)'; c.beginPath(); c.ellipse(0, -0.1 * u, 0.4 * u, 0.14 * u, 0, 0, 7); c.fill();
   }
   // achterwiel
-  if (m & 4096) { // antilekband (Gouden Kassei): band in de voegkleur van de kasseien, met een zachte gloed
+  if (run) { /* geen wiel op de grond: de fiets zit op de schouder */ }
+  else if (m & 4096) { // antilekband (Gouden Kassei): band in de voegkleur van de kasseien, met een zachte gloed
     c.fillStyle = (opts.tire || '#ffd166') + '55'; c.fillRect(-0.075 * u, -0.73 * u, 0.15 * u, 0.76 * u);
     c.fillStyle = opts.tire || '#ffd166';
   } else c.fillStyle = '#0c0c14';
-  c.fillRect(-0.045 * u, -0.7 * u, 0.09 * u, 0.7 * u);
-  c.fillStyle = '#c9c9d9'; c.fillRect(-0.012 * u, -0.66 * u, 0.024 * u, 0.62 * u);
+  if (!run) {
+    c.fillRect(-0.045 * u, -0.7 * u, 0.09 * u, 0.7 * u);
+    c.fillStyle = '#c9c9d9'; c.fillRect(-0.012 * u, -0.66 * u, 0.024 * u, 0.62 * u);
+  }
   if (m & 2) { c.fillStyle = '#b44dff'; c.beginPath(); c.ellipse(0, -0.05 * u, 0.3 * u, 0.1 * u, 0, 0, 7); c.fill(); }
   if (m & 128) { // lekke band: witte straaltjes lucht die aan één kant uit het achterwiel spuiten
     if (r._flatSide == null) r._flatSide = Math.random() < 0.5 ? -1 : 1; // per lekke band links of rechts
@@ -187,13 +192,20 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   const ph = r._ph || 0;
   c.lineCap = 'round';
   for (const s of [-1, 1]) {
+    if (run) { // rennen: lange passen, voeten om en om van de grond
+      const lift = Math.max(0, Math.sin(ph * 1.6 + (s > 0 ? Math.PI : 0))) * 0.22 * u, foot = -0.02 * u - lift, knee = -0.5 * u - lift * 0.6;
+      c.strokeStyle = '#e8b58f'; c.lineWidth = 0.09 * u; c.beginPath(); c.moveTo(s * 0.13 * u, knee); c.lineTo(s * 0.12 * u, foot); c.stroke();
+      c.strokeStyle = '#15152a'; c.lineWidth = 0.13 * u; c.beginPath(); c.moveTo(s * 0.1 * u, -0.98 * u); c.lineTo(s * 0.13 * u, knee); c.stroke();
+      c.fillStyle = '#f5f5ff'; c.fillRect(s * 0.12 * u - 0.05 * u, foot - 0.02 * u, 0.1 * u, 0.07 * u);
+      continue;
+    }
     const foot = -0.3 * u + s * Math.sin(ph) * 0.15 * u, knee = foot - 0.36 * u;
     c.strokeStyle = '#e8b58f'; c.lineWidth = 0.09 * u; c.beginPath(); c.moveTo(s * 0.14 * u, knee); c.lineTo(s * 0.12 * u, foot); c.stroke();
     c.strokeStyle = '#15152a'; c.lineWidth = 0.13 * u; c.beginPath(); c.moveTo(s * 0.1 * u, -0.98 * u); c.lineTo(s * 0.14 * u, knee); c.stroke();
     c.fillStyle = '#f5f5ff'; c.fillRect(s * 0.12 * u - 0.05 * u, foot - 0.02 * u, 0.1 * u, 0.07 * u);
   }
   // stuur (achter de romp, zodat alleen de uiteinden naast het lichaam te zien zijn)
-  c.strokeStyle = '#23233a'; c.lineWidth = 0.05 * u; c.beginPath(); c.moveTo(-0.34 * u, -1.08 * u); c.lineTo(0.34 * u, -1.08 * u); c.stroke();
+  if (!run) { c.strokeStyle = '#23233a'; c.lineWidth = 0.05 * u; c.beginPath(); c.moveTo(-0.34 * u, -1.08 * u); c.lineTo(0.34 * u, -1.08 * u); c.stroke(); }
   // romp
   // Ploegen: trui in de ploegkleur; de groene trui en bolletjestrui houden hun patroon, met mouwen en rand in de ploegkleur.
   const jersey = opts.green ? GREEN_DARK : opts.polka ? '#fbfbff' : opts.team || r.color;
@@ -240,11 +252,21 @@ export function drawRider(c, X, Y, u, r, t, opts = {}) {
   for (const s of [-1, 1]) {
     c.beginPath(); c.moveTo(s * 0.22 * u, -1.4 * u);
     if (s < 0 && elb > 0) { const w = Math.sin(t * 18) * 0.03 * elb; c.lineTo((-0.31 - 0.24 * elb + w) * u, (-1.27 - 0.03 * elb) * u); } // elleboog uit
-    c.lineTo(s * 0.31 * u, -1.1 * u); c.stroke();
+    if (run && s > 0) c.lineTo(0.34 * u, -1.62 * u); // rechterarm omhoog: houdt de fiets vast
+    else if (run) c.lineTo(-0.3 * u, -1.0 * u + Math.sin(ph * 1.6) * 0.06 * u); // linkerarm zwaait mee
+    else c.lineTo(s * 0.31 * u, -1.1 * u);
+    c.stroke();
   }
   // helm
   c.fillStyle = shade(r.color, 1.35); c.beginPath(); c.ellipse(0, -1.62 * u, 0.15 * u, 0.16 * u, 0, 0, 7); c.fill();
   c.fillStyle = 'rgba(0,0,0,.35)'; for (const s of [-1, 0, 1]) c.fillRect(s * 0.07 * u - 0.015 * u, -1.74 * u, 0.03 * u, 0.16 * u);
+  if (run) { // de fiets op de rechterschouder: wiel (van achteren gezien een smalle streep) en het frame schuin omhoog
+    c.save(); c.translate(0.26 * u, -1.5 * u); c.rotate(-0.35);
+    c.fillStyle = '#0c0c14'; c.fillRect(-0.04 * u, -0.5 * u, 0.08 * u, 0.7 * u);
+    c.fillStyle = '#c9c9d9'; c.fillRect(-0.01 * u, -0.46 * u, 0.02 * u, 0.62 * u);
+    c.strokeStyle = r.color; c.lineWidth = 0.06 * u; c.beginPath(); c.moveTo(0, 0.15 * u); c.lineTo(0.22 * u, -0.2 * u); c.lineTo(-0.05 * u, -0.35 * u); c.stroke();
+    c.restore();
+  }
   c.globalAlpha = 1;
   if (m & 4) { // schild
     c.strokeStyle = `rgba(125,249,255,${0.6 + 0.3 * Math.sin(t * 8)})`; c.lineWidth = 0.05 * u;

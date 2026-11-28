@@ -103,7 +103,7 @@ test('Zwift-knoppen: Play, Click en Ride', async () => {
   const { parseZwiftPad } = await import('../js/ble.js');
   const u = (...b) => Uint8Array.from(b);
   // Play links (veld 1 = 1), pijl links ingedrukt (veld 3 = 0), rest los
-  const idle = { left: 0, right: 0, item: false, elbow: false, up: false, down: false };
+  const idle = { left: 0, right: 0, item: false, elbow: false, up: false, down: false, hop: false };
   let a = parseZwiftPad(u(0x07, 0x08, 1, 0x10, 1, 0x18, 0, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 1));
   assert.deepEqual(a, { ...idle, kind: 'play', left: 1 });
   // Play rechts (veld 1 = 0), A ingedrukt (veld 4 = 0), flipper half (zigzag 100 = 50)
@@ -129,7 +129,7 @@ test('Zwift-knoppen: Play, Click en Ride', async () => {
   a = parseZwiftPad(u(0x23, 0x08, 0xff, 0xfd, 0x0f)); // − links (0x100)
   assert.ok(a.down && !a.up && !a.item);
   assert.equal(parseZwiftPad(u(0x23, 0x08, 0xff, 0xf7, 0x0f)).item, true); // power-up-knop links (0x400)
-  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xdf, 0xff, 0x0f)).elbow, true); // B (0x20)
+  assert.equal(parseZwiftPad(u(0x23, 0x08, 0xdf, 0xff, 0x0f)).hop, true); // B (0x20): springen (elders het elleboogje)
   // Onbekend type (bv. batterij) wordt genegeerd
   assert.equal(parseZwiftPad(u(0x19, 0x10, 80)), null);
 });
@@ -1251,8 +1251,24 @@ test('Veldrit: kaart sluit, legs kruisen alleen via de brug, ondergrond remt, tr
   assert.ok(vS < vG && vG < vA, `asfalt ${vA}, gras ${vG}, zand ${vS}`);
   const st = S.find((s) => s.stairs); me.dist = st.i * SEG; me.x = 0; me.v = 7; g._stepLocal(me, 300, 0, 0.05, false);
   assert.ok(me.v <= 2.5, 'trap: lopen');
-  const pl = tr.obstacles.find((o) => o.type === 'plank'); me.dist = pl.at - 0.3; me.x = 0; me.v = 8; g._stepLocal(me, 300, 0, 0.1, false);
-  assert.ok(me.v < 5 && me.bumpKick > 0, 'balk: afremmen en tik');
+  assert.ok(me.run, 'na de klap tegen de trap ren je verder');
+  const pl = tr.obstacles.find((o) => o.type === 'plank');
+  me.run = false; me.dist = pl.at - 0.3; me.x = 0; me.v = 8; g._stepLocal(me, 300, 0, 0.1, false);
+  assert.ok(me.v < 3 && me.bumpKick > 0 && me.run, 'balk zonder te drukken: klap, daarna rennen');
+  // springen: op tijd en snel genoeg = eroverheen zonder snelheidsverlies
+  g.state = 'race'; me.run = false; me.hopT = 0; me.hopCd = 0; me.bumpKick = 0;
+  me.dist = pl.at - 1.5; me.v = 7; g.hop();
+  assert.ok(me.hopT > 0, 'springt');
+  for (let i = 0; i < 10; i++) g._stepLocal(me, 300, 0, 0.03, false);
+  assert.ok(me.dist > pl.at && me.v > 6 && !me.run, `sprong: v ${me.v.toFixed(1)}`);
+  // langzaam bij een balk = afstappen; daarna (voorbij de balk) weer opstappen met dezelfde knop
+  me.hopT = 0; me.hopCd = 0; me.dist = pl.at - 5; me.v = 3; g.hop();
+  assert.ok(me.run, 'afstappen');
+  me.dist = pl.at + 1.5; me.hopCd = 0; g.hop(); assert.ok(me.run, 'tussen de dubbele balk: nog niet opstappen');
+  me.dist = pl.at + 4.5; me.hopCd = 0;
+  if (!g._cxClear(me)) me.dist += 4; // dubbele balk: voorbij de tweede
+  g.hop(); assert.ok(!me.run, 'weer opgestapt');
+  me.run = false;
   me.dist = 99999;
   let on = 0;
   for (const o of tr.obstacles.filter((x) => x.block)) {
