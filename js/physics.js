@@ -12,7 +12,7 @@ export function fxMask(r) {
   const e = r.fx;
   return (e.boost > 0 ? 1 : 0) | (e.slow > 0 ? 2 : 0) | (e.shield > 0 ? 4 : 0) | (e.storm > 0 ? 8 : 0) |
     (e.magnet > 0 ? 16 : 0) | (e.spin > 0 ? 32 : 0) | (r.draft ? 64 : 0) |
-    (e.flat > 0 ? 128 : 0) | (e.wheel > 0 ? 256 : 0) | (e.tow > 0 ? 512 : 0) | (e.scooter > 0 ? 1024 : 0) | (r.onCobble ? 2048 : 0) | (e.antilek > 0 ? 4096 : 0);
+    (e.flat > 0 ? 128 : 0) | (e.wheel > 0 ? 256 : 0) | (e.tow > 0 ? 512 : 0) | (e.scooter > 0 ? 1024 : 0) | (r.onCobble ? 2048 : 0) | (e.antilek > 0 ? 4096 : 0) | (r.hopT > 0 ? 8192 : 0) | (r.run ? 16384 : 0);
 }
 
 // Geeft de nieuwe snelheid (m/s) na dt seconden.

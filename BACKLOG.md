@@ -25,6 +25,7 @@ Gebouwd, maar nog niet met echte hardware getest. Eerst terugkoppeling, dan bijs
 | # | Wat | Bron | Grootte |
 |---|---|---|---|
 | WB-59 | Moddermolen (veldrit): af en toe nog een hapering op de iPhone (demo-modus). Uitzoeken met een profiel op het toestel; mogelijke oorzaken: geheugen opruimen door tijdelijke objecten per beeld (lijsten, punten), of de vloer op de grafische chip laten tekenen. | zelf | S |
+| WB-60 | Veldrit vervolg: vallen bij een klap tegen een balk; extreme modder waar je beter rent (fietsen = grote kans op vallen naast een dun spoor); springen ook op de wegbanen (drempels, lijm, punaises, short cut). | zelf | M |
 | WB-58 | Bochten met decor: kruispunt met 90-gradenbocht (zijweg, afgesloten weg rechtdoor met dranghekken), rotonde (eiland, zijwegen met hekken), haarspeld met parallelle weg en tegenliggers; horizon die meedraait met de bocht, decor aan de buitenkant snel en binnenkant langzaam; snelheid omlaag in scherpe bochten. Eerst proefanimatie van het kruispunt. | zelf | M |
 | WB-57 | Veldritbaan (testbaan Moddermolen staat er; nog te doen): korte rondes op tijd met bel voor de laatste ronde, lint als baanrand, gras/modder (met snel spoor)/zand, balken springen op het goede moment, trap met afstappen en lopen, vliegbrug, materiaalpost met modder op je fiets, Zandkoning-trui; later Modderspat en een kermis-hardstyle Clubsound. In stappen bouwen. | zelf | L |
 | WB-10 | Lichte weergave voor oude tablets: minder decor en minder ver vooruit tekenen. | zelf (zorg over oude tablet) | S |
@@ -76,6 +77,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- 🦘 Veldrit: springen/afstappen/opstappen met één knop (B op de Zwift-knop, J, 🦘): snel genoeg = springen over de balken, langzamer of bij de trap = afstappen en rennen, nog eens = opstappen; vergeten = klap zoals de Muur. Bots doen mee. Elleboogje op de veldrit via 💪 of ↓ links
 - 🔊 Geluid ~20 dB harder (Clubsound van −41 naar −15 dB, Arcade van −45 naar −19 dB), met compressor en begrenzer; radio op de schuif tot vol volume
 - 🔋 Proef: Zwift-knop wakker houden (instelling). Meet de eerste keer na hoeveel tijd zonder knopdruk hij in slaap valt en stuurt daarna ~10 s eerder een seintje; valt hij toch in slaap, dan stopt de proef vanzelf. Uitkomst nog te testen met de Click v2.
 - 🔧 Truien, namen boven renners en hellen in bochten weer zichtbaar (stonden per ongeluk achter een commentaar); jurystraffen pas in de uitslag; renners die nog op de vorige baan rijden niet tonen; bord, hekken en pion bij wegwerkzaamheden staan in het afgezette stuk (rijbaan smaller); camera bij de brug-afdaling niet hoger dan nodig

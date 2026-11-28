@@ -1,5 +1,5 @@
 // Race-logica: renners, items, bots, zones/PR's, spook en netwerk-synchronisatie.
-import { SURF, STAIRS_V, PLANK_V } from './cx.js';
+import { SURF, STAIRS_V, PLANK_V, JUMP_V, AIR, RUN_V, CX_LOOK } from './cx.js';
 import { SEG, ROAD_W, GUTTER } from './track.js';
 import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
@@ -304,6 +304,7 @@ export class Race {
 
     const seg = this.track.segAt(me.dist);
     this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) + (me.bermKick > 0 ? BERM_KICK * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) : 0) + (me.bumpKick > 0 ? 6 : 0) /* drempel */ + (me.surf ? SURF[me.surf].feel : 0) /* veldrit: zand, modder */ + (me.onCobble ? 3 + (Math.floor(this.clock * 2) % 2 ? 2 : -2) : 0) /* hobbelen op de kasseien */ + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
+    if (me.run || me.hopT > 0) this.trainerGrade = Math.min(this.trainerGrade, -1); // rennen of in de lucht: even licht
     this._net(dt);
   }
 
@@ -420,7 +421,8 @@ export class Race {
     }
     const prev = r.dist;
     r.v = stepSpeed(r, power, seg.grade, dt, pull);
-    if (seg.stairs) r.v = Math.min(r.v, STAIRS_V); // trap: lopen met de fiets op de schouder
+    if (this.track.m7) this._cxStep(r, seg, dt); // veldrit: springen, rennen, klap tegen balk of trap
+    else if (seg.stairs) r.v = Math.min(r.v, STAIRS_V);
     // Voortgang t.o.v. je snelheid: lijn in de bocht, short cut, berm en groene trui.
     const viaCut = r.onCut && r.cutValid;
     r.line = 1 / (1 - (viaCut ? r.x : clamp(r.x, -w, w)) * seg.curve * LINE_K) - 1;
@@ -439,7 +441,10 @@ export class Race {
     if (r.dist > prev) for (const o of this.track.obstacles) { // drempel of balk: een tik op de trainer (balk: ook even afremmen)
       if (o.type !== 'bump' && o.type !== 'plank') continue;
       const line = Math.floor((r.dist - o.at) / this.L) * this.L + o.at;
-      if (prev < line && r.dist >= line) { if (o.type === 'plank') r.v = Math.min(r.v, PLANK_V); if (r === this.me) { r.bumpKick = 0.45; this.emit('shake', 4); } }
+      if (prev < line && r.dist >= line) {
+        if (o.type === 'plank' && this.track.m7) { if (!(r.hopT > 0 && r.hopAge > 0.06) && !r.run && !r.finished) this._cxCrash(r); } // eroverheen gesprongen of rennend: geen probleem
+        else { if (o.type === 'plank') r.v = Math.min(r.v, PLANK_V); if (r === this.me) { r.bumpKick = 0.45; this.emit('shake', 4); } }
+      }
     }
     if (r.roulette > 0) {
       r.roulette -= dt;
@@ -985,6 +990,56 @@ export class Race {
   }
 
   // Elleboogje uitsteken: "neem over!". Een bot-ploeggenoot die in je wiel zit komt naar voren.
+  // ---------- veldrit: springen, afstappen en weer opstappen (één knop) ----------
+  // Eerstvolgende balk en trap binnen CX_LOOK meter (afstand, of null). Op de trap zelf: trap = 0.
+  _cxAhead(r) {
+    const d0 = mod(r.dist, this.L);
+    let plank = null, stairs = this.track.segAt(r.dist).stairs ? 0 : null;
+    for (const o of this.track.obstacles) {
+      if (o.type !== 'plank' && o.type !== 'stairs') continue;
+      const dd = mod(o.at - d0, this.L);
+      if (dd > CX_LOOK) continue;
+      if (o.type === 'plank') plank = plank == null ? dd : Math.min(plank, dd); else stairs = stairs == null ? dd : Math.min(stairs, dd);
+    }
+    return { plank, stairs };
+  }
+  _cxClear(r) { const a = this._cxAhead(r); return (a.plank == null || a.plank > 3) && (a.stairs == null || a.stairs > 3); } // hier mag je weer opstappen
+  // Bij een balk: snel genoeg = springen, anders afstappen. Bij een trap: afstappen. Al aan het rennen: weer opstappen.
+  hop(r = this.me) {
+    if (!this.track.m7 || !r || r.finished || this.state !== 'race' || r.hopT > 0 || r.hopCd > 0) return;
+    const a = this._cxAhead(r), me = r === this.me;
+    if (r.run) { if (this._cxClear(r)) { r.run = false; r.remountT = 0.3; r.hopCd = 0.3; if (me) this.emit('sfx', 'tick'); } return; }
+    if (a.stairs != null || (a.plank != null && r.v < JUMP_V)) { r.run = true; r.hopCd = 0.3; r.v = Math.min(r.v, RUN_V + 1.2); if (me) this.emit('sfx', 'tick'); return; }
+    if (r.v < JUMP_V) return;
+    r.hopT = AIR; r.hopAge = 0; r.hopCd = AIR + 0.05; // kort: bij de dubbele balk spring je twee keer vlak na elkaar
+    if (me) this.emit('sfx', 'hop');
+  }
+  // Tegen een balk of de trap op fietsen: een klap zoals de Muur, daarna ren je verder (opstappen met de knop).
+  _cxCrash(r) {
+    r.v *= 0.3; r.fx.spin = Math.max(r.fx.spin || 0, 1); r.bolts = Math.max(0, (r.bolts || 0) - 1);
+    r.run = true; r.hopT = 0; r.hitAt = this.clock;
+    if (r === this.me) { this.emit('sfx', 'hit'); this.emit('shake', 12); r.bumpKick = 0.45; }
+  }
+  _cxStep(r, seg, dt) {
+    if (r.hopCd > 0) r.hopCd -= dt;
+    if (r.hopT > 0) { r.hopT -= dt; r.hopAge = (r.hopAge || 0) + dt; if (r.hopT <= 0 && r === this.me) { r.bumpKick = Math.max(r.bumpKick || 0, 0.2); this.emit('shake', 2); } } // landen
+    if (r.remountT > 0) { r.remountT -= dt; r.v = Math.min(r.v, RUN_V + 0.3); }
+    if (seg.stairs && !r.run && !r.finished) this._cxCrash(r); // een trap kun je niet op fietsen
+    if (r.run) { const tv = seg.stairs ? STAIRS_V : RUN_V; r.v += (tv - r.v) * Math.min(1, dt * 3); } // rennen: je benen, niet je vermogen
+  }
+  // Bots: springen of afstappen, met wat fouten bij de zwakkeren; na de balk of trap weer op de fiets.
+  _cxBot(r, dt) {
+    const ai = r.ai, a = this._cxAhead(r);
+    if (r.run) { if (this._cxClear(r)) { ai.remT = (ai.remT || 0) + dt; if (ai.remT > 0.3 + (1 - ai.skill) * 0.9) { ai.remT = 0; this.hop(r); } } else ai.remT = 0; return; }
+    if (a.stairs != null && a.stairs < 3 + ai.skill * 2) { this.hop(r); return; }
+    if (a.plank == null) return;
+    const key = Math.round(mod(r.dist + a.plank, this.L));
+    if (ai.cxKey !== key) { ai.cxKey = key; ai.cxJump = r.v >= JUMP_V + 0.4 && this.rng() < 0.3 + 0.65 * ai.skill; ai.cxMiss = this.rng() < 0.12 * (1 - ai.skill); }
+    if (ai.cxMiss) return; // vergeet te drukken: klap
+    if (ai.cxJump) { if (r.v >= JUMP_V && a.plank <= r.v * AIR * 0.5) this.hop(r); }
+    else if (a.plank < 4) this.hop(r);
+  }
+
   elbow(r = this.me) {
     if (r.elbow > 0 || r.finished) return;
     r.elbow = ELBOW_SECS;
@@ -1008,6 +1063,7 @@ export class Race {
   _bot(r, dt) {
     const ai = r.ai, me = this.me;
     const seg = this.track.segAt(r.dist);
+    if (this.track.m7 && !r.finished && this.state === 'race') this._cxBot(r, dt);
     let p = ai.base * (1 + 0.08 * Math.sin(this.time * 0.13 + ai.ph) + 0.05 * Math.sin(this.time * 0.47 + ai.ph * 2));
 
     if (seg.grade > 3) p *= 1.08;

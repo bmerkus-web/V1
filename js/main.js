@@ -190,7 +190,9 @@ $('b-pads').onclick = async () => {
       a.item = a.item || a.up || a.down; // geen virtueel schakelen: schakelknoppen = power-up
       a.up = a.down = false;
     } else a.up = a.down = false;
+    if (!race?.track?.m7) { a.elbow = a.elbow || a.hop; a.hop = false; } // B = springen op de veldrit, elders het elleboogje
     input.setPad(pad, a.left, a.right);
+    if (a.hop && !was.hop) input.trigger('hop');
     if (a.item && !was.item) input.trigger('item');
     if (a.elbow && !was.elbow) input.trigger('elbow');
     if (a.up && !was.up) input.trigger('gearUp');
@@ -1429,6 +1431,7 @@ function hud(dt) {
     : gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`);
   setText($('h-tot'), `${(r.stats.km || 0).toFixed(2)} km · ${Math.round(r.stats.hm || 0)} hm`);
   setText($('h-item-n'), me.item ? ITEMS[me.item].name : 'spatie');
+  $('h-hop').classList.toggle('hidden', !r.track.m7); $('h-hop').classList.toggle('run', !!me.run); // veldrit: springknop (rennend: opstappen)
   const d = $('h-delta');
   if (r.ghostDelta != null) {
     setText(d, `${fmtDelta(r.ghostDelta)} vs PR ${r.ghostLabel}`);
@@ -1490,6 +1493,7 @@ function frame(now) {
   if (input.take('pause')) togglePause();
   if (input.take('item')) itemTap();
   if (input.take('elbow')) race.elbow();
+  if (input.take('hop')) race.hop(); // veldrit: springen / afstappen / opstappen
   const gu = input.take('gearUp'), gd = input.take('gearDown');
   if (input.take('skip')) wkSkip();
   if (input.take('track')) nextTrack();
@@ -1555,6 +1559,7 @@ $('h-item').addEventListener('touchstart', fireItem, { passive: false });
 $('t-zone').addEventListener('touchstart', fireItem, { passive: false });
 $('h-item').addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') fireItem(e); });
 $('h-item').addEventListener('click', (e) => { if (e.detail === 0) input.trigger('item'); });
+for (const [id, act] of [['h-elbow', 'elbow'], ['h-hop', 'hop']]) $(id).addEventListener('pointerdown', (e) => { e.preventDefault(); input.trigger(act); const el = $(id); el.classList.add('tap'); setTimeout(() => el.classList.remove('tap'), 140); });
 $('h-menu').onclick = () => togglePause();
 window.addEventListener('pointerdown', () => audio.unlock(), { once: true });
 window.addEventListener('keydown', () => audio.unlock(), { once: true });

@@ -67,6 +67,7 @@ const SFX = {
   block: (t) => { tone(1500, t, 0.12, 'triangle', 0.3); tone(1000, t + 0.08, 0.15, 'triangle', 0.25); },
   fire: (t) => { noise(t, 0.4, 0.25, sfxGain, 500); tone(900, t, 0.3, 'sawtooth', 0.15, sfxGain, 200); },
   drop: (t) => tone(400, t, 0.2, 'sine', 0.3, sfxGain, 120),
+  hop: (t) => { tone(240, t, 0.16, 'square', 0.22, sfxGain, 720); noise(t + 0.02, 0.08, 0.08, sfxGain, 2500); },
   storm: (t) => { noise(t, 1.2, 0.3, sfxGain, 100); tone(60, t, 1, 'sawtooth', 0.3); },
   elbow: (t) => { tone(330, t, 0.07, 'square', 0.12); tone(495, t + 0.08, 0.1, 'square', 0.12); }, // kort 'hup-hup': overnemen!
   pr: (t) => { [523, 659, 784, 1047].forEach((f, i) => tone(f, t + i * 0.1, 0.25, 'square', 0.25)); },
