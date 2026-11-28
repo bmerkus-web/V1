@@ -1,5 +1,5 @@
 // Race-logica: renners, items, bots, zones/PR's, spook en netwerk-synchronisatie.
-import { SURF, STAIRS_V, PLANK_V, JUMP_V, AIR, RUN_V, CX_LOOK } from './cx.js';
+import { SURF, STAIRS_V, PLANK_V, JUMP_V, AIR, RUN_V, RUN_P, RUN_FEEL, CX_LOOK } from './cx.js';
 import { SEG, ROAD_W, GUTTER } from './track.js';
 import { stepSpeed, fxMask, REF_FTP, REF_KG, FX } from './physics.js';
 import { clamp, mod, lerp, mulberry, fmtTime, fmtDelta } from './util.js';
@@ -304,7 +304,8 @@ export class Race {
 
     const seg = this.track.segAt(me.dist);
     this.trainerGrade = seg.grade * (this.profile.trainerFeel / 100) + (me.fx.slow > 0 ? 3 : 0) + (me.fx.storm > 0 ? 1.5 : 0) + (me.fx.kwak > 0 ? 1.5 : 0) + (me.fx.bump > 0 ? 2 : 0) + (me.berm ? 4 : 0) * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) + (me.bermKick > 0 ? BERM_KICK * (me.fx.antilek > 0 ? ANTILEK_BERM : 1) : 0) + (me.bumpKick > 0 ? 6 : 0) /* drempel */ + (me.surf ? SURF[me.surf].feel : 0) /* veldrit: zand, modder */ + (me.onCobble ? 3 + (Math.floor(this.clock * 2) % 2 ? 2 : -2) : 0) /* hobbelen op de kasseien */ + (me.fx.flat > 0 ? 3 : 0) - (me.towing ? 2 : 0) - (me.inScooter ? 1 : 0) - (me.fx.boost > 0 ? 1.5 : 0); // berm: voelbaar zwaarder
-    if (me.run || me.hopT > 0) this.trainerGrade = Math.min(this.trainerGrade, -1); // rennen of in de lucht: even licht
+    if (me.hopT > 0) this.trainerGrade = Math.min(this.trainerGrade, -1); // in de lucht: even licht
+    else if (me.run) this.trainerGrade += RUN_FEEL; // rennen is zwaar (de trap komt daar nog met zijn helling bovenop)
     this._net(dt);
   }
 
@@ -346,7 +347,7 @@ export class Race {
     // Veldrit: ondergrond (zand, modder, gras…) remt en laat het stuur wiebelen; door een plas spat het.
     const sf = this.track.m7 ? (r.berm ? 'grass' : seg.surf) : null, pud = sf && seg.puddle && Math.abs(r.x - seg.puddle.x) < seg.puddle.w;
     if (pud && !r.inPuddle && r === this.me) this.emit('shake', 3);
-    r.inPuddle = !!pud; r.surf = sf; r.surfK = sf ? SURF[sf].k * (pud ? 1.4 : 1) : 1;
+    r.inPuddle = !!pud; r.surf = sf; r.surfK = sf ? SURF[sf].k * (pud ? 1.4 : 1) : 1; // rennen: zwaar, hoe minder vermogen hoe trager
     if (sf) { const wob = SURF[sf].wob + (pud ? 0.25 : 0); if (wob) r.x += (Math.sin(this.clock * 7.3 + r.dist * 0.9) * 0.6 + Math.sin(this.clock * 13.1 + r.dist)) * wob * dt; }
     if (r.onCobble) r.x += (Math.sin(this.clock * 9.1 + r.dist * 0.7) * 0.18 + Math.sin(this.clock * 15.7 + r.dist) * 0.1) * dt; // stuur wiebelt op de stenen
     if ((r.onCobble || r.inGutter) && !this.free && !r.finished && this.rng() < (r.onCobble ? COBBLE_FLAT : GUTTER_FLAT) * dt) this._flat(r, 'kasseien');
@@ -421,7 +422,7 @@ export class Race {
     }
     const prev = r.dist;
     r.v = stepSpeed(r, power, seg.grade, dt, pull);
-    if (this.track.m7) this._cxStep(r, seg, dt); // veldrit: springen, rennen, klap tegen balk of trap
+    if (this.track.m7) this._cxStep(r, seg, dt, power); // veldrit: springen, rennen, klap tegen balk of trap
     else if (seg.stairs) r.v = Math.min(r.v, STAIRS_V);
     // Voortgang t.o.v. je snelheid: lijn in de bocht, short cut, berm en groene trui.
     const viaCut = r.onCut && r.cutValid;
@@ -1008,7 +1009,7 @@ export class Race {
   hop(r = this.me) {
     if (!this.track.m7 || !r || r.finished || this.state !== 'race' || r.hopT > 0 || r.hopCd > 0) return;
     const a = this._cxAhead(r), me = r === this.me;
-    if (r.run) { if (this._cxClear(r)) { r.run = false; r.remountT = 0.3; r.hopCd = 0.3; if (me) this.emit('sfx', 'tick'); } return; }
+    if (r.run) { r.run = false; r.remountT = 0.3; r.hopCd = 0.3; if (me) this.emit('sfx', 'tick'); return; } // opstappen kan altijd; vlak voor een balk of de trap volgt dan gewoon de klap
     if (a.stairs != null || (a.plank != null && r.v < JUMP_V)) { r.run = true; r.hopCd = 0.3; r.v = Math.min(r.v, RUN_V + 1.2); if (me) this.emit('sfx', 'tick'); return; }
     if (r.v < JUMP_V) return;
     r.hopT = AIR; r.hopAge = 0; r.hopCd = AIR + 0.05; // kort: bij de dubbele balk spring je twee keer vlak na elkaar
@@ -1020,12 +1021,12 @@ export class Race {
     r.run = true; r.hopT = 0; r.hitAt = this.clock;
     if (r === this.me) { this.emit('sfx', 'hit'); this.emit('shake', 12); r.bumpKick = 0.45; }
   }
-  _cxStep(r, seg, dt) {
+  _cxStep(r, seg, dt, power = 0) {
     if (r.hopCd > 0) r.hopCd -= dt;
     if (r.hopT > 0) { r.hopT -= dt; r.hopAge = (r.hopAge || 0) + dt; if (r.hopT <= 0 && r === this.me) { r.bumpKick = Math.max(r.bumpKick || 0, 0.2); this.emit('shake', 2); } } // landen
     if (r.remountT > 0) { r.remountT -= dt; r.v = Math.min(r.v, RUN_V + 0.3); }
     if (seg.stairs && !r.run && !r.finished) this._cxCrash(r); // een trap kun je niet op fietsen
-    if (r.run) { const tv = seg.stairs ? STAIRS_V : RUN_V; r.v += (tv - r.v) * Math.min(1, dt * 3); } // rennen: je benen, niet je vermogen
+    if (r.run) { const tv = RUN_V * clamp(power / (seg.stairs ? RUN_P * 1.5 : RUN_P), 0.25, 1); if (r.v > tv) r.v = Math.max(tv, r.v - 4 * dt); } // rennen: hoe minder vermogen hoe trager, hooguit 10 km/u; de trap is zwaarder
   }
   // Bots: springen of afstappen, met wat fouten bij de zwakkeren; na de balk of trap weer op de fiets.
   _cxBot(r, dt) {

@@ -103,9 +103,9 @@ test('Zwift-knoppen: Play, Click en Ride', async () => {
   const { parseZwiftPad } = await import('../js/ble.js');
   const u = (...b) => Uint8Array.from(b);
   // Play links (veld 1 = 1), pijl links ingedrukt (veld 3 = 0), rest los
-  const idle = { left: 0, right: 0, item: false, elbow: false, up: false, down: false, hop: false };
+  const idle = { left: 0, right: 0, item: false, elbow: false, up: false, down: false, hop: false, la: false };
   let a = parseZwiftPad(u(0x07, 0x08, 1, 0x10, 1, 0x18, 0, 0x20, 1, 0x28, 1, 0x30, 1, 0x38, 1));
-  assert.deepEqual(a, { ...idle, kind: 'play', left: 1 });
+  assert.deepEqual(a, { ...idle, kind: 'play', left: 1, la: true });
   // Play rechts (veld 1 = 0), A ingedrukt (veld 4 = 0), flipper half (zigzag 100 = 50)
   a = parseZwiftPad(u(0x07, 0x08, 0, 0x10, 1, 0x18, 1, 0x20, 0, 0x28, 1, 0x30, 1, 0x38, 1, 0x40, 100));
   assert.equal(a.item, true); assert.equal(a.elbow, false); assert.equal(a.right, 0.5);
@@ -1264,7 +1264,12 @@ test('Veldrit: kaart sluit, legs kruisen alleen via de brug, ondergrond remt, tr
   // langzaam bij een balk = afstappen; daarna (voorbij de balk) weer opstappen met dezelfde knop
   me.hopT = 0; me.hopCd = 0; me.dist = pl.at - 5; me.v = 3; g.hop();
   assert.ok(me.run, 'afstappen');
-  me.dist = pl.at + 1.5; me.hopCd = 0; g.hop(); assert.ok(me.run, 'tussen de dubbele balk: nog niet opstappen');
+  me.dist = pl.at + 1.5; me.hopCd = 0; g.hop(); assert.ok(!me.run, 'opstappen kan altijd (ook tussen de balken)');
+  me.v = 3; g._stepLocal(me, 150, 0, 0.05, false); me.dist = pl.at + 3.9; g._stepLocal(me, 150, 0, 0.1, false);
+  assert.ok(me.run, 'op de fiets tegen de tweede balk: klap en weer rennen'); me.run = true;
+  const runV = (P, stairs) => { const s0 = S.find((x) => !!x.stairs === stairs && !x.obs && !x.puddle); me.run = true; me.hopT = 0; me.v = 2; for (let i = 0; i < 60; i++) { me.dist = s0.i * SEG + 1; g._stepLocal(me, P, 0, 0.05, false); } return me.v; };
+  const r100 = runV(100, false), r250 = runV(250, false), rTrap = runV(250, true);
+  assert.ok(r250 <= 2.79 && r250 > 2.7 && r100 < r250 * 0.6 && r100 > 0.5 && rTrap < r250, `rennen: 100 W ${r100.toFixed(2)}, 250 W ${r250.toFixed(2)}, trap ${rTrap.toFixed(2)}`);
   me.dist = pl.at + 4.5; me.hopCd = 0;
   if (!g._cxClear(me)) me.dist += 4; // dubbele balk: voorbij de tweede
   g.hop(); assert.ok(!me.run, 'weer opgestapt');

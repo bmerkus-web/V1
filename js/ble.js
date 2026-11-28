@@ -335,7 +335,7 @@ export function parseZwiftPad(bytes) {
   const fields = pbFields(bytes.subarray(1));
   const m = new Map(fields.filter(([, v]) => typeof v === 'number'));
   const on = (f) => (m.get(f) ?? 0) === 0; // 0 (of weggelaten, de protobuf-standaard) = ingedrukt
-  const out = { kind: type === 0x07 ? 'play' : type === 0x37 ? 'click' : 'ride', left: 0, right: 0, item: false, elbow: false, up: false, down: false, hop: false };
+  const out = { kind: type === 0x07 ? 'play' : type === 0x37 ? 'click' : 'ride', left: 0, right: 0, item: false, elbow: false, up: false, down: false, hop: false, la: false }; // la = pijltje links (los, voor het elleboogje)
   if (type === 0x07) { // Zwift Play
     const rightPad = on(1), paddle = Math.min(1, Math.abs(zigzag(m.get(8) || 0)) / 100);
     if (rightPad) {
@@ -346,6 +346,7 @@ export function parseZwiftPad(bytes) {
       out.right = paddle;
     } else {
       out.left = on(3) ? 1 : paddle; // pijl links of flipper
+      out.la = on(3);
       out.right = on(4) ? 1 : 0;
       out.item = on(2) || on(6); // pijl omhoog, aan/uit-knop
       out.down = on(7); // zijknop links = lichter
@@ -361,6 +362,7 @@ export function parseZwiftPad(bytes) {
     // rechts Z/A sturen, Y power-up, B springen (veldrit; elders het elleboogje). De schakelknoppen: links = lichter, rechts = zwaarder.
     const map = m.get(1), p = (k) => (map & RIDE_BITS[k]) === 0;
     out.left = p('left') || p('z') ? 1 : 0;
+    out.la = p('left');
     out.right = p('right') || p('a') ? 1 : 0;
     out.item = p('up') || p('y') || p('powerL') || p('powerR');
     out.down = p('shiftUpL') || p('shiftDnL');

@@ -191,6 +191,7 @@ $('b-pads').onclick = async () => {
       a.up = a.down = false;
     } else a.up = a.down = false;
     if (!race?.track?.m7) { a.elbow = a.elbow || a.hop; a.hop = false; } // B = springen op de veldrit, elders het elleboogje
+    if (a.la && steerKind() !== 'buttons') { a.elbow = true; a.left = 0; } // stuur je met de Sterzo of telefoon, dan is ◀ links het elleboogje (de arm gaat naar links)
     input.setPad(pad, a.left, a.right);
     if (a.hop && !was.hop) input.trigger('hop');
     if (a.item && !was.item) input.trigger('item');
