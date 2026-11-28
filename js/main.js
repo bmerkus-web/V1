@@ -1,5 +1,6 @@
 // Watt Blitz – menu's, HUD en de hoofdlus.
 import { TRACK_DEFS, getTrack } from './track.js';
+import { JUMP_V } from './cx.js';
 import { Race, ITEMS, BOT_NAMES, juryWhat, raceKind } from './game.js';
 import { Renderer } from './render.js';
 import { Trainer, Sterzo, HeartRate, ZwiftPad, bleSupported, errText } from './ble.js';
@@ -1432,7 +1433,8 @@ function hud(dt) {
     : gain > 0 ? `↪ BINNENBOCHT +${(gain * 100).toFixed(0)}%` : `BUITENBOCHT −${(-gain * 100).toFixed(0)}%`);
   setText($('h-tot'), `${(r.stats.km || 0).toFixed(2)} km · ${Math.round(r.stats.hm || 0)} hm`);
   setText($('h-item-n'), me.item ? ITEMS[me.item].name : 'spatie');
-  $('h-hop').classList.toggle('hidden', !r.track.m7); $('h-hop').classList.toggle('run', !!me.run); // veldrit: springknop (rennend: opstappen)
+  $('h-hop').classList.toggle('hidden', !r.track.m7); // veldrit: de knop laat zien wat hij nu doet
+  if (r.track.m7) { const a = r._cxAhead(me); setText($('h-hop'), me.run ? '🚲' : a.stairs != null || (a.plank != null && me.v < JUMP_V) ? '🏃' : '🐇'); }
   const d = $('h-delta');
   if (r.ghostDelta != null) {
     setText(d, `${fmtDelta(r.ghostDelta)} vs PR ${r.ghostLabel}`);
