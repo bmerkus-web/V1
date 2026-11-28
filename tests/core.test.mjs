@@ -1267,6 +1267,9 @@ test('Veldrit: kaart sluit, legs kruisen alleen via de brug, ondergrond remt, tr
   me.dist = pl.at + 1.5; me.hopCd = 0; g.hop(); assert.ok(!me.run, 'opstappen kan altijd (ook tussen de balken)');
   me.v = 3; g._stepLocal(me, 150, 0, 0.05, false); me.dist = pl.at + 3.9; g._stepLocal(me, 150, 0, 0.1, false);
   assert.ok(me.run, 'op de fiets tegen de tweede balk: klap en weer rennen'); me.run = true;
+  { const open_ = S.find((x) => x.surf === 'grass' && !x.obs && !x.stairs && Math.abs(x.grade) < 0.5 && !g._cxAhead({ dist: x.i * SEG }).plank && g._cxAhead({ dist: x.i * SEG }).stairs == null);
+    me.run = false; me.hopT = 0; me.hopCd = 0; me.dist = open_.i * SEG; me.v = 3; g.hop(); assert.ok(me.run, 'langzaam op een gewoon stuk: afstappen (hele parcours rennen kan)');
+    me.hopCd = 0; g.hop(); me.v = 6; me.hopCd = 0; g.hop(); assert.ok(me.hopT > 0 && !me.run, 'snel op een gewoon stuk: springen'); me.hopT = 0; }
   const runV = (P, stairs) => { const s0 = S.find((x) => !!x.stairs === stairs && !x.obs && !x.puddle); me.run = true; me.hopT = 0; me.v = 2; for (let i = 0; i < 60; i++) { me.dist = s0.i * SEG + 1; g._stepLocal(me, P, 0, 0.05, false); } return me.v; };
   const r100 = runV(100, false), r250 = runV(250, false), rTrap = runV(250, true);
   assert.ok(r250 <= 2.79 && r250 > 2.7 && r100 < r250 * 0.6 && r100 > 0.5 && rTrap < r250, `rennen: 100 W ${r100.toFixed(2)}, 250 W ${r250.toFixed(2)}, trap ${rTrap.toFixed(2)}`);
