@@ -1434,7 +1434,7 @@ function hud(dt) {
   setText($('h-tot'), `${(r.stats.km || 0).toFixed(2)} km · ${Math.round(r.stats.hm || 0)} hm`);
   setText($('h-item-n'), me.item ? ITEMS[me.item].name : 'spatie');
   $('h-hop').classList.toggle('hidden', !r.track.m7); // veldrit: de knop laat zien wat hij nu doet
-  if (r.track.m7) { const a = r._cxAhead(me); setText($('h-hop'), me.run ? '🚲' : a.stairs != null || (a.plank != null && me.v < JUMP_V) ? '🏃' : '🐇'); }
+  if (r.track.m7) { const a = r._cxAhead(me); setText($('h-hop'), me.run ? '🚲' : a.stairs != null || me.v < JUMP_V ? '🏃' : '🐇'); }
   const d = $('h-delta');
   if (r.ghostDelta != null) {
     setText(d, `${fmtDelta(r.ghostDelta)} vs PR ${r.ghostLabel}`);

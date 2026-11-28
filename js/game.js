@@ -1005,14 +1005,13 @@ export class Race {
     return { plank, stairs };
   }
   _cxClear(r) { const a = this._cxAhead(r); return (a.plank == null || a.plank > 3) && (a.stairs == null || a.stairs > 3); } // hier mag je weer opstappen
-  // Bij een balk: snel genoeg = springen, anders afstappen. Bij een trap: afstappen. Al aan het rennen: weer opstappen.
+  // Overal: snel genoeg = springen, langzamer = afstappen (je kunt dus ook het hele parcours rennen). Bij een trap: afstappen. Al aan het rennen: weer opstappen.
   hop(r = this.me) {
     if (!this.track.m7 || !r || r.finished || this.state !== 'race' || r.hopT > 0 || r.hopCd > 0) return;
     const a = this._cxAhead(r), me = r === this.me;
     if (r.run) { r.run = false; r.remountT = 0.3; r.hopCd = 0.3; if (me) this.emit('sfx', 'tick'); return; } // opstappen kan altijd; vlak voor een balk of de trap volgt dan gewoon de klap
-    if (a.stairs != null || (a.plank != null && r.v < JUMP_V)) { r.run = true; r.hopCd = 0.3; r.v = Math.min(r.v, RUN_V + 1.2); if (me) this.emit('sfx', 'tick'); return; }
-    if (r.v < JUMP_V) return;
-    r.hopT = AIR; r.hopAge = 0; r.hopCd = AIR + 0.05; // kort: bij de dubbele balk spring je twee keer vlak na elkaar
+    if (a.stairs != null || r.v < JUMP_V) { r.run = true; r.hopCd = 0.3; r.v = Math.min(r.v, RUN_V + 1.2); if (me) this.emit('sfx', 'tick'); return; }
+    r.hopT = AIR; // snel genoeg: springen (overal, niet alleen bij een balk) r.hopAge = 0; r.hopCd = AIR + 0.05; // kort: bij de dubbele balk spring je twee keer vlak na elkaar
     if (me) this.emit('sfx', 'hop');
   }
   // Tegen een balk of de trap op fietsen: een klap zoals de Muur, daarna ren je verder (opstappen met de knop).
