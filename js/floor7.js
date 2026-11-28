@@ -35,6 +35,7 @@ export const M7 = {
       // details per ondergrond
       if (s.surf === 'grass' || s.surf === 'mud') for (const l of [-0.2, 0.2]) quad(d0, d1 - 0.4, l * s.wA - 0.035, l * s.wA + 0.035, s.surf === 'mud' ? 'rgba(20,10,5,.5)' : 'rgba(60,45,25,.45)'); // bandensporen
       if (s.surf === 'mud' || s.surf === 'sand') for (let i = 0; i < 18; i++) { const [x, y] = at(d0 + rnd() * SEG, (rnd() * 2 - 1) * s.wA * 0.9); c.fillStyle = s.surf === 'mud' ? `rgba(15,8,4,${0.3 + rnd() * 0.3})` : rnd() < 0.5 ? 'rgba(255,240,200,.35)' : 'rgba(120,90,40,.35)'; c.beginPath(); c.arc(TX(x), TY(y), 1 + rnd() * 2.5, 0, 7); c.fill(); }
+      if (s.cobble) for (const sd of [-1, 1]) quad(d0, d1, sd * (s.wA - 0.14), sd * s.wA, th.road[0]); // glad gootje langs de rand
       if (s.surf === 'cobble') for (let r = 0; r < 5; r++) for (let q = -3; q < 3; q++) if ((r + q) & 1) quad(d0 + r, d0 + r + 1, (q / 3) * s.wA, ((q + 1) / 3) * s.wA, 'rgba(255,255,255,.12)');
       if (s.surf === 'asphalt' && s.i % 2 === 0) quad(d0, d0 + 2.5, -0.012, 0.012, th.lane);
       if (s.pad) { quad(d0, d1, s.pad.x - s.pad.w, s.pad.x + s.pad.w, '#16c98a'); quad(d0 + 1, d0 + 2.5, s.pad.x - s.pad.w * 0.7, s.pad.x + s.pad.w * 0.7, '#39ffb0'); }

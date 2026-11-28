@@ -1314,6 +1314,8 @@ test('Maanhoven: sneeuwnachtcross met de Kuil en een schuine kant waar je afglij
     assert.ok(Math.hypot(a.wx - b.wx, a.wy - b.wy) - (a.wA + b.wA) * 4.5 > 1.5, `legs ${a.leg} en ${b.leg} te dicht`);
   }
   assert.ok(Math.min(...S.map((s) => s.y1)) < -4, 'de Kuil gaat diep');
+  const kz = tr.zones.find((z) => z.type === 'cobble'); assert.ok(kz && kz.name === 'Maankeien' && S[kz.start / SEG].cobble, 'kasseienstrook de Maankeien');
+  assert.ok(!tr.objects.some((o) => tr.segAt(o.d).cobble), 'geen boxen of blitzjes op de keien');
   assert.ok(S.some((s) => s.stairs && s.y1 < -1), 'de trap uit de Kuil');
   const cs = S.find((s) => s.camber > 0.4);
   assert.ok(cs, 'schuine kant');

@@ -180,6 +180,14 @@ export function buildCx(def) {
     segs[(z.start / SEG) % n].arch = { text: z.name.toUpperCase(), color: z.type === 'sprint' ? '#39ffb0' : '#ff7b1c' };
     if (z.type === 'sprint') segs[(z.end / SEG - 1) % n].arch = { text: 'EINDE SPRINT', color: '#f5f5ff' };
   }
+  // Kasseienstroken zoals op de wegbanen: glad gootje langs de randen, eigen klassement (Gouden Kassei) en bogen.
+  const cobbles = (def.cobbles || []).map((c) => { const start = Math.round(legD(c.leg, c.from) / SEG) * SEG, end = Math.round(legD(c.leg, c.to) / SEG) * SEG; return { name: c.name, start, end, len: end - start, stars: c.stars || 3 }; });
+  for (const c of cobbles) {
+    for (let k = c.start / SEG; k < c.end / SEG; k++) { const s = segs[k % n]; s.cobble = true; s.surf = 'cobble'; s.zone = 'cobble'; }
+    zones.push({ id: c.name.toLowerCase(), type: 'cobble', name: c.name, start: c.start, end: c.end, stars: c.stars });
+    segs[(c.start / SEG) % n].arch = { text: `KASSEIEN · ${c.name.toUpperCase()} ${'★'.repeat(c.stars)}`, color: '#d9d2e6' };
+    segs[(c.end / SEG - 1) % n].arch = { text: 'EINDE KASSEIEN', color: '#f5f5ff' };
+  }
   segs[0].arch = { text: 'START · FINISH', color: '#ff3fa4' };
   // Obstakels (zelfde vorm als bij de gewone banen; block = je kunt er niet doorheen)
   const obstacles = (def.obs || []).map((o) => {
@@ -196,7 +204,7 @@ export function buildCx(def) {
   // Items: rijtjes boxen, blitzjes in slalom, turbostroken
   const objects = [];
   const wAt = (d) => { const m = mod(d, total), s = segs[Math.floor(m / SEG) % n]; return s.wA + (s.wB - s.wA) * ((m % SEG) / SEG); };
-  const add = (type, d, x) => { d = mod(d, total); if (inObs(d, x) || segs[Math.floor(d / SEG) % n].y1 > 0.2) return; const o = { id: objects.length, type, d, x }; objects.push(o); segs[Math.floor(d / SEG) % n].objs.push(o); };
+  const add = (type, d, x) => { d = mod(d, total); if (segs[Math.floor(d / SEG) % n].cobble || inObs(d, x) || segs[Math.floor(d / SEG) % n].y1 > 0.2) return; const o = { id: objects.length, type, d, x }; objects.push(o); segs[Math.floor(d / SEG) % n].objs.push(o); };
   for (const [leg, m] of def.boxes || []) { const d = legD(leg, m), w = wAt(d) * 0.7; for (const f of [-1, -1 / 3, 1 / 3, 1]) add('box', d, f * w); }
   for (const [leg, m] of def.bolts || []) { const d0 = legD(leg, m), side = rng() < 0.5 ? 1 : -1; for (let b = 0; b < 5; b++) { const d = d0 + b * 9; add('bolt', d, side * (b % 2 ? -1 : 1) * wAt(d) * 0.55); } }
   for (const [leg, m, x] of def.pads || []) {
@@ -229,7 +237,7 @@ export function buildCx(def) {
   const minY = Math.min(...segs.map((s) => s.wy)) - 50, maxY = Math.max(...segs.map((s) => s.wy)) + 50;
   return {
     id: def.id, name: def.name, desc: def.desc, theme: def.theme, music: def.music,
-    segs, n, length: total, zones, objects, cut: null, cobbles: [], obstacles, m7: true, free, bounds: { minX, maxX, minY, maxY }, step,
+    segs, n, length: total, zones, objects, cut: null, cobbles, obstacles, m7: true, free, bounds: { minX, maxX, minY, maxY }, step,
     obsAt(d, x) { const o = this.segAt(d).obs; return o && o.block && Math.abs(x - o.x) < o.w ? o : null; },
     wAt,
     segAt(d) { return segs[Math.floor(mod(d, total) / SEG) % n]; },
@@ -265,7 +273,7 @@ export const SNOW_DEF = {
     fog: '#22305a',
     tape: ['#ff3fa4', '#7df9ff'],
     bank: ['#bac5d9', '#a6b2ca'], // sneeuwhellingen en de wanden van de kuil
-    surf: { asphalt: '#3a3f50', cobble: '#6a6478', grass: '#9aa4b8', mud: '#5d544c', sand: '#cdb88f', wood: '#7a5a42' },
+    surf: { asphalt: '#3a3f50', cobble: '#7a8296', grass: '#9aa4b8', mud: '#5d544c', sand: '#cdb88f', wood: '#7a5a42' },
   },
   wp: [
     [-5, 0, 6, { s: 'asphalt', w: 0.75 }], // 0: Maanstraat, onder de lichtmasten
@@ -298,6 +306,7 @@ export const SNOW_DEF = {
     { leg: 6, pts: [[24, 0], [33, -4.5], [45, -4.5], [53, 0]], name: 'De Kuil', zone: [45, 53] }, // steil naar beneden, de trap weer op (klassement: de trap)
   ],
   camber: [{ leg: 7, from: 6, to: 50, s: 0.45 }], // links hoger, rechts (oost) lager
+  cobbles: [{ leg: 19, from: 3, to: 53, name: 'Maankeien', stars: 3 }], // ijzige keien, met een glad gootje langs de rand
   obs: [
     { leg: 6, at: 45, len: 8, type: 'stairs' },
     { leg: 6, at: 37, len: 5, type: 'puddle', x: 0.05, w: 0.22 },
@@ -314,8 +323,8 @@ export const SNOW_DEF = {
     props: [[0, 30, 1, 'frites', 3], [0, 80, 1, 'frites', 3], [6, 30, -1, 'snowman', 4], [19, 30, 1, 'snowman', 3]],
   },
   start: 45,
-  boxes: [[0, 92], [5, 60], [19, 20], [9, 6]],
-  bolts: [[0, 72], [15, 10], [19, 40]],
-  pads: [[0, 58, 0], [15, 30, 0], [19, 52, 0]],
+  boxes: [[0, 92], [5, 60], [15, 24], [9, 6]],
+  bolts: [[0, 72], [15, 4], [17, 30]],
+  pads: [[0, 58, 0], [14, 20, 0], [24, 2, 0]],
   sprint: { leg: 0, from: 55, to: 125, name: 'Maanstraat' },
 };

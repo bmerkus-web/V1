@@ -347,11 +347,11 @@ export class Race {
     // Veldrit: ondergrond (zand, modder, gras…) remt en laat het stuur wiebelen; door een plas spat het.
     const sf = this.track.m7 ? (r.berm ? 'grass' : seg.surf) : null, pud = sf && seg.puddle && Math.abs(r.x - seg.puddle.x) < seg.puddle.w;
     if (pud && !r.inPuddle && r === this.me) this.emit('shake', 3);
-    r.inPuddle = !!pud; r.surf = sf; r.surfK = sf ? SURF[sf].k * (pud ? 1.4 : 1) : 1; // rennen: zwaar, hoe minder vermogen hoe trager
+    r.inPuddle = !!pud; r.surf = sf; r.surfK = sf ? (seg.cobble ? 1 : SURF[sf].k) * (pud ? 1.4 : 1) : 1; // kasseienstrook: zoals op de wegbanen (trager midden op de stenen, gootje glad) // rennen: zwaar, hoe minder vermogen hoe trager
     if (sf && seg.camber && !r.run) r.x += seg.camber * CAMBER_PUSH * SURF[sf].slip * (pud ? 1.3 : 1) * dt; // schuine kant: je glijdt naar de lage kant (rennend niet)
     if (sf) { const wob = SURF[sf].wob + (pud ? 0.25 : 0); if (wob) r.x += (Math.sin(this.clock * 7.3 + r.dist * 0.9) * 0.6 + Math.sin(this.clock * 13.1 + r.dist)) * wob * dt; }
     if (r.onCobble) r.x += (Math.sin(this.clock * 9.1 + r.dist * 0.7) * 0.18 + Math.sin(this.clock * 15.7 + r.dist) * 0.1) * dt; // stuur wiebelt op de stenen
-    if ((r.onCobble || r.inGutter) && !this.free && !r.finished && this.rng() < (r.onCobble ? COBBLE_FLAT : GUTTER_FLAT) * dt) this._flat(r, 'kasseien');
+    if ((r.onCobble || r.inGutter) && !this.free && !r.finished && this.rng() < (r.onCobble ? COBBLE_FLAT : GUTTER_FLAT) * (this.track.m7 ? 0.3 : 1) * dt) this._flat(r, 'kasseien'); // veldrit: tubes
     // Lek uit de berm: de kans groeit met elke keer in de berm én met de tijd erin.
     if (!this.free && !r.finished) {
       if (r.berm && !wasBerm) r.bermWear += 1;
