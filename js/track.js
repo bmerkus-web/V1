@@ -1,6 +1,6 @@
 // Banen: opgebouwd uit secties [lengte m, bocht, helling %, zone].
 import { mulberry, hashStr, mod } from './util.js';
-import { buildCx, CX_DEF } from './cx.js';
+import { buildCx, CX_DEF, SNOW_DEF } from './cx.js';
 
 export const SEG = 5; // meter per wegsegment
 export const ROAD_W = 4.5;
@@ -106,6 +106,7 @@ export const TRACK_DEFS = [
     ],
   },
   CX_DEF,
+  SNOW_DEF,
 ];
 
 function blur(arr, win) {

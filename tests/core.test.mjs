@@ -1303,3 +1303,33 @@ test('Zwift-knop wakker houden: meet de slaaptijd, seintje 10 s eerder, stopt al
   pad._onDisconnect(); // toch in slaap terwijl er net een seintje was
   assert.equal(pad.wake.bad, true);
 });
+
+test('Maanhoven: sneeuwnachtcross met de Kuil en een schuine kant waar je afglijdt', async () => {
+  const { Race } = await import('../js/game.js');
+  const tr = getTrack('maanhoven'), S = tr.segs;
+  assert.ok(tr.m7 && tr.length > 950 && tr.theme.snow);
+  for (let i = 0; i < tr.n; i++) for (let j = i + 6; j < tr.n; j++) {
+    if (Math.abs(i - j) > tr.n - 6) continue;
+    const a = S[i], b = S[j]; if (a.open || b.open || Math.max(a.y1, b.y1) > 1) continue;
+    assert.ok(Math.hypot(a.wx - b.wx, a.wy - b.wy) - (a.wA + b.wA) * 4.5 > 1.5, `legs ${a.leg} en ${b.leg} te dicht`);
+  }
+  assert.ok(Math.min(...S.map((s) => s.y1)) < -4, 'de Kuil gaat diep');
+  assert.ok(S.some((s) => s.stairs && s.y1 < -1), 'de trap uit de Kuil');
+  const cs = S.find((s) => s.camber > 0.4);
+  assert.ok(cs, 'schuine kant');
+  const lo = tr.world(cs.i * SEG, 0.3).z, hi = tr.world(cs.i * SEG, -0.3).z;
+  assert.ok(hi - lo > 0.4, 'de linkerkant ligt hoger');
+  const g = new Race({ track: tr, laps: 2, seed: 5, room: null, isHost: true, ns: 'demo', riders: [{ id: 'p0', name: 'Ik', color: '#fff', kind: 'me' }, { id: 'b0', name: 'Bot', color: '#000', kind: 'bot', skill: 0.5 }],
+    profile: { ftp: 200, fair: true, weight: 75, assist: false, trainerFeel: 50 }, difficulty: 'normaal', ghost: null,
+    getPower: () => ({ power: 200, cadence: 90 }), getSteer: () => 0, emit: () => {} });
+  g.countdown = 0; g.update(0.04); g.time = 10;
+  const [me, bot] = g.riders;
+  me.dist = cs.i * SEG; me.x = 0; me.v = 6; for (let i = 0; i < 10; i++) { g._stepLocal(me, 200, 0, 0.05, false); me.dist = cs.i * SEG; }
+  assert.ok(me.x > 0.1, `zonder tegensturen glijd je naar rechts (${me.x.toFixed(2)})`);
+  me.x = 0; me.run = true; for (let i = 0; i < 10; i++) { g._stepLocal(me, 200, 0, 0.05, false); me.dist = cs.i * SEG; }
+  assert.ok(Math.abs(me.x) < 0.05, 'rennend glijd je niet weg'); me.run = false;
+  // een bot houdt de hoge kant aan en blijft op de baan
+  me.dist = 99999; const c0 = S.findIndex((s) => s.camber > 0.05); bot.dist = c0 * SEG - 20; bot.x = 0; bot.v = 6;
+  let berm = 0, n = 0; while (bot.dist < c0 * SEG + 50 && n < 4000) { g._bot(bot, 0.02); if (bot.berm) berm++; n++; }
+  assert.ok(berm < 20, `bot ${berm} keer in de berm op de schuine kant`);
+});

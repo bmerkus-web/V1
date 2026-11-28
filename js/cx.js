@@ -6,13 +6,14 @@ import { mulberry, hashStr, mod } from './util.js';
 
 const SEG = 5, ROAD_W = 4.5; // zelfde als track.js (niet importeren: dat zou een kringverwijzing geven)
 export const SURF = { // weerstand (x de gewone rolweerstand), extra gevoel op de trainer, wiebelen van het stuur
-  asphalt: { k: 1, feel: 0, wob: 0 },
-  cobble: { k: 1.6, feel: 2, wob: 0.12 },
-  grass: { k: 2.4, feel: 1, wob: 0.03 },
-  mud: { k: 3.6, feel: 2.5, wob: 0.16 },
-  sand: { k: 4.4, feel: 3.5, wob: 0.22 },
-  wood: { k: 1.2, feel: 0, wob: 0 },
+  asphalt: { k: 1, feel: 0, wob: 0, slip: 0.5 },
+  cobble: { k: 1.6, feel: 2, wob: 0.12, slip: 0.8 },
+  grass: { k: 2.4, feel: 1, wob: 0.03, slip: 1 },
+  mud: { k: 3.6, feel: 2.5, wob: 0.16, slip: 1.6 },
+  sand: { k: 4.4, feel: 3.5, wob: 0.22, slip: 1.3 },
+  wood: { k: 1.2, feel: 0, wob: 0, slip: 0.7 },
 };
+export const CAMBER_PUSH = 0.7; // schuine kant: zo hard trekt de helling je opzij (halve wegbreedtes per seconde per eenheid helling, x de gladheid)
 export const STAIRS_V = 2.4; // trappen: lopen met de fiets op de schouder (m/s)
 export const PLANK_V = 4.2; // (niet meer gebruikt voor de speler: zie springen/afstappen)
 // Springen en afstappen (één knop): snel genoeg bij een balk = springen; langzamer, of bij een trap = afstappen
@@ -30,7 +31,7 @@ const smooth = (k) => k * k * (3 - 2 * k);
 export const CX_DEF = {
   id: 'modder',
   name: 'Moddermolen',
-  desc: 'Veldrit (test): smal, bochtig, zand, modder, balken, een trap en een brug.',
+  desc: 'Veldrit: smal, bochtig, zand, modder, balken, een trap en een brug.',
   cx: true,
   music: 'kosmo',
   theme: {
@@ -87,6 +88,7 @@ export const CX_DEF = {
     { leg: 16, at: 12, len: 2.5, type: 'tyres', x: -0.2, w: 0.16 }, { leg: 16, at: 22, len: 2.5, type: 'tyres', x: 0.2, w: 0.16 }, { leg: 16, at: 32, len: 2.5, type: 'tyres', x: -0.2, w: 0.16 },
     { leg: 23, at: 30, len: 4, type: 'bale', x: 0.18, w: 0.14 }, { leg: 23, at: 55, type: 'plank' },
   ],
+  decor: { crowd: [[1, 6, 30], [14, 2, 28], [7, 4, 22], [3, 4, 30], [11, 4, 50], [9, 6, 60], [16, 4, 46]], props: [[0, 30, 1, 'frites', 3], [23, 70, -1, 'frites', 2]] },
   boxes: [[0, 92], [9, 28], [16, 42], [23, 14]],
   bolts: [[0, 75], [17, 4], [23, 64]],
   pads: [[0, 58, 0], [9, 54, 0.15], [23, 78, 0]],
@@ -153,6 +155,12 @@ export function buildCx(def) {
     if (hf.open) for (let k = Math.floor(legD(hf.leg, hf.open[0]) / SEG); k < Math.ceil(legD(hf.leg, hf.open[1]) / SEG); k++) open[k % n] = 1; // elk segment dat (deels) boven het lagere stuk ligt
   }
   y[n] = y[0];
+  // Schuine kant: dwarshelling per segment (meter per meter; > 0 = rechts ligt lager), met een zachte in- en uitloop.
+  const camber = new Float32Array(n);
+  for (const cf of def.camber || []) {
+    const d0 = legD(cf.leg, cf.from), d1 = legD(cf.leg, cf.to);
+    for (let k = Math.floor(d0 / SEG); k < Math.ceil(d1 / SEG); k++) { const d = k * SEG + SEG / 2, e = Math.min(1, (d - d0) / 10, (d1 - d) / 10); if (e > 0) camber[k % n] = cf.s * smooth(e); }
+  }
   const segs = [];
   for (let k = 0; k < n; k++) {
     const p = pts[k], q = pts[k + 1];
@@ -160,13 +168,13 @@ export function buildCx(def) {
     segs.push({
       i: k, curve: Math.max(-3, Math.min(3, kap * 19)), grade: Math.max(-10, Math.min(10, ((y[k + 1] - y[k]) / step) * 100)), y1: y[k], y2: y[k + 1], // steile stukjes: op de trainer hooguit 10%
       sprites: [], objs: [], zone: null, pad: null, arch: null, scr: {}, wA: width[k], wB: width[(k + 1) % n], cobble: false,
-      surf: open[k] ? 'wood' : legProps[p.leg].s, wx: p.x, wy: p.y, hd: p.h, open: !!open[k], leg: p.leg,
+      surf: open[k] ? 'wood' : legProps[p.leg].s, wx: p.x, wy: p.y, hd: p.h, open: !!open[k], leg: p.leg, camber: camber[k],
     });
   }
   // Zones en bogen
   const zones = [];
   if (def.sprint) { const s = def.sprint; zones.push({ id: s.name.toLowerCase(), type: 'sprint', name: s.name, start: Math.round(legD(s.leg, s.from) / SEG) * SEG, end: Math.round(legD(s.leg, s.to) / SEG) * SEG }); }
-  for (const hf of def.heights || []) if (hf.name && !hf.open) zones.push({ id: hf.name.toLowerCase(), type: 'climb', name: hf.name, start: Math.round(legD(hf.leg, hf.pts[0][0]) / SEG) * SEG, end: Math.round(legD(hf.leg, hf.pts[2][0]) / SEG) * SEG });
+  for (const hf of def.heights || []) if (hf.name && !hf.open) { const [z0, z1] = hf.zone || [hf.pts[0][0], hf.pts[2][0]]; zones.push({ id: hf.name.toLowerCase(), type: 'climb', name: hf.name, start: Math.round(legD(hf.leg, z0) / SEG) * SEG, end: Math.round(legD(hf.leg, z1) / SEG) * SEG }); }
   for (const z of zones) {
     for (let k = z.start / SEG; k < z.end / SEG; k++) segs[k % n].zone = z.type;
     segs[(z.start / SEG) % n].arch = { text: z.name.toUpperCase(), color: z.type === 'sprint' ? '#39ffb0' : '#ff7b1c' };
@@ -200,17 +208,21 @@ export function buildCx(def) {
   const clear = (x, yy, m) => segs.every((s) => Math.hypot(s.wx - x, s.wy - yy) > s.wA * ROAD_W + m);
   const free = [];
   // Plaatjes draaien altijd naar je toe: houd de hele breedte (plus wat ruimte) vrij van élk stuk parcours.
-  const SIZE = { crowd: 3, billboard: 9, frites: 6 };
+  const SIZE = { crowd: 3, billboard: 9, frites: 6, snowman: 2, pine: 5 };
+  const minX0 = Math.min(...segs.map((s) => s.wx)), maxX0 = Math.max(...segs.map((s) => s.wx)), minY0 = Math.min(...segs.map((s) => s.wy)), maxY0 = Math.max(...segs.map((s) => s.wy));
   const near = (k, side, sp, extra = 0) => {
+    if (!SIZE[sp]) SIZE[sp] = 3;
     const s = segs[k % n], half = SIZE[sp] / 2, o = side * (s.wA * ROAD_W + 0.9 + half + extra), x = s.wx + Math.cos(s.hd) * o, yy = s.wy - Math.sin(s.hd) * o;
     if (s.y1 < 0.2 && clear(x, yy, half + 0.7)) free.push({ k: sp, x, y: yy });
   };
   const legK = (leg, m) => Math.floor(legD(leg, m) / SEG);
-  for (let m = 4; m < 125; m += 4) { near(legK(0, m), -1, 'crowd'); if (m % 8 === 4) near(legK(0, m), 1, m % 32 === 4 ? 'billboard' : 'crowd'); }
-  for (const [leg, a, b] of [[1, 6, 30], [14, 2, 28], [7, 4, 22], [3, 4, 30], [11, 4, 50], [9, 6, 60], [16, 4, 46]]) for (let m = a; m < b; m += 4) near(legK(leg, m), leg % 2 ? 1 : -1, 'crowd');
-  near(legK(0, 30), 1, 'frites', 3); near(legK(23, 70), -1, 'frites', 2);
-  for (let i = 0; i < 260; i++) { // bomen en lichtmasten verspreid over het veld en eromheen
-    const x = -40 + rng() * 225, yy = -30 + rng() * 165, k = rng() < 0.12 ? 'lamp' : 'oak';
+  const D = def.decor || {};
+  for (let m = 4; m < (D.straight ?? 125); m += 4) { near(legK(0, m), -1, 'crowd'); if (m % 8 === 4) near(legK(0, m), 1, m % 32 === 4 ? 'billboard' : 'crowd'); }
+  for (const [leg, a, b, side] of D.crowd || []) for (let m = a; m < b; m += 4) near(legK(leg, m), side ?? (leg % 2 ? 1 : -1), 'crowd');
+  for (const [leg, m, side, k, extra] of D.props || []) near(legK(leg, m), side, k, extra);
+  const trees = D.trees || ['oak'];
+  for (let i = 0; i < (D.n ?? 260); i++) { // bomen en lichtmasten verspreid over het veld en eromheen
+    const x = minX0 - 40 + rng() * (maxX0 - minX0 + 80), yy = minY0 - 30 + rng() * (maxY0 - minY0 + 60), k = rng() < (D.lamps ?? 0.12) ? 'lamp' : trees[Math.floor(rng() * trees.length)];
     if (clear(x, yy, 6)) free.push({ k, x, y: yy });
   }
   const minX = Math.min(...segs.map((s) => s.wx)) - 50, maxX = Math.max(...segs.map((s) => s.wx)) + 50;
@@ -226,8 +238,84 @@ export function buildCx(def) {
     world(d, lat = 0) {
       const m = mod(d, total), k = Math.floor(m / SEG) % n, t = (m % SEG) / SEG, s = segs[k], q = segs[(k + 1) % n];
       const h = s.hd + wrap(q.hd - s.hd) * t, o = lat * ROAD_W;
-      return { x: s.wx + (q.wx - s.wx) * t + Math.cos(h) * o, y: s.wy + (q.wy - s.wy) * t - Math.sin(h) * o, z: s.y1 + (s.y2 - s.y1) * t, h };
+      return { x: s.wx + (q.wx - s.wx) * t + Math.cos(h) * o, y: s.wy + (q.wy - s.wy) * t - Math.sin(h) * o, z: s.y1 + (s.y2 - s.y1) * t - (s.camber + (q.camber - s.camber) * t) * o, h }; // schuine kant: rechts lager bij camber > 0
     },
     climbTotal: segs.reduce((s, g) => s + Math.max(0, g.y2 - g.y1), 0),
   };
 }
+
+// Maanhoven: nachtcross in de sneeuw, met witte duinen, de Kuil en een schuine kant langs de bosrand.
+export const SNOW_DEF = {
+  id: 'maanhoven',
+  name: 'Maanhoven',
+  desc: 'Nachtcross in de sneeuw: witte duinen, de Kuil in en uit, en een gladde schuine kant langs het bos.',
+  cx: true,
+  music: 'kosmo',
+  theme: {
+    sky: ['#01020a', '#08112b', '#16264d', '#2f4a78'],
+    sun: '#eef4ff', // de maan
+    stars: true,
+    snow: true,
+    bg: 'mountains',
+    bgColor: ['#5d6d90', '#3c4a6b'],
+    grass: ['#cdd6e6', '#c2ccde'],
+    road: ['#3a3f50', '#34394a'],
+    rumble: ['#ff3fa4', '#f5f5ff'],
+    lane: '#ffd166',
+    fog: '#22305a',
+    tape: ['#ff3fa4', '#7df9ff'],
+    bank: ['#bac5d9', '#a6b2ca'], // sneeuwhellingen en de wanden van de kuil
+    surf: { asphalt: '#3a3f50', cobble: '#6a6478', grass: '#9aa4b8', mud: '#5d544c', sand: '#cdb88f', wood: '#7a5a42' },
+  },
+  wp: [
+    [-5, 0, 6, { s: 'asphalt', w: 0.75 }], // 0: Maanstraat, onder de lichtmasten
+    [140, 0, 8, { s: 'sand', w: 0.45 }], // 1: Witte Duinen, noord
+    [140, 72, 6, { s: 'grass', w: 0.4 }],
+    [128, 72, 6, { s: 'sand', w: 0.38 }], // 3: duinen, zuid
+    [128, 20, 6, { s: 'grass', w: 0.4 }],
+    [116, 20, 6, { s: 'sand', w: 0.42 }], // 5: het lange duin, noord
+    [116, 95, 7, { s: 'grass', w: 0.42 }], // 6: west, de Kuil in en uit
+    [20, 95, 6, { s: 'grass', w: 0.38 }], // 7: zuid, de schuine kant langs het bos
+    [20, 30, 6, { s: 'grass', w: 0.4 }],
+    [45, 30, 5, { s: 'mud', w: 0.36 }], // 9: slingers door de sneeuwbrij
+    [45, 80, 5, { s: 'grass', w: 0.4 }],
+    [57, 80, 5, { s: 'grass', w: 0.36 }], // 11: de balken
+    [57, 30, 5, { s: 'grass', w: 0.4 }],
+    [69, 30, 5, { s: 'mud', w: 0.36 }],
+    [69, 80, 5, { s: 'grass', w: 0.4 }],
+    [81, 80, 5, { s: 'grass', w: 0.38 }],
+    [81, 30, 5, { s: 'grass', w: 0.4 }],
+    [93, 30, 5, { s: 'mud', w: 0.36 }],
+    [93, 80, 5, { s: 'grass', w: 0.4 }],
+    [105, 80, 5, { s: 'grass', w: 0.42 }], // 19: lang naar het zuiden
+    [105, 15, 6, { s: 'grass', w: 0.42 }], // 20: west terug, slalom
+    [62, 11, 4], [44, 18, 4], [26, 11, 4],
+    [-5, 15, 6, { s: 'grass', w: 0.45 }], // 24: naar de finish
+  ],
+  heights: [
+    { leg: 1, pts: [[6, 0], [11, 1.8], [15, 1.8], [20, 0], [26, 0], [31, 2.2], [34, 2.2], [39, 0], [46, 0], [50, 1.5], [53, 1.5], [57, 0]] }, // duintoppen
+    { leg: 5, pts: [[8, 0], [16, 2.6], [22, 2.6], [30, 0], [38, 0], [44, 1.6], [48, 1.6], [54, 0]], name: 'Witte Duinen' },
+    { leg: 6, pts: [[24, 0], [33, -4.5], [45, -4.5], [53, 0]], name: 'De Kuil', zone: [45, 53] }, // steil naar beneden, de trap weer op (klassement: de trap)
+  ],
+  camber: [{ leg: 7, from: 6, to: 50, s: 0.45 }], // links hoger, rechts (oost) lager
+  obs: [
+    { leg: 6, at: 45, len: 8, type: 'stairs' },
+    { leg: 6, at: 37, len: 5, type: 'puddle', x: 0.05, w: 0.22 },
+    { leg: 7, at: 28, len: 6, type: 'puddle', x: 0.1, w: 0.2 },
+    { leg: 11, at: 14, type: 'plank' }, { leg: 11, at: 18, type: 'plank' },
+    { leg: 13, at: 12, len: 4, type: 'bale', x: 0.12, w: 0.13 },
+    { leg: 17, at: 20, len: 4, type: 'bale', x: -0.12, w: 0.13 },
+    { leg: 20, at: 10, len: 2.5, type: 'tyres', x: -0.2, w: 0.16 }, { leg: 20, at: 22, len: 2.5, type: 'tyres', x: 0.2, w: 0.16 },
+    { leg: 22, at: 6, len: 1.2, type: 'log', x: -0.16, w: 0.2 },
+  ],
+  decor: {
+    trees: ['pine', 'pine', 'pine', 'snowman'], lamps: 0.18, n: 320,
+    crowd: [[1, 4, 60], [6, 18, 60, -1], [6, 18, 60, 1], [7, 4, 50, -1], [11, 6, 40], [19, 6, 50, 1], [20, 6, 36, 1]],
+    props: [[0, 30, 1, 'frites', 3], [0, 80, 1, 'frites', 3], [6, 30, -1, 'snowman', 4], [19, 30, 1, 'snowman', 3]],
+  },
+  start: 45,
+  boxes: [[0, 92], [5, 60], [19, 20], [9, 6]],
+  bolts: [[0, 72], [15, 10], [19, 40]],
+  pads: [[0, 58, 0], [15, 30, 0], [19, 52, 0]],
+  sprint: { leg: 0, from: 55, to: 125, name: 'Maanstraat' },
+};

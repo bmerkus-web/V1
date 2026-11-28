@@ -77,6 +77,7 @@ Uit het plan van 18 november. Volgorde is de voorgestelde volgorde.
 
 ## Gedaan (recent)
 
+- ❄️ Nieuwe veldrit Maanhoven (1 km): nachtcross in de sneeuw met vallende sneeuw, maan, dennen en sneeuwpoppen; Witte Duinen, de Kuil (4,5 m diep, trap eruit = klimklassement), schuine kant langs het bos (je glijdt naar de lage kant, harder in de sneeuwbrij, niet als je rent; bots houden de hoge kant aan). Baanbouwer: decor, dwarshelling en kuilen per baan instelbaar
 - 🦘 Veldrit: springen/afstappen/opstappen met één knop (B op de Zwift-knop, J, 🦘): snel genoeg = springen over de balken, langzamer of bij de trap = afstappen en rennen, nog eens = opstappen; vergeten = klap zoals de Muur. Bots doen mee. Elleboogje op de veldrit via 💪 of ↓ links
 - 🔊 Geluid ~20 dB harder (Clubsound van −41 naar −15 dB, Arcade van −45 naar −19 dB), met compressor en begrenzer; radio op de schuif tot vol volume
 - 🔋 Proef: Zwift-knop wakker houden (instelling). Meet de eerste keer na hoeveel tijd zonder knopdruk hij in slaap valt en stuurt daarna ~10 s eerder een seintje; valt hij toch in slaap, dan stopt de proef vanzelf. Uitkomst nog te testen met de Click v2.

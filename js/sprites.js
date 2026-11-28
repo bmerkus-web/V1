@@ -118,6 +118,18 @@ const P = {
     c.fillStyle = '#ffd166'; c.fillRect(w * 0.18, h * 0.5, w * 0.64, h * 0.2);
     c.fillStyle = '#7a2a10'; c.font = `bold ${h * 0.15}px sans-serif`; c.textAlign = 'center'; c.fillText('FRIETEN', w / 2, h * 0.65);
   } },
+  pine: { w: 5, h: 9, draw(c, w, h) { // besneeuwde den
+    c.fillStyle = '#2a1a14'; c.fillRect(w * 0.45, h * 0.82, w * 0.1, h * 0.18);
+    for (let i = 0; i < 4; i++) { const y0 = h * (0.08 + i * 0.2), y1 = y0 + h * 0.3, hw = w * (0.18 + i * 0.1);
+      c.fillStyle = '#0f3324'; c.beginPath(); c.moveTo(w / 2, y0); c.lineTo(w / 2 + hw, y1); c.lineTo(w / 2 - hw, y1); c.fill();
+      c.fillStyle = '#eef3ff'; c.beginPath(); c.moveTo(w / 2, y0); c.lineTo(w / 2 + hw * 0.55, y0 + h * 0.13); c.lineTo(w / 2 - hw * 0.55, y0 + h * 0.13); c.fill(); }
+  } },
+  snowman: { w: 2, h: 2.6, draw(c, w, h) {
+    c.fillStyle = '#f4f7ff'; for (const [y, r] of [[0.78, 0.36], [0.47, 0.27], [0.22, 0.19]]) { c.beginPath(); c.arc(w / 2, h * y, w * r, 0, 7); c.fill(); }
+    c.fillStyle = '#ff7b1c'; c.beginPath(); c.moveTo(w / 2, h * 0.22); c.lineTo(w * 0.78, h * 0.24); c.lineTo(w / 2, h * 0.26); c.fill();
+    c.fillStyle = '#111'; c.fillRect(w * 0.33, h * 0.02, w * 0.34, h * 0.08); c.fillRect(w * 0.25, h * 0.09, w * 0.5, h * 0.025);
+    c.fillStyle = '#ff3fa4'; c.fillRect(w * 0.3, h * 0.31, w * 0.4, h * 0.05);
+  } },
   oak: { w: 6, h: 8, draw(c, w, h) {
     c.fillStyle = '#2a1a14'; c.fillRect(w * 0.44, h * 0.55, w * 0.12, h * 0.45);
     c.fillStyle = '#123a24'; c.beginPath(); c.ellipse(w / 2, h * 0.4, w * 0.46, h * 0.36, 0, 0, 7); c.fill();
