@@ -78,7 +78,7 @@ export const M7 = {
     this.pitch7 = (this.pitch7 || 0) + (clamp(g / 100, -0.3, 0.3) * 0.45 * f - (this.pitch7 || 0)) * Math.min(1, dt * 3); // klimmen: je kijkt omhoog
     const hz = (this.hz = hz0 + this.pitch7);
     const cam = (this.cam7 = { x: rp.x - fx * back, y: rp.y - fy * back, h: CAM_H + this.camZ7, fx, fy, rx: fy, ry: -fx, f, hz, W });
-    this.tr7 = tr;
+    this.tr7 = tr; this.dt7 = dt;
     // lucht, zon en bergen draaien mee
     if (this.pitch7 > 0) { c.fillStyle = th.sky[0]; c.fillRect(0, 0, W, this.pitch7 + 1); }
     c.drawImage(this.bg.sky, 0, this.pitch7);
@@ -116,9 +116,13 @@ export const M7 = {
   },
 
   // Hoe schuin een renner in de bocht hangt (eenheden zoals sturen: 1 = 0,2 rad): eigen sturen plus de bocht zelf.
+  // Hellen in de bocht: alleen als reactie op je eigen sturen. Stuur je de bocht in, dan hang je schuiner naarmate
+  // de bocht scherper is (zacht opgebouwd, dus niet plotseling). Niet sturen = rechtop, zoals op de wegbanen.
   _lean7(r) {
     const tr = this.tr7, s = tr.segAt(r.dist), q = tr.segs[(s.i + 1) % tr.n], kap = wrap(q.hd - s.hd) / tr.step;
-    return clamp((r.steer || 0) + (Math.atan(((r.v || 0) ** 2 * kap) / 9.81) / 0.2) * 0.6, -1.8, 1.8);
+    r._kap7 = (r._kap7 ?? kap) + (kap - (r._kap7 ?? kap)) * Math.min(1, (this.dt7 || 0.016) * 4);
+    const st = r.steer || 0, into = Math.sign(st) === Math.sign(r._kap7) ? Math.min(1.2, Math.abs(r._kap7) * 5) : 0;
+    return clamp(st * (1 + into), -1.8, 1.8);
   },
 
   // Wereldpunt → scherm

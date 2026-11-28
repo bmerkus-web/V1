@@ -389,3 +389,8 @@ body.zen #zen-bg { display: block; }
 .h-acts button { width: clamp(48px, 9vh, 70px); height: clamp(48px, 9vh, 70px); border-radius: 50%; background: rgba(0, 0, 0, .5); border: 2px solid var(--line); font-size: clamp(22px, 4.5vh, 32px); padding: 0; }
 .h-acts button.tap { transform: scale(.92); }
 #h-hop { transition: transform .1s; }
+
+/* aanraakscherm: springknop groot, links naast de power-upknop (niet over de stand heen) */
+body.touchy .h-br { position: absolute; }
+body.touchy .h-acts { position: absolute; right: calc(100% + 10px); bottom: 0; flex-direction: column-reverse; }
+body.touchy .h-acts button { width: clamp(64px, 14vh, 96px); height: clamp(64px, 14vh, 96px); font-size: clamp(30px, 7vh, 44px); }
